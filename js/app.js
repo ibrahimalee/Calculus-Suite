@@ -28,7 +28,7 @@
 
     const MODES = {
         derivative: {
-            label: '∂ Derivative', icon: '∂',
+            label: 'Derivative', icon: '∂',
             input: () => ({ label: 'f(x)', placeholder: 'e.g. x^2 * sin(x)', hint: 'Differentiate any expression. Use another variable via the option below.' }),
             fields: [
                 { key: 'order', label: 'Order of derivative', type: 'number', def: '1', min: 1, max: 10 },
@@ -44,7 +44,7 @@
             ]
         },
         integral: {
-            label: '∫ Integral', icon: '∫',
+            label: 'Integral', icon: '∫',
             input: () => ({ label: 'f(x)', placeholder: 'e.g. x*e^x', hint: 'Leave both limits empty for an indefinite integral. Limits accept pi, e and inf.' }),
             fields: [
                 { key: 'method', label: 'Strategy', type: 'select', def: 'auto', options: [['auto', 'Auto (try everything)'], ['substitution', 'U-substitution'], ['parts', 'Integration by parts'], ['partial', 'Partial fractions (rational functions)'], ['cas', 'Computer algebra only']], show: v => !(v.lower || v.upper) },
@@ -63,7 +63,7 @@
             ]
         },
         series: {
-            label: 'Σ Taylor series', icon: 'Σ',
+            label: 'Taylor series', icon: 'Σ',
             input: () => ({ label: 'f(x)', placeholder: 'e.g. sin(x)', hint: 'Taylor polynomial about a point (Maclaurin series when a = 0).' }),
             fields: [
                 { key: 'point', label: 'Expansion point a', type: 'text', def: '0', placeholder: '0' },
@@ -79,7 +79,7 @@
             ]
         },
         limit: {
-            label: 'lim Limit', icon: 'lim',
+            label: 'Limits', icon: 'lim',
             input: () => ({ label: 'f(x)', placeholder: 'e.g. sin(x)/x', hint: 'Numerical limit analysis from both sides (also at ±∞).' }),
             fields: [
                 { key: 'point', label: 'x approaches', type: 'text', def: '0', placeholder: '0, pi, inf, -inf' },
@@ -96,7 +96,7 @@
             ]
         },
         analysis: {
-            label: '📈 Function analysis', icon: 'f',
+            label: 'Analysis', icon: 'f',
             input: () => ({ label: 'f(x)', placeholder: 'e.g. x^3 - 3x', hint: 'Finds roots, extrema, inflection points, asymptotes, monotonicity and concavity.' }),
             fields: [
                 { key: 'min', label: 'Search from x =', type: 'text', def: '-10' },
@@ -113,7 +113,7 @@
             ]
         },
         ode: {
-            label: '∂ Differential equations', icon: 'y′',
+            label: 'ODEs', icon: 'y′',
             input: v => ({
                 first: { label: "y′ = f(x, y)", placeholder: 'e.g. x + y   or   x*y   or   y*(1-y)', hint: 'Right-hand side of dy/dx. Linear and separable equations are solved in closed form; all are solved numerically.' },
                 second: { label: "y″ = f(x, y, yp)", placeholder: 'e.g. -y   or   -0.5*yp - 4*y', hint: 'Write y′ as yp. Constant-coefficient homogeneous equations also get a closed form.' },
@@ -139,7 +139,7 @@
             ]
         },
         multivariable: {
-            label: '∇ Multivariable', icon: '∇',
+            label: 'Multivariable', icon: '∇',
             input: v => (VECTOR_OPS.includes(v.op)
                 ? { label: 'Vector field  F = (P ; Q ; R)', placeholder: 'e.g. -y ; x     or     x*y ; y*z ; z*x', hint: 'Give 2 or 3 components separated by ;' }
                 : { label: 'f(x, y, …)', placeholder: 'e.g. x^2*y + sin(y)', hint: 'A scalar function of two or three variables.' }),
@@ -168,6 +168,118 @@
         }
     };
 
+
+    MODES.graph = {
+        label: 'Graph & sliders', icon: '∿',
+        input: () => ({ label: 'Functions  (separate with ;)', placeholder: 'e.g. a*sin(b*x) ; x^2/5', hint: 'Plot several functions at once. Every extra letter (a, b, c…) becomes a live slider; intersections are marked automatically.' }),
+        fields: [],
+        examples: [
+            { label: 'Sine with amplitude & frequency sliders', fn: 'a*sin(b*x)', opts: {} },
+            { label: 'Function and its derivative', fn: 'x^3-3*x ; 3*x^2-3', opts: {} },
+            { label: 'Intersections: parabola vs line', fn: 'x^2 ; x+2', opts: {} },
+            { label: 'Gaussian family', fn: 'a*e^(-b*x^2)', opts: {} },
+            { label: 'sin, cos & tan together', fn: 'sin(x) ; cos(x) ; tan(x)', opts: {} },
+            { label: 'Damped oscillation', fn: 'e^(-a*x)*cos(b*x) ; e^(-a*x) ; -e^(-a*x)', opts: {} }
+        ]
+    };
+    MODES.riemann = {
+        label: 'Riemann sums', icon: 'Δx',
+        input: () => ({ label: 'f(x)', placeholder: 'e.g. x^2', hint: 'Visualise how left / right / midpoint / trapezoid / Simpson sums converge to the integral.' }),
+        fields: [
+            { key: 'lower', label: 'From a', type: 'text', def: '0' },
+            { key: 'upper', label: 'To b', type: 'text', def: '1' },
+            { key: 'n', label: 'Subintervals n', type: 'number', def: '8', min: 1, max: 100000 },
+            { key: 'rule', label: 'Rule', type: 'select', def: 'left', options: [['left', 'Left endpoints'], ['right', 'Right endpoints'], ['mid', 'Midpoint'], ['trap', 'Trapezoidal'], ['simpson', "Simpson's"]] }
+        ],
+        examples: [
+            { label: 'x² on [0,1], left sum, n = 8', fn: 'x^2', opts: { lower: '0', upper: '1', n: '8', rule: 'left' } },
+            { label: 'sin x on [0,π], midpoint, n = 10', fn: 'sin(x)', opts: { lower: '0', upper: 'pi', n: '10', rule: 'mid' } },
+            { label: 'e^(−x²) on [−2,2], trapezoid, n = 12', fn: 'e^(-x^2)', opts: { lower: '-2', upper: '2', n: '12', rule: 'trap' } },
+            { label: '1/x on [1,e], Simpson, n = 6', fn: '1/x', opts: { lower: '1', upper: 'e', n: '6', rule: 'simpson' } }
+        ]
+    };
+    MODES.applications = {
+        label: 'Area & volume', icon: 'V',
+        input: () => ({ label: 'f(x)', placeholder: 'e.g. sqrt(x)', hint: 'Applications of integration. Add a second curve g(x) for areas between curves and washers.' }),
+        fields: [
+            { key: 'op', label: 'Quantity', type: 'select', def: 'area', options: [['area', 'Area between curves'], ['arclength', 'Arc length'], ['volumex', 'Volume – revolve about x-axis (disk/washer)'], ['volumey', 'Volume – revolve about y-axis (shells)'], ['surface', 'Surface area of revolution (x-axis)'], ['average', 'Average value & mean-value point']] },
+            { key: 'g', label: 'Second curve g(x) (blank = 0)', type: 'text', def: '', placeholder: 'e.g. x^2', show: v => ['area', 'volumex', 'volumey'].includes(v.op) },
+            { key: 'lower', label: 'From a', type: 'text', def: '0' },
+            { key: 'upper', label: 'To b', type: 'text', def: '1' }
+        ],
+        examples: [
+            { label: 'Area between y = x and y = x²', fn: 'x', opts: { op: 'area', g: 'x^2', lower: '0', upper: '1' } },
+            { label: 'Area between sin x and cos x', fn: 'sin(x)', opts: { op: 'area', g: 'cos(x)', lower: '0', upper: 'pi' } },
+            { label: 'Volume: revolve √x about the x-axis', fn: 'sqrt(x)', opts: { op: 'volumex', g: '', lower: '0', upper: '4' } },
+            { label: 'Volume by shells: y = x(1−x)', fn: 'x*(1-x)', opts: { op: 'volumey', g: '', lower: '0', upper: '1' } },
+            { label: 'Arc length of y = x²', fn: 'x^2', opts: { op: 'arclength', lower: '0', upper: '1' } },
+            { label: 'Surface area: cone y = x', fn: 'x', opts: { op: 'surface', lower: '0', upper: '1' } },
+            { label: 'Average value of x² on [0,3]', fn: 'x^2', opts: { op: 'average', lower: '0', upper: '3' } }
+        ]
+    };
+    MODES.root = {
+        label: 'Root finding', icon: 'x*',
+        input: () => ({ label: 'f(x) = 0', placeholder: 'e.g. cos(x) - x', hint: "Solve f(x) = 0 iteratively and watch every step. Move terms to one side first." }),
+        fields: [
+            { key: 'method', label: 'Method', type: 'select', def: 'newton', options: [['newton', "Newton's method"], ['bisection', 'Bisection'], ['secant', 'Secant']] },
+            { key: 'x0', label: 'Starting guess x₀', type: 'text', def: '1', show: v => v.method !== 'bisection' },
+            { key: 'x1', label: 'Second guess x₁', type: 'text', def: '2', show: v => v.method === 'secant' },
+            { key: 'a', label: 'Interval start a', type: 'text', def: '0', show: v => v.method === 'bisection' },
+            { key: 'b', label: 'Interval end b', type: 'text', def: '2', show: v => v.method === 'bisection' },
+            { key: 'steps', label: 'Max iterations', type: 'number', def: '12', min: 1, max: 60 }
+        ],
+        examples: [
+            { label: "√2 by Newton: x² − 2", fn: 'x^2-2', opts: { method: 'newton', x0: '1', steps: '8' } },
+            { label: 'Dottie number: cos x − x (bisection)', fn: 'cos(x)-x', opts: { method: 'bisection', a: '0', b: '1', steps: '40' } },
+            { label: 'Secant on x³ − x − 2', fn: 'x^3-x-2', opts: { method: 'secant', x0: '1', x1: '2', steps: '12' } },
+            { label: 'Newton failing: x² + 1', fn: 'x^2+1', opts: { method: 'newton', x0: '1', steps: '8' } }
+        ]
+    };
+    MODES.fourier = {
+        label: 'Fourier series', icon: '∼',
+        input: () => ({ label: 'f(x) on one period', placeholder: 'e.g. x   or   sign(x)', hint: 'Fourier coefficients and the partial-sum approximation of a periodic extension.' }),
+        fields: [
+            { key: 'lower', label: 'Period starts at', type: 'text', def: '-pi' },
+            { key: 'upper', label: 'Period ends at', type: 'text', def: 'pi' },
+            { key: 'terms', label: 'Harmonics N (1–60)', type: 'number', def: '8', min: 1, max: 60 }
+        ],
+        examples: [
+            { label: 'Square wave sign(x) – Gibbs phenomenon', fn: 'sign(x)', opts: { lower: '-pi', upper: 'pi', terms: '15' } },
+            { label: 'Sawtooth f(x) = x', fn: 'x', opts: { lower: '-pi', upper: 'pi', terms: '10' } },
+            { label: 'Triangle wave |x|', fn: 'abs(x)', opts: { lower: '-pi', upper: 'pi', terms: '6' } },
+            { label: 'Parabola x² on [−π, π]', fn: 'x^2', opts: { lower: '-pi', upper: 'pi', terms: '5' } }
+        ]
+    };
+    MODES.matrix = {
+        label: 'Matrices', icon: '[ ]',
+        input: () => ({ label: 'Matrix A  (rows separated by ; or new lines)', placeholder: 'e.g. 2 1 ; 1 3', hint: 'Entries may be numbers or expressions like pi/2. Up to 8×8.' }),
+        fields: [
+            { key: 'op', label: 'Operation', type: 'select', def: 'det', options: [['det', 'Determinant'], ['inverse', 'Inverse'], ['eigen', 'Eigenvalues & eigenvectors'], ['rank', 'Rank & row-reduced form'], ['rref', 'Reduced row echelon form'], ['transpose', 'Transpose'], ['trace', 'Trace'], ['charpoly', 'Characteristic polynomial'], ['solve', 'Solve A·x = b'], ['power', 'Matrix power Aⁿ']] },
+            { key: 'b', label: 'Right-hand side b (column, rows split by ;)', type: 'text', def: '1 ; 2', show: v => v.op === 'solve' },
+            { key: 'power', label: 'Exponent n', type: 'number', def: '5', min: -20, max: 20, show: v => v.op === 'power' }
+        ],
+        examples: [
+            { label: 'Determinant of a 3×3', fn: '2 0 1 ; 1 3 2 ; 1 1 4', opts: { op: 'det' } },
+            { label: 'Inverse (exact fractions)', fn: '1 2 ; 3 4', opts: { op: 'inverse' } },
+            { label: 'Eigenvalues of [[2,1],[1,2]]', fn: '2 1 ; 1 2', opts: { op: 'eigen' } },
+            { label: 'Rank of a singular matrix', fn: '1 2 3 ; 4 5 6 ; 7 8 9', opts: { op: 'rank' } },
+            { label: 'Solve a linear system', fn: '2 1 ; 1 3', opts: { op: 'solve', b: '3 ; 5' } },
+            { label: 'Fibonacci via matrix power', fn: '1 1 ; 1 0', opts: { op: 'power', power: '10' } }
+        ]
+    };
+
+    const MODE_GROUPS = [
+        ['Core calculus', ['derivative', 'integral', 'limit', 'series', 'analysis']],
+        ['Explore & visualise', ['graph', 'riemann', 'applications', 'root', 'fourier']],
+        ['Advanced', ['ode', 'multivariable', 'matrix']]
+    ];
+    const MODE_ORDER = MODE_GROUPS.flatMap(g => g[1]);
+    const MODE_DESC = {
+        derivative: 'Rules, steps, tangent', integral: 'Symbolic, definite, improper', limit: 'Two-sided & at ∞', series: 'Taylor / Maclaurin', analysis: 'Roots, extrema, asymptotes',
+        graph: 'Sliders & intersections', riemann: 'Left, mid, trap, Simpson', applications: 'Area, volume, arc length', root: 'Newton, bisection, secant', fourier: 'Coefficients & Gibbs',
+        ode: 'Closed form + RK45', multivariable: '∇, Hessian, ∬, curl', matrix: 'det, inverse, eigen'
+    };
+
     const TEMPLATES = [
         ['x²', 'x^2'], ['sin', 'sin(x)'], ['cos', 'cos(x)'], ['eˣ', 'e^x'], ['ln', 'ln(x)'], ['1/x', '1/x'],
         ['√x', 'sqrt(x)'], ['cubic', 'x^3-2*x'], ['tan', 'tan(x)'], ['gauss', 'e^(-x^2)'], ['|x|', 'abs(x)'], ['sinc', 'sin(x)/x']
@@ -183,7 +295,10 @@
         result: null,
         liveSpec: null,
         view3d: 'surface',
-        busy: false
+        busy: false,
+        paramVals: {},
+        paramKey: null,
+        playing: null
     };
     Object.keys(MODES).forEach(m => {
         state.opts[m] = {};
@@ -259,6 +374,7 @@
         }).join('');
         const box = $('modeOptions');
         box.innerHTML = html;
+        $('optionsPanel').hidden = !html;
         box.querySelectorAll('[data-key]').forEach(el => {
             const handler = () => {
                 vals[el.dataset.key] = el.value;
@@ -289,12 +405,23 @@
     function setMode(mode, keepInput) {
         if (!MODES[mode]) mode = 'derivative';
         state.mode = mode;
-        $('operationMode').value = mode;
+        document.querySelectorAll('.mode-btn').forEach(b => { const on = b.dataset.mode === mode; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
         renderOptions();
         updateInputLabels();
         renderExamples();
         if (!keepInput) validateInput();
         saveSession();
+    }
+
+    function renderModeGrid() {
+        $('modeGrid').innerHTML = MODE_GROUPS.map(([title, ids]) => `
+            <div class="mode-group">${esc(title)}</div>
+            <div class="mode-grid">${ids.map(id => `
+                <button class="mode-btn" type="button" data-mode="${id}" aria-pressed="false" title="${esc(MODES[id].label)} – Alt+${MODE_ORDER.indexOf(id) + 1}">
+                    <span class="mode-ico">${esc(MODES[id].icon)}</span>
+                    <span class="mode-txt"><b>${esc(MODES[id].label)}</b><small>${esc(MODE_DESC[id])}</small></span>
+                </button>`).join('')}</div>`).join('');
+        $('modeGrid').querySelectorAll('.mode-btn').forEach(b => b.addEventListener('click', () => { setMode(b.dataset.mode); $('functionInput').focus(); }));
     }
 
     function renderExamples() {
@@ -303,7 +430,8 @@
             MODES[state.mode].examples.map((e, i) => `<option value="${i}">${esc(e.label)}</option>`).join('');
     }
 
-    function loadExample(i) {
+    function loadExample(i, mode) {
+        if (mode && mode !== state.mode) setMode(mode, true);
         const ex = MODES[state.mode].examples[i];
         if (!ex) return;
         const vals = currentValues();
@@ -322,7 +450,7 @@
     function splitParts(src) { return src.split(/[;\n]+/).map(s => s.trim()).filter(Boolean); }
     function multiPartMode() {
         const v = currentValues();
-        return (state.mode === 'ode' && v.odeType === 'system') || (state.mode === 'multivariable' && VECTOR_OPS.includes(v.op));
+        return state.mode === 'graph' || (state.mode === 'ode' && v.odeType === 'system') || (state.mode === 'multivariable' && VECTOR_OPS.includes(v.op));
     }
 
     function validateInput() {
@@ -335,7 +463,15 @@
             return false;
         }
         try {
-            const parts = multiPartMode() ? splitParts(src) : [src];
+            if (state.mode === 'matrix') {
+                const m = engine.run.matrix(src, { op: 'transpose' });
+                preview.className = 'preview-box valid';
+                preview.innerHTML = `<span class="preview-tex">${texSpan(m.items[0].tex, m.items[0].text, false)}</span><span class="preview-meta">${esc(m.meta[0] || '')}</span>`;
+                renderTex(preview);
+                return true;
+            }
+            const stripY = p => (state.mode === 'graph' ? p.replace(/^\s*(y|f\(x\)|g\(x\)|h\(x\))\s*=\s*/, '') : p);
+            const parts = (multiPartMode() ? splitParts(src) : [src]).map(stripY);
             const infos = parts.map(p => engine.inspect(p));
             const tex = infos.map(i => i.tex).join(',\\;');
             const vars = [...new Set(infos.flatMap(i => i.vars))];
@@ -346,6 +482,7 @@
                 `<span class="preview-meta">${vars.length ? 'variables: ' + esc(vars.join(', ')) : 'constant'}${esc(sample)}</span>`;
             renderTex(preview);
             if (infos.length === 1 && !multiPartMode()) state.liveSpec = infos[0];
+            if (state.mode === 'graph') liveGraph();
             return true;
         } catch (e) {
             preview.className = 'preview-box error';
@@ -364,8 +501,8 @@
         if (m === 'ode') {
             vals.odeType = vals.odeType || 'first';
         }
-        if (m === 'derivative') vals.variable = (vals.variable || '').trim() || undefined;
-        if (m === 'integral' || m === 'series' || m === 'limit' || m === 'analysis') vals.variable = (vals.variable || '').trim() || undefined;
+        if ('variable' in vals) vals.variable = (vals.variable || '').trim() || undefined;
+        void m;
         return vals;
     }
 
@@ -377,13 +514,15 @@
         btn.classList.add('loading');
         btn.innerHTML = '<div class="spinner"></div><span>Cancel</span>';
         $('results').setAttribute('aria-busy', 'true');
+        if (activeTab() === 'results') $('results').innerHTML = '<div class="skeleton"><i></i><i></i><i></i><i></i></div>';
         try {
             const src = $('functionInput').value;
-            const mode = state.mode === 'multivariable' ? 'multivariable' : state.mode;
-            const result = await Runner.run(mode, src, gatherOptions());
+            const mode = state.mode;
+            const result = mode === 'graph' ? engine.run.graph(src.replace(/(^|[;\n])\s*(y|f\(x\))\s*=/g, '$1'), gatherOptions()) : await Runner.run(mode, src, gatherOptions());
             state.result = result;
+            resetParams(result);
             displayResult(result);
-            switchTab('results');
+            switchTab(mode === 'graph' ? 'plot' : 'results');
             pushHistory(result);
             updateShareHash();
             prepareAuxiliaryTabs(result);
@@ -406,7 +545,7 @@
     // ------------------------------------------------------------------
     // Result rendering
     // ------------------------------------------------------------------
-    const KIND_ICON = { derivative: '∂', integral: '∫', definite: '∫', series: 'Σ', limit: 'lim', analysis: 'f', ode: 'y′', multivariable: '∇', vector: '∇' };
+    const KIND_ICON = { derivative: '∂', integral: '∫', definite: '∫', series: 'Σ', limit: 'lim', analysis: 'f', ode: 'y′', multivariable: '∇', vector: '∇', graph: '∿', riemann: 'Δx', applications: 'V', root: 'x*', fourier: '∼', matrix: '[ ]' };
 
     function displayResult(r) {
         const rows = r.items.map(i => `
@@ -420,6 +559,7 @@
                         <button class="mini-btn" data-act="copy" title="Copy result as text">📋 Copy</button>
                         <button class="mini-btn" data-act="copytex" title="Copy LaTeX">TeX</button>
                         <button class="mini-btn" data-act="share" title="Copy a link to this calculation">🔗 Share</button>
+                        <button class="mini-btn" data-act="export" title="Download a Markdown report">📄 Export</button>
                     </div>
                 </div>
                 ${r.main ? `<div class="result-content">${r.main.tex ? '' : `<span class="row-label">${esc(r.main.label)}</span> `}${texSpan(r.main.tex, r.main.text, true)}</div>` : ''}
@@ -433,6 +573,7 @@
         container.querySelector('[data-act="copy"]').addEventListener('click', () => copyText(r.text, 'Result copied'));
         container.querySelector('[data-act="copytex"]').addEventListener('click', () => copyText(r.main && r.main.tex ? r.main.tex : r.text, 'LaTeX copied'));
         container.querySelector('[data-act="share"]').addEventListener('click', shareLink);
+        container.querySelector('[data-act="export"]').addEventListener('click', exportReport);
         displaySteps(r.steps);
     }
 
@@ -652,12 +793,16 @@
         }
 
         if (spec) {
+            const pv = (spec.paramVars || []).map(p => state.paramVals[p]);
+            const fnOf = c => (pv.length && c.vars && c.vars.length > 1 ? (x => c.fn(x, ...pv)) : c.fn);
+            if (spec.params) buildParamBar(spec);
+            else $('paramBar').innerHTML = '';
             (spec.curves || []).forEach((c, i) => {
                 let s;
                 if (c.data) {
                     const t0 = c.data.t[0], t1 = c.data.t[c.data.t.length - 1];
                     s = sampleCurve(c.fn, Math.min(t0, t1), Math.max(t0, t1), n);
-                } else s = sampleCurve(c.fn, lo, hi, n);
+                } else s = sampleCurve(fnOf(c), lo, hi, spec.interactive ? Math.min(n, 700) : n);
                 s.ys.forEach(y => { if (y !== null) allY.push(y); });
                 traces.push({
                     x: s.xs, y: s.ys, mode: 'lines', type: 'scatter', name: c.name, connectgaps: false,
@@ -670,6 +815,30 @@
                     const s = sampleCurve(spec.shade.fn, a, b, Math.max(200, n / 2));
                     traces.push({ x: s.xs, y: s.ys.map(y => (y === null || Math.abs(y) > 1e6 ? null : y)), type: 'scatter', mode: 'lines', fill: 'tozeroy', fillcolor: 'rgba(0,122,255,0.22)', line: { width: 0 }, name: 'area', hoverinfo: 'skip' });
                 }
+            }
+            if (spec.bars && spec.bars.length) {
+                traces.push({ type: 'bar', x: spec.bars.map(b => (b.x0 + b.x1) / 2), y: spec.bars.map(b => b.y), width: spec.bars.map(b => b.x1 - b.x0), marker: { color: 'rgba(99,102,241,.28)', line: { color: '#6366f1', width: 1 } }, name: 'rectangles', hovertemplate: 'f ≈ %{y:.5g}<extra></extra>' });
+                spec.bars.forEach(b => allY.push(b.y));
+            }
+            if (spec.trap && spec.trap.length) {
+                traces.push({ type: 'scatter', mode: 'lines', x: spec.trap.map(p => p.x), y: spec.trap.map(p => p.y), fill: 'tozeroy', fillcolor: 'rgba(99,102,241,.25)', line: { color: '#6366f1', width: 1.5 }, name: 'trapezoids' });
+            }
+            if (spec.shade2) {
+                const a2 = Math.max(spec.shade2.a, lo), b2 = Math.min(spec.shade2.b, hi), m2 = 240;
+                if (b2 > a2) {
+                    const xs2 = [], gy = [], fy = [];
+                    for (let i = 0; i <= m2; i++) { const x = a2 + (b2 - a2) * i / m2; xs2.push(x); gy.push(spec.shade2.gFn(x)); fy.push(spec.shade2.fFn(x)); }
+                    traces.push({ type: 'scatter', mode: 'lines', x: xs2, y: gy, line: { width: 0 }, hoverinfo: 'skip', showlegend: false });
+                    traces.push({ type: 'scatter', mode: 'lines', x: xs2, y: fy, fill: 'tonexty', fillcolor: 'rgba(34,211,238,.26)', line: { width: 0 }, name: 'region', hoverinfo: 'skip' });
+                }
+            }
+            (spec.segments || []).forEach(sg => traces.push({ type: 'scatter', mode: 'lines', x: sg.x, y: sg.y, line: { color: '#f59e0b', width: 1.6, dash: 'dot' }, hoverinfo: 'skip', showlegend: false }));
+            if (spec.interactive && spec.curves.length > 1) {
+                const fns = spec.curves.map(fnOf), ix = [], iy = [];
+                for (let a = 0; a < fns.length; a++) for (let b = a + 1; b < fns.length; b++) {
+                    Runner.getEngine().intersections(fns[a], fns[b], lo, hi, 1200).slice(0, 12).forEach(x => { ix.push(x); iy.push(fns[a](x)); });
+                }
+                if (ix.length) traces.push({ type: 'scatter', mode: 'markers', x: ix, y: iy, name: 'intersections', text: ix.map((x, i) => `(${x.toPrecision(5)}, ${iy[i].toPrecision(5)})`), hovertemplate: '%{text}<extra>intersection</extra>', marker: { size: 11, color: '#f43f5e', line: { color: '#fff', width: 2 } } });
             }
             if (spec.points && spec.points.length) {
                 traces.push({
@@ -734,6 +903,137 @@
             }, { responsive: true, displaylogo: false });
         }
     }
+
+    // ---------- parameter sliders (graph mode) ----------
+    function resetParams(result) {
+        stopPlay();
+        const p = result && result.plot && result.plot.params;
+        state.paramKey = null;
+        if (p) p.forEach(q => { if (!(q.name in state.paramVals)) state.paramVals[q.name] = q.value; });
+    }
+    function buildParamBar(spec) {
+        const key = spec.params.map(p => p.name).join(',');
+        const bar = $('paramBar');
+        if (state.paramKey === key && bar.children.length) return;
+        state.paramKey = key;
+        bar.innerHTML = spec.params.map((p, i) => `
+            <div class="param"><span>${esc(p.name)}</span>
+                <input class="slider" type="range" data-p="${esc(p.name)}" min="${p.min}" max="${p.max}" step="${p.step}" value="${state.paramVals[p.name] ?? p.value}" aria-label="Parameter ${esc(p.name)}">
+                <output>${(+(state.paramVals[p.name] ?? p.value)).toFixed(2)}</output>
+                ${i === 0 ? '<button class="mini-btn" type="button" data-play title="Animate">▶</button>' : '<span></span>'}
+            </div>`).join('');
+        bar.querySelectorAll('input[data-p]').forEach(inp => inp.addEventListener('input', () => {
+            state.paramVals[inp.dataset.p] = parseFloat(inp.value);
+            inp.nextElementSibling.textContent = (+inp.value).toFixed(2);
+            if (!state.rafPending) { state.rafPending = true; requestAnimationFrame(() => { state.rafPending = false; plot2D(); }); }
+        }));
+        const play = bar.querySelector('[data-play]');
+        if (play) play.addEventListener('click', () => (state.playing ? stopPlay() : startPlay(spec.params[0])));
+    }
+    function startPlay(p) {
+        const btn = document.querySelector('[data-play]'); if (btn) btn.textContent = '❚❚';
+        let dir = 1, v = state.paramVals[p.name] ?? p.value;
+        state.playing = setInterval(() => {
+            v += dir * p.step * 3;
+            if (v >= p.max) { v = p.max; dir = -1; } else if (v <= p.min) { v = p.min; dir = 1; }
+            state.paramVals[p.name] = v;
+            const inp = document.querySelector(`input[data-p="${p.name}"]`);
+            if (inp) { inp.value = v; inp.nextElementSibling.textContent = v.toFixed(2); }
+            plot2D();
+        }, 60);
+    }
+    function stopPlay() { if (state.playing) { clearInterval(state.playing); state.playing = null; } const btn = document.querySelector('[data-play]'); if (btn) btn.textContent = '▶'; }
+
+    let liveTimer;
+    function liveGraph() {
+        clearTimeout(liveTimer);
+        liveTimer = setTimeout(() => {
+            if (state.mode !== 'graph') return;
+            try {
+                const r = engine.run.graph($('functionInput').value.replace(/(^|[;\n])\s*(y|f\(x\))\s*=/g, '$1'), {});
+                state.result = r; resetParams(r);
+                if (activeTab() === 'plot') plot2D();
+            } catch (e) { /* preview shows the error */ }
+        }, 150);
+    }
+
+    // ---------- export ----------
+    function exportReport() {
+        const r = state.result; if (!r) return;
+        const lines = [`# ${r.title}`, '', `*Calculus Suite Pro – ${new Date().toISOString().slice(0, 10)}*`, '', '## Input', '', '```', $('functionInput').value, '```', ''];
+        const o = currentValues(); const optLines = Object.keys(o).filter(k => String(o[k]).trim() !== '').map(k => `- ${k}: \`${o[k]}\``);
+        if (optLines.length) lines.push('Options:', '', ...optLines, '');
+        lines.push('## Result', '');
+        if (r.main) lines.push(`**${r.main.label}** ${r.main.text}`, '');
+        if (r.main && r.main.tex) lines.push('$$', r.main.tex, '$$', '');
+        r.items.forEach(i => lines.push(`- **${i.label}** ${i.text}`));
+        if (r.meta.length) lines.push('', ...r.meta.map(m => `> ${m}`));
+        r.warnings.forEach(w => lines.push('', `> ⚠ ${w}`));
+        if (r.steps.length) { lines.push('', '## Steps', ''); r.steps.forEach((st, i) => { lines.push(`${i + 1}. **${st.title}** – ${st.text}`); if (st.tex) lines.push('   ', '   $$' + st.tex + '$$'); }); }
+        const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/markdown' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `calculus-${r.kind}-${Date.now()}.md`; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        toast('Report downloaded', 'ok');
+    }
+    function downloadPlot() {
+        const t = activeTab();
+        const div = t === 'plot3d' ? $('plot3dDiv') : $('plot2d');
+        if (!div.data) { toast('Nothing to save yet', 'err'); return; }
+        Plotly.downloadImage(div, { format: 'png', filename: 'calculus-suite-plot', scale: 2, width: 1200, height: 720 });
+    }
+
+    // ---------- command palette ----------
+    function paletteCommands() {
+        const cmds = [];
+        MODE_ORDER.forEach((id, i) => cmds.push({ group: 'Tools', ico: MODES[id].icon, label: `Open ${MODES[id].label}`, hint: `Alt+${i + 1}`, keys: MODE_DESC[id], run: () => { setMode(id); $('functionInput').focus(); } }));
+        const acts = [
+            ['Actions', '🚀', 'Compute', 'Ctrl+Enter', 'run calculate solve', compute],
+            ['Actions', '🗑', 'Clear everything', 'Ctrl+Shift+K', 'reset', clearAll],
+            ['Actions', '🌗', 'Toggle dark / light theme', '', 'theme night day', () => { applyTheme(!isDark()); refreshActivePlot(); }],
+            ['Actions', '🔗', 'Copy share link', '', 'url link', shareLink],
+            ['Actions', '📄', 'Export result as Markdown report', '', 'download save report', exportReport],
+            ['Actions', '📷', 'Save current plot as PNG', '', 'image picture download', downloadPlot],
+            ['Actions', '📋', 'Copy result as text', '', 'clipboard', () => state.result && copyText(state.result.text, 'Result copied')],
+            ['Actions', '⌨', 'Show / hide symbol keypad', '', 'symbols keyboard', toggleKeypad],
+            ['Actions', '🕘', 'Clear history', '', 'delete', () => { try { localStorage.removeItem('cs_history'); } catch (e) { /* ignore */ } renderHistory(); }],
+            ['Actions', '?', 'Syntax help & shortcuts', '?', 'documentation', () => $('helpBtn').click()],
+            ['Go to', '📊', 'Results tab', 'Alt+R', '', () => switchTab('results')],
+            ['Go to', '📈', '2D plot tab', 'Alt+P', '', () => switchTab('plot')],
+            ['Go to', '🎮', '3D plot tab', 'Alt+D', '', () => switchTab('plot3d')],
+            ['Go to', '📚', 'Steps tab', 'Alt+S', '', () => switchTab('steps')]
+        ];
+        acts.forEach(a => cmds.push({ group: a[0], ico: a[1], label: a[2], hint: a[3], keys: a[4], run: a[5] }));
+        if (deferredInstall) cmds.push({ group: 'Actions', ico: '⬇', label: 'Install as an app', hint: '', keys: 'pwa', run: installApp });
+        MODE_ORDER.forEach(id => MODES[id].examples.forEach((ex, i) => cmds.push({ group: 'Examples', ico: MODES[id].icon, label: `${MODES[id].label}: ${ex.label}`, hint: '', keys: ex.fn, run: () => { setMode(id, true); loadExample(i); } })));
+        return cmds;
+    }
+    let palItems = [], palSel = 0;
+    function openPalette() {
+        const dlg = $('paletteDialog');
+        if (!dlg.open) { dlg.showModal ? dlg.showModal() : dlg.setAttribute('open', ''); }
+        $('paletteInput').value = ''; palSel = 0; renderPalette(); $('paletteInput').focus();
+    }
+    function renderPalette() {
+        const q = $('paletteInput').value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+        const all = paletteCommands();
+        palItems = all.filter(c => { const hay = (c.label + ' ' + (c.keys || '') + ' ' + c.group).toLowerCase(); return q.every(w => hay.includes(w)); }).slice(0, 60);
+        palSel = Math.min(palSel, Math.max(0, palItems.length - 1));
+        let last = '', html = '';
+        palItems.forEach((c, i) => {
+            if (c.group !== last) { html += `<div class="palette-group">${esc(c.group)}</div>`; last = c.group; }
+            html += `<button class="palette-item ${i === palSel ? 'sel' : ''}" role="option" data-i="${i}"><span class="p-ico">${esc(c.ico)}</span><span>${esc(c.label)}</span><small>${esc(c.hint || '')}</small></button>`;
+        });
+        $('paletteList').innerHTML = html || '<div class="empty-state" style="padding:30px">No matches</div>';
+        $('paletteList').querySelectorAll('.palette-item').forEach(b => { b.addEventListener('click', () => runPalette(+b.dataset.i)); b.addEventListener('mousemove', () => { palSel = +b.dataset.i; markPalette(); }); });
+        const sel = $('paletteList').querySelector('.sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
+    }
+    function markPalette() { $('paletteList').querySelectorAll('.palette-item').forEach((b, i) => b.classList.toggle('sel', i === palSel)); }
+    function runPalette(i) { const c = palItems[i]; if (!c) return; const d = $('paletteDialog'); d.close ? d.close() : d.removeAttribute('open'); setTimeout(c.run, 30); }
+
+    // ---------- install / misc ----------
+    let deferredInstall = null;
+    function installApp() { if (!deferredInstall) return; deferredInstall.prompt(); deferredInstall.userChoice.finally(() => { deferredInstall = null; $('installBtn').hidden = true; }); }
+    function toggleKeypad() { const k = $('keypad'); k.hidden = !k.hidden; $('keypadToggle').setAttribute('aria-expanded', String(!k.hidden)); }
 
     function plot3D() {
         const div = $('plot3dDiv');
@@ -827,26 +1127,51 @@
         validateInput(); saveSession();
     }
 
+    const FEATURED = [
+        ['derivative', 0, '∂', 'Differentiate with steps', 'x^2*sin(x)'],
+        ['integral', 1, '∫', 'u-substitution, solved', '2x*cos(x^2)'],
+        ['graph', 0, '∿', 'Sliders you can animate', 'a*sin(b*x)'],
+        ['riemann', 1, 'Δx', 'Watch sums converge', 'sin(x), n = 10'],
+        ['ode', 2, 'y′', 'Logistic growth ODE', 'y*(1-y)'],
+        ['fourier', 0, '∼', 'Gibbs phenomenon', 'sign(x)'],
+        ['multivariable', 2, '∇', 'Critical points & saddles', 'x^3-3x+y^2'],
+        ['matrix', 2, '[ ]', 'Eigenvalues, exact', '2 1 ; 1 2']
+    ];
+
+    function welcomeHTML() {
+        return `<div class="welcome">
+            <h2>Calculus, <span>beautifully</span><br>solved &amp; explained.</h2>
+            <p>Thirteen tools, one workspace. Every result comes with the reasoning behind it, live 2D/3D plots, and exact answers wherever they exist. Pick a tile to start – or press <kbd>Ctrl</kbd> <kbd>K</kbd>.</p>
+            <div class="tiles">${FEATURED.map((f, i) => `<button class="tile" type="button" data-i="${i}"><span class="t-ico">${esc(f[2])}</span><b>${esc(f[3])}</b><code>${esc(f[4])}</code></button>`).join('')}</div>
+            <div class="chips"><span class="chip">✓ Verified antiderivatives</span><span class="chip">⚡ Background worker</span><span class="chip">📴 Works offline</span><span class="chip">🔗 Shareable links</span><span class="chip">🧮 LaTeX output</span><span class="chip">🌗 Dark mode</span></div>
+        </div>`;
+    }
+    function showWelcome() {
+        const el = $('results');
+        el.innerHTML = welcomeHTML();
+        el.querySelectorAll('.tile').forEach(t => t.addEventListener('click', () => { const f = FEATURED[+t.dataset.i]; setMode(f[0], true); loadExample(f[1]); }));
+        const st = $('steps');
+        st.classList.remove('show-timeline');
+        st.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📖</div><h3>Step-by-step reasoning</h3><p>Run a computation and every step of the solution appears here.</p></div>';
+    }
+
     function clearAll() {
         $('functionInput').value = '';
         state.result = null;
         state.liveSpec = null;
         validateInput();
-        $('results').innerHTML = '<div class="empty-state"><div class="empty-state-icon">🧮</div><h3>Ready to Compute</h3><p>Enter a function, pick an operation and press <kbd>Ctrl</kbd>+<kbd>Enter</kbd></p></div>';
-        displaySteps([]);
-        $('steps').classList.remove('show-timeline');
-        $('steps').innerHTML = '<div class="empty-state"><div class="empty-state-icon">📖</div><h3>Step-by-Step Solutions</h3><p>The reasoning behind each result appears here</p></div>';
+        showWelcome();
         try { Plotly.purge($('plot2d')); Plotly.purge($('plot3dDiv')); Plotly.purge($('plotPhase')); } catch (e) { /* ignore */ }
-        $('plot2d').innerHTML = ''; $('plot3dDiv').innerHTML = ''; $('plotPhase').style.display = 'none';
+        $('plot2d').innerHTML = ''; $('plot3dDiv').innerHTML = ''; $('plotPhase').style.display = 'none'; $('paramBar').innerHTML = '';
         try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ }
         saveSession();
+        switchTab('results');
         $('functionInput').focus();
     }
 
     function initUI() {
         // mode select
-        $('operationMode').innerHTML = Object.keys(MODES).map(k => `<option value="${k}">${esc(MODES[k].label)}</option>`).join('');
-        $('operationMode').addEventListener('change', e => { setMode(e.target.value); });
+        renderModeGrid();
 
         // templates and keypad
         $('templates').innerHTML = TEMPLATES.map(([l, t], i) => `<button class="template-btn" data-i="${i}" type="button">${esc(l)}</button>`).join('');
@@ -882,10 +1207,27 @@
         $('helpClose').addEventListener('click', () => { if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); });
         dlg.addEventListener('click', e => { if (e.target === dlg && dlg.close) dlg.close(); });
 
+        $('paletteBtn').addEventListener('click', openPalette);
+        $('paletteInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
+        $('paletteInput').addEventListener('keydown', e => {
+            if (e.key === 'ArrowDown') { e.preventDefault(); palSel = Math.min(palItems.length - 1, palSel + 1); markPalette(); const s2 = $('paletteList').querySelector('.sel'); if (s2) s2.scrollIntoView({ block: 'nearest' }); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); palSel = Math.max(0, palSel - 1); markPalette(); const s2 = $('paletteList').querySelector('.sel'); if (s2) s2.scrollIntoView({ block: 'nearest' }); }
+            else if (e.key === 'Enter') { e.preventDefault(); runPalette(palSel); }
+        });
+        $('paletteDialog').addEventListener('click', e => { if (e.target === $('paletteDialog')) $('paletteDialog').close(); });
+        $('keypadToggle').addEventListener('click', toggleKeypad);
+        $('downloadPlot').addEventListener('click', downloadPlot);
+        $('installBtn').addEventListener('click', installApp);
+        window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; $('installBtn').hidden = false; });
+        if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { /* offline support is optional */ });
+
         document.addEventListener('keydown', e => {
             const mod = e.ctrlKey || e.metaKey;
             if (mod && e.key === 'Enter') { e.preventDefault(); compute(); }
-            else if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); clearAll(); }
+            else if (mod && e.shiftKey && e.key.toLowerCase() === 'k') { e.preventDefault(); clearAll(); }
+            else if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); }
+            else if (e.altKey && /^[1-9]$/.test(e.key) && MODE_ORDER[+e.key - 1]) { e.preventDefault(); setMode(MODE_ORDER[+e.key - 1]); }
+            else if (e.altKey && 'rpds'.includes(e.key.toLowerCase()) && e.key.length === 1) { e.preventDefault(); switchTab({ r: 'results', p: 'plot', d: 'plot3d', s: 'steps' }[e.key.toLowerCase()]); }
             else if (e.key === '?' && !/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '')) { $('helpBtn').click(); }
         });
 
@@ -929,7 +1271,7 @@
             validateInput();
         }
         Runner.warmUp();
-        if (restored) compute();
+        if (restored) compute(); else showWelcome();
         $('app').classList.add('ready');
     }
 

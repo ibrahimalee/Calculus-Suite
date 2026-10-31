@@ -1059,6 +1059,7 @@
             (p.curves || []).forEach(c => { c.fn = c.data ? hermite(c.data) : fnFromExpr(c.expr, c.vars); });
             if (p.shade) p.shade.fn = fnFromExpr(p.shade.expr, p.shade.vars);
             if (p.slopeField) p.slopeField.fn = fnFromExpr(p.slopeField.expr, ['x', 'y']);
+            if (p.shade2) { p.shade2.fFn = fnFromExpr(p.shade2.f, p.shade2.vars); p.shade2.gFn = fnFromExpr(p.shade2.g, p.shade2.vars); }
         }
         if (res.plot3) {
             if (res.plot3.expr) res.plot3.fn = fnFromExpr(res.plot3.expr, res.plot3.vars);
@@ -2130,6 +2131,443 @@
         return finalizeText(r);
     }
 
+
+    // ------------------------------------------------------------------
+    // Shared quadrature helper for the "applications" modes
+    // ------------------------------------------------------------------
+    function quad(node, v, a, b, aNode, bNode) {
+        const f = compile(node, [v]);
+        const num = integrateRobust(f, a, b, kinkPoints(node, v, a, b));
+        const rel = num.error / Math.max(1e-12, Math.abs(num.value));
+        const diverges = !Number.isFinite(num.value) || Math.abs(num.value) > 1e9 || (num.error > 1e-4 && rel > 1e-3);
+        let exact = null;
+        if (!diverges && Number.isFinite(a) && Number.isFinite(b)) {
+            const sym = antiderivative(node, v, 'auto');
+            if (sym.ok) {
+                const Fb = substitute(sym.F, { [v]: bNode || b }), Fa = substitute(sym.F, { [v]: aNode || a });
+                const dn = OP('-', 'subtract', [new math.ParenthesisNode(Fb), new math.ParenthesisNode(Fa)]);
+                const val = compile(dn, [])();
+                if (Number.isFinite(val) && Math.abs(val - num.value) <= 1e-6 * Math.max(1, Math.abs(val))) exact = simplifyNode(dn);
+            }
+        }
+        return { value: num.value, error: num.error, warnings: num.warnings, diverges, exact };
+    }
+
+    function sameSign(f, g, lo, hi) {
+        let pos = 0, neg = 0;
+        for (let i = 0; i <= 200; i++) { const x = lo + (hi - lo) * i / 200, d = f(x) - g(x); if (d > 1e-12) pos++; else if (d < -1e-12) neg++; }
+        return pos === 0 || neg === 0 ? (pos ? 1 : -1) : 0;
+    }
+
+    // ------------------------------- Riemann sums -------------------------------
+    function runRiemann(src, opt) {
+        const node = parse(src);
+        const v = pickVar(node, opt.variable);
+        const a = parseLimit(opt.lower === undefined || opt.lower === '' ? '0' : opt.lower, 'Lower limit');
+        const b = parseLimit(opt.upper === undefined || opt.upper === '' ? '1' : opt.upper, 'Upper limit');
+        if (!Number.isFinite(a.value) || !Number.isFinite(b.value) || a.value >= b.value) throw new CalcError('Use finite limits with lower < upper');
+        const rule = opt.rule || 'left';
+        let n = Math.max(1, Math.min(100000, parseInt(opt.n, 10) || 8));
+        if (rule === 'simpson' && n % 2) n += 1;
+        const f = compile(node, [v]);
+        const sum = (nn, rl) => {
+            const dx = (b.value - a.value) / nn;
+            let s0 = 0;
+            if (rl === 'simpson') {
+                for (let i = 0; i <= nn; i++) s0 += f(a.value + i * dx) * (i === 0 || i === nn ? 1 : i % 2 ? 4 : 2);
+                return s0 * dx / 3;
+            }
+            for (let i = 0; i < nn; i++) {
+                const x0 = a.value + i * dx;
+                s0 += rl === 'left' ? f(x0) : rl === 'right' ? f(x0 + dx) : rl === 'mid' ? f(x0 + dx / 2) : (f(x0) + f(x0 + dx)) / 2;
+            }
+            return s0 * dx;
+        };
+        const approx = sum(n, rule);
+        if (!Number.isFinite(approx)) throw new CalcError('The function is undefined somewhere on the interval');
+        const q = quad(node, v, a.value, b.value, a.node, b.node);
+        const dx = (b.value - a.value) / n;
+        const names = { left: 'Left Riemann sum', right: 'Right Riemann sum', mid: 'Midpoint rule', trap: 'Trapezoidal rule', simpson: "Simpson's rule" };
+        const r = makeResult('riemann', names[rule]);
+        const intTex = `\\int_{${texOf(a.node)}}^{${texOf(b.node)}} ${texOf(node)}\\,d${v}`;
+        r.main = { label: 'Approximation ≈', text: fmt(approx, opt.digits), tex: `${intTex}\\approx ${fmt(approx, opt.digits)}` };
+        if (!q.diverges) {
+            r.items.push({ label: 'Exact integral:', text: q.exact ? strOf(q.exact) + ' ≈ ' + fmt(q.value, opt.digits) : fmt(q.value, opt.digits), tex: q.exact ? `${intTex}=${texOf(q.exact)}\\approx ${fmt(q.value, opt.digits)}` : `${intTex}\\approx ${fmt(q.value, opt.digits)}` });
+            r.items.push({ label: 'Error:', text: `${approx - q.value >= 0 ? '+' : ''}${(approx - q.value).toExponential(3)}  (${(Math.abs(approx - q.value) / Math.max(1e-300, Math.abs(q.value)) * 100).toFixed(4)} %)`, tex: '' });
+        }
+        r.items.push({ label: 'Subintervals:', text: `n = ${n},  Δx = ${fmt(dx, 8)}`, tex: `n=${n},\\quad \\Delta x=\\frac{b-a}{n}=${fmt(dx, 8)}` });
+        const conv = [];
+        for (let k = 2; k <= 1024 && conv.length < 6; k *= 4) { const val = sum(rule === 'simpson' && k % 2 ? k + 1 : k, rule); conv.push(`n=${k}: ${fmt(val, 8)}`); }
+        r.items.push({ label: 'Convergence:', text: conv.join('   '), tex: '' });
+        const formula = { left: 'Σ f(xᵢ)·Δx, xᵢ = a + iΔx (i = 0…n−1)', right: 'Σ f(xᵢ)·Δx, xᵢ = a + iΔx (i = 1…n)', mid: 'Σ f(a + (i+½)Δx)·Δx', trap: 'Δx·[½f(x₀) + f(x₁) + … + f(xₙ₋₁) + ½f(xₙ)]', simpson: '(Δx/3)·[f(x₀) + 4f(x₁) + 2f(x₂) + … + 4f(xₙ₋₁) + f(xₙ)]' }[rule];
+        r.steps.push({ title: 'Partition the interval', text: `Δx = (${strOf(b.node)} − ${strOf(a.node)}) / ${n} = ${fmt(dx, 8)}`, tex: `\\Delta x=\\frac{b-a}{n}` });
+        r.steps.push({ title: 'Apply the rule', text: formula, tex: '' });
+        const show = Math.min(n, 5);
+        for (let i = 0; i < show; i++) {
+            const x0 = a.value + i * dx, xs = rule === 'left' ? x0 : rule === 'right' ? x0 + dx : x0 + dx / 2;
+            if (rule !== 'simpson' && rule !== 'trap') r.steps.push({ title: `Term ${i + 1}`, text: `f(${fmt(xs, 6)}) · Δx = ${fmt(f(xs), 6)} · ${fmt(dx, 6)} = ${fmt(f(xs) * dx, 8)}`, tex: '' });
+        }
+        r.steps.push({ title: 'Add everything up', text: `≈ ${fmt(approx, 10)}`, tex: '' });
+        if (!q.diverges) r.steps.push({ title: 'Compare with the exact value', text: `The integral equals ${fmt(q.value, 10)}; error ${(approx - q.value).toExponential(3)}. Doubling n shrinks the error by ~2 (left/right), ~4 (trap/mid) or ~16 (Simpson).`, tex: '' });
+        const bars = [];
+        if (n <= 400 && (rule === 'left' || rule === 'right' || rule === 'mid')) {
+            for (let i = 0; i < n; i++) { const x0 = a.value + i * dx, xs = rule === 'left' ? x0 : rule === 'right' ? x0 + dx : x0 + dx / 2; bars.push({ x0, x1: x0 + dx, y: f(xs) }); }
+        }
+        const trap = [];
+        if (n <= 400 && rule === 'trap') for (let i = 0; i <= n; i++) trap.push({ x: a.value + i * dx, y: f(a.value + i * dx) });
+        r.plot = { variable: v, curves: [curveOf('f(x)', node, [v])], bars, trap, xRange: rangeFor(a.value, b.value) };
+        return finalizeText(r);
+    }
+
+    // ---------------------------- Applications of integration ----------------------------
+    function runApplications(src, opt) {
+        const fN = parse(src);
+        const v = pickVar(fN, opt.variable);
+        const gN = opt.g && String(opt.g).trim() ? parse(opt.g) : C(0);
+        const a = parseLimit(opt.lower === undefined || opt.lower === '' ? '0' : opt.lower, 'Lower limit');
+        const b = parseLimit(opt.upper === undefined || opt.upper === '' ? '1' : opt.upper, 'Upper limit');
+        if (!Number.isFinite(a.value) || !Number.isFinite(b.value) || a.value >= b.value) throw new CalcError('Use finite limits with lower < upper');
+        const f = compile(fN, [v]), g = compile(gN, [v]);
+        const op = opt.op || 'area';
+        const sg = sameSign(f, g, a.value, b.value);
+        const P = new math.ParenthesisNode(fN), Gp = new math.ParenthesisNode(gN);
+        const diffN = OP('-', 'subtract', [P, Gp]);
+        let integrand, title, label, text;
+        const abs = n => new math.FunctionNode('abs', [n]);
+        const absIf = (n, fn) => { const sgn = sameSign(fn, () => 0, a.value, b.value); return sgn > 0 ? n : sgn < 0 ? OP('-', 'unaryMinus', [new math.ParenthesisNode(n)]) : abs(n); };
+        const sqrtN = n => new math.FunctionNode('sqrt', [n]);
+        const df = () => diff(fN, v);
+        const r0 = op;
+        if (op === 'area') {
+            integrand = sg === 0 ? abs(diffN) : (sg > 0 ? diffN : OP('-', 'unaryMinus', [diffN]));
+            title = gN.type === 'ConstantNode' && gN.value === 0 ? 'Area under the curve' : 'Area between curves'; label = 'Area =';
+        } else if (op === 'arclength') {
+            integrand = sqrtN(OP('+', 'add', [C(1), OP('^', 'pow', [new math.ParenthesisNode(df()), C(2)])]));
+            title = 'Arc length'; label = 'Length ='; 
+        } else if (op === 'volumex') {
+            integrand = OP('*', 'multiply', [S('pi'), absIf(OP('-', 'subtract', [OP('^', 'pow', [P, C(2)]), OP('^', 'pow', [Gp, C(2)])]), x => f(x) * f(x) - g(x) * g(x))]);
+            title = 'Volume of revolution about the x-axis'; label = 'Volume =';
+        } else if (op === 'volumey') {
+            if (a.value < 0) throw new CalcError('Shell method needs x ≥ 0 on the interval');
+            integrand = OP('*', 'multiply', [OP('*', 'multiply', [C(2), S('pi')]), OP('*', 'multiply', [S(v), absIf(diffN, x => f(x) - g(x))])]);
+            title = 'Volume of revolution about the y-axis (shells)'; label = 'Volume =';
+        } else if (op === 'surface') {
+            integrand = OP('*', 'multiply', [OP('*', 'multiply', [C(2), S('pi')]), OP('*', 'multiply', [absIf(P, f), sqrtN(OP('+', 'add', [C(1), OP('^', 'pow', [new math.ParenthesisNode(df()), C(2)])]))])]);
+            title = 'Surface area of revolution (x-axis)'; label = 'Surface area =';
+        } else if (op === 'average') {
+            integrand = fN; title = 'Average value of f'; label = 'Average ='; 
+        } else throw new CalcError('Unknown operation');
+        integrand = simplifyNode(integrand);
+        const q = quad(integrand, v, a.value, b.value, a.node, b.node);
+        const r = makeResult('applications', title);
+        if (q.diverges || !Number.isFinite(q.value)) throw new CalcError('The integral does not converge on this interval');
+        r.warnings.push(...q.warnings);
+        let value = q.value, exact = q.exact;
+        if (op === 'average') {
+            value = q.value / (b.value - a.value);
+            exact = exact ? simplifyNode(OP('/', 'divide', [new math.ParenthesisNode(exact), new math.ParenthesisNode(OP('-', 'subtract', [b.node, a.node]))])) : null;
+        }
+        const nv = nice(value, opt.digits);
+        const unit = { area: '', arclength: '', volumex: '', volumey: '', surface: '', average: '' }[op];
+        r.main = { label, text: (exact ? strOf(exact) + ' ≈ ' : '') + fmt(value, opt.digits), tex: `${exact ? texOf(exact) + '\\approx ' : ''}${fmt(value, opt.digits)}${unit}` };
+        r.items.push({ label: 'Integrand:', text: strOf(integrand), tex: `${texOf(integrand)}` });
+        r.items.push({ label: 'Interval:', text: `[${strOf(a.node)}, ${strOf(b.node)}]`, tex: '' });
+        if (nv.text !== fmt(value, opt.digits) && !exact) r.items.push({ label: 'Recognised as:', text: nv.text, tex: nv.tex });
+        const formulas = {
+            area: ['A = ∫ |f(x) − g(x)| dx', `A=\\int_a^b \\left|f(x)-g(x)\\right|dx`],
+            arclength: ['L = ∫ √(1 + f′(x)²) dx', `L=\\int_a^b\\sqrt{1+\\left(f'(x)\\right)^2}\\,dx`],
+            volumex: ['V = π ∫ |f(x)² − g(x)²| dx  (disk / washer)', `V=\\pi\\int_a^b\\left|f(x)^2-g(x)^2\\right|dx`],
+            volumey: ['V = 2π ∫ x·|f(x) − g(x)| dx  (cylindrical shells)', `V=2\\pi\\int_a^b x\\,\\left|f(x)-g(x)\\right|dx`],
+            surface: ['S = 2π ∫ |f(x)| √(1 + f′(x)²) dx', `S=2\\pi\\int_a^b |f(x)|\\sqrt{1+f'(x)^2}\\,dx`],
+            average: ['f_avg = 1/(b − a) · ∫ f(x) dx', `f_{avg}=\\frac{1}{b-a}\\int_a^b f(x)\\,dx`]
+        }[op];
+        r.steps.push({ title: 'Formula', text: formulas[0], tex: formulas[1] });
+        r.steps.push({ title: 'Build the integrand', text: strOf(integrand), tex: texOf(integrand) });
+        r.steps.push({ title: exact ? 'Evaluate exactly (FTC)' : 'Evaluate numerically', text: exact ? `= ${strOf(exact)}` : `tanh-sinh quadrature gives ${fmt(value, 10)}`, tex: '' });
+        if (op === 'average') {
+            const m = [], ff = f;
+            signChanges(x => ff(x) - value, a.value, b.value, 800).forEach(c => m.push(c.x));
+            if (m.length) { r.items.push({ label: 'Mean-value point(s) c:', text: m.map(c => `c = ${fmt(c, 6)}`).join(',  '), tex: '' }); r.steps.push({ title: 'Mean Value Theorem', text: `f(c) = ${fmt(value, 6)} at ${m.map(c => fmt(c, 5)).join(', ')}`, tex: '' }); }
+        }
+        const curves = [curveOf('f(x)', fN, [v])];
+        if (!(gN.type === 'ConstantNode' && gN.value === 0) && op !== 'arclength' && op !== 'average') curves.push(curveOf('g(x)', gN, [v], 'dash'));
+        if (op === 'volumex' || op === 'surface') curves.push(curveOf('−f(x)', OP('-', 'unaryMinus', [P]), [v], 'dot'));
+        r.plot = { variable: v, curves, xRange: rangeFor(a.value, b.value) };
+        if (op === 'area' || op === 'volumex' || op === 'volumey') r.plot.shade2 = { f: strOf(fN), g: strOf(gN), vars: [v], a: a.value, b: b.value, fFn: f, gFn: g };
+        if (op === 'average') { r.plot.shade = { expr: strOf(fN), vars: [v], fn: f, a: a.value, b: b.value }; r.plot.hline = value; }
+        return finalizeText(r);
+    }
+
+    // --------------------------------- Root finding ---------------------------------
+    function runRoot(src, opt) {
+        const node = parse(src);
+        const v = pickVar(node, opt.variable);
+        const f = compile(node, [v]);
+        const d = diff(node, v), df = compile(d, [v]);
+        const method = opt.method || 'newton';
+        const maxIt = Math.max(1, Math.min(60, parseInt(opt.steps, 10) || 12));
+        const tol = Math.abs(parseFloat(opt.tol)) || 1e-12;
+        const r = makeResult('root', { newton: "Newton's method", bisection: 'Bisection method', secant: 'Secant method' }[method] || 'Root finding');
+        const rows = [], segs = [];
+        let x;
+        if (method === 'newton') {
+            x = parseLimit(opt.x0 === undefined || opt.x0 === '' ? '1' : opt.x0, 'Starting guess').value;
+            for (let i = 0; i < maxIt; i++) {
+                const fx = f(x), dfx = df(x);
+                rows.push({ i, x, fx });
+                if (!Number.isFinite(fx) || !Number.isFinite(dfx)) { r.warnings.push('The function or its derivative is undefined at an iterate.'); break; }
+                if (Math.abs(fx) < tol) break;
+                if (Math.abs(dfx) < 1e-14) { r.warnings.push('The derivative is ~0 at an iterate – Newton\'s method cannot continue. Try another starting guess.'); break; }
+                const nx = x - fx / dfx;
+                segs.push({ x: [x, nx], y: [fx, 0] }); segs.push({ x: [nx, nx], y: [0, f(nx)] });
+                x = nx;
+                if (i === maxIt - 1) rows.push({ i: i + 1, x, fx: f(x) });
+            }
+        } else if (method === 'secant') {
+            let x0 = parseLimit(opt.x0 === undefined || opt.x0 === '' ? '0' : opt.x0, 'x₀').value, x1 = parseLimit(opt.x1 === undefined || opt.x1 === '' ? '1' : opt.x1, 'x₁').value;
+            rows.push({ i: 0, x: x0, fx: f(x0) });
+            for (let i = 1; i <= maxIt; i++) {
+                const f0 = f(x0), f1 = f(x1);
+                rows.push({ i, x: x1, fx: f1 });
+                if (!Number.isFinite(f1) || Math.abs(f1) < tol || f1 === f0) break;
+                const nx = x1 - f1 * (x1 - x0) / (f1 - f0);
+                segs.push({ x: [x0, x1, nx], y: [f0, f1, 0] });
+                x0 = x1; x1 = nx;
+            }
+            x = x1;
+        } else {
+            let lo = parseLimit(opt.a === undefined || opt.a === '' ? '0' : opt.a, 'a').value, hi = parseLimit(opt.b === undefined || opt.b === '' ? '2' : opt.b, 'b').value;
+            if (lo > hi) [lo, hi] = [hi, lo];
+            if (!(f(lo) * f(hi) < 0)) throw new CalcError(`f(a) and f(b) must have opposite signs (f(${fmt(lo)}) = ${fmt(f(lo), 4)}, f(${fmt(hi)}) = ${fmt(f(hi), 4)})`);
+            const it = Math.max(maxIt, 1);
+            for (let i = 0; i < Math.max(it, 60); i++) {
+                const mid = (lo + hi) / 2, fm = f(mid);
+                rows.push({ i, x: mid, fx: fm, lo, hi });
+                if (Math.abs(fm) < tol || (hi - lo) / 2 < tol) { x = mid; break; }
+                if (f(lo) * fm < 0) hi = mid; else lo = mid;
+                x = mid;
+            }
+        }
+        const last = rows[rows.length - 1];
+        const conv = last && Number.isFinite(last.fx) && Math.abs(last.fx) < 1e-8 * Math.max(1, Math.abs(last.x));
+        r.main = { label: conv ? 'Root ≈' : 'Last iterate ≈', text: fmt(x, 12), tex: `${v}\\approx ${fmt(x, 12)}` };
+        r.items.push({ label: 'f(root):', text: Number.isFinite(f(x)) ? f(x).toExponential(3) : 'undefined', tex: '' });
+        if (conv) { const nv = nice(x, 10, 1e-9); if (nv.text !== fmt(x, 12)) r.items.push({ label: 'Recognised as:', text: nv.text, tex: nv.tex }); }
+        else r.warnings.push('The iteration did not converge within the step limit.');
+        if (method === 'newton') r.items.push({ label: "f′(x) =", text: strOf(d), tex: `f'(${v})=${texOf(d)}` });
+        rows.forEach(row => r.steps.push({
+            title: `Iteration ${row.i}`,
+            text: method === 'bisection' ? `midpoint = ${fmt(row.x, 12)},  f = ${row.fx.toExponential(3)},  interval [${fmt(row.lo, 8)}, ${fmt(row.hi, 8)}]` : `x = ${fmt(row.x, 14)},  f(x) = ${Number.isFinite(row.fx) ? row.fx.toExponential(3) : 'undefined'}`,
+            tex: ''
+        }));
+        if (method === 'newton') r.steps.unshift({ title: 'Iteration formula', text: `xₙ₊₁ = xₙ − f(xₙ)/f′(xₙ)`, tex: `x_{n+1}=x_n-\\frac{f(x_n)}{f'(x_n)}` });
+        const pts = rows.map((row, k) => ({ x: row.x, y: 0, name: `x${k}`, color: '#ff9500' }));
+        r.plot = { variable: v, curves: [curveOf('f(x)', node, [v])], points: pts, segments: segs, hlines: [0], xRange: [Math.min(...rows.map(q => q.x), x) - 2, Math.max(...rows.map(q => q.x), x) + 2] };
+        return finalizeText(r);
+    }
+
+    // ---------------------------------- Fourier ----------------------------------
+    function runFourier(src, opt) {
+        const node = parse(src);
+        const v = pickVar(node, opt.variable);
+        const a = parseLimit(opt.lower === undefined || opt.lower === '' ? '-pi' : opt.lower, 'Period start');
+        const b = parseLimit(opt.upper === undefined || opt.upper === '' ? 'pi' : opt.upper, 'Period end');
+        if (!Number.isFinite(a.value) || !Number.isFinite(b.value) || a.value >= b.value) throw new CalcError('Use a finite period with start < end');
+        const N = Math.max(1, Math.min(60, parseInt(opt.terms, 10) || 8));
+        const T = b.value - a.value, w = 2 * Math.PI / T;
+        const f = compile(node, [v]);
+        const kinks = kinkPoints(node, v, a.value, b.value);
+        const I = fn => integrateRobust(fn, a.value, b.value, kinks).value;
+        const a0 = 2 / T * I(f);
+        const an = [], bn = [];
+        for (let k = 1; k <= N; k++) {
+            an.push(2 / T * I(x => f(x) * Math.cos(k * w * x)));
+            bn.push(2 / T * I(x => f(x) * Math.sin(k * w * x)));
+        }
+        if (!Number.isFinite(a0) || !an.every(Number.isFinite) || !bn.every(Number.isFinite)) throw new CalcError('The function is not integrable on the period');
+        const clean = x => (Math.abs(x) < 1e-10 ? 0 : x);
+        const terms = [`${snapCoef(clean(a0) / 2)}`];
+        for (let k = 1; k <= N; k++) {
+            if (clean(an[k - 1]) !== 0) terms.push(`${snapCoef(an[k - 1])}*cos(${k * w}*${v})`);
+            if (clean(bn[k - 1]) !== 0) terms.push(`${snapCoef(bn[k - 1])}*sin(${k * w}*${v})`);
+        }
+        const sExpr = terms.join(' + ');
+        const sNode = parse(sExpr);
+        const sf = compile(sNode, [v]);
+        const r = makeResult('fourier', `Fourier series (${N} harmonics)`);
+        const cosOnly = bn.every(x => Math.abs(x) < 1e-8), sinOnly = an.every(x => Math.abs(x) < 1e-8) && Math.abs(a0) < 1e-8;
+        r.main = { label: `S${N}(${v}) =`, text: `${nice(a0 / 2, 6).text} + Σ (aₖ cos kωx + bₖ sin kωx)`, tex: `S_{${N}}(${v})=\\frac{a_0}{2}+\\sum_{k=1}^{${N}}\\left(a_k\\cos(k\\omega ${v})+b_k\\sin(k\\omega ${v})\\right),\\quad \\omega=\\frac{2\\pi}{${fmt(T, 6)}}` };
+        r.items.push({ label: 'Period & frequency:', text: `T = ${fmt(T, 8)},  ω = ${fmt(w, 8)}`, tex: '' });
+        r.items.push({ label: 'a₀ / 2 =', text: nice(a0 / 2, 8).text, tex: '' });
+        for (let k = 1; k <= Math.min(N, 8); k++) r.items.push({ label: `k = ${k}:`, text: `aₖ = ${nice(clean(an[k - 1]), 6).text},   bₖ = ${nice(clean(bn[k - 1]), 6).text}`, tex: '' });
+        if (cosOnly) r.meta.push('All sine coefficients vanish – f is even (cosine series).');
+        if (sinOnly) r.meta.push('All cosine coefficients vanish – f is odd (sine series).');
+        // error estimate
+        let mx = 0; for (let i = 0; i <= 400; i++) { const x = a.value + T * i / 400, d = Math.abs(f(x) - sf(x)); if (Number.isFinite(d)) mx = Math.max(mx, d); }
+        r.meta.push(`Max |f − S${N}| on one period ≈ ${fmt(mx, 4)} (larger near jumps – the Gibbs phenomenon).`);
+        const Ek = [a0 * a0 / 2 + an.reduce((s0, c) => s0 + c * c, 0) + bn.reduce((s0, c) => s0 + c * c, 0)];
+        r.meta.push(`Parseval partial energy: ${fmt(Ek[0] * T / 2, 6)} vs ∫f² = ${fmt(I(x => f(x) * f(x)), 6)}`);
+        r.steps.push({ title: 'Period and frequency', text: `T = b − a = ${fmt(T, 8)}, ω = 2π/T`, tex: `\\omega=\\frac{2\\pi}{T}` });
+        r.steps.push({ title: 'Coefficient formulas', text: 'a₀ = (2/T)∫f,  aₖ = (2/T)∫f·cos(kωx),  bₖ = (2/T)∫f·sin(kωx)', tex: `a_k=\\frac{2}{T}\\int_a^b f(x)\\cos(k\\omega x)\\,dx,\\quad b_k=\\frac{2}{T}\\int_a^b f(x)\\sin(k\\omega x)\\,dx` });
+        r.steps.push({ title: 'Numerical integration', text: `Each coefficient is computed with tanh-sinh quadrature (${2 * N + 1} integrals).`, tex: '' });
+        r.steps.push({ title: 'Assemble the partial sum', text: sExpr.length > 220 ? sExpr.slice(0, 220) + ' …' : sExpr, tex: '' });
+        const lo = a.value - T, hi = b.value + T, M = 1200, tt = [], yy = [], dy = [];
+        const per = x => { let t = ((x - a.value) % T + T) % T; return f(a.value + t); };
+        for (let i = 0; i <= M; i++) { const x = lo + (hi - lo) * i / M; tt.push(x); yy.push(per(x)); }
+        for (let i = 0; i <= M; i++) dy.push(i === 0 || i === M ? 0 : (yy[i + 1] - yy[i - 1]) / (tt[i + 1] - tt[i - 1]) || 0);
+        r.plot = {
+            variable: v,
+            curves: [{ name: 'f (periodic extension)', data: { t: tt, y: yy.map(y => (Number.isFinite(y) ? y : 0)), dy }, fn: hermite({ t: tt, y: yy, dy }) }, curveOf(`S${N}(x)`, sNode, [v], 'dash')],
+            xRange: [lo, hi]
+        };
+        return finalizeText(r);
+    }
+
+    // ----------------------------------- Matrices -----------------------------------
+    function parseMatrix(text, what) {
+        const rows = String(text).split(/[;\n]+/).map(s => s.trim()).filter(Boolean).map(row => row.split(/[,\s]+/).filter(Boolean));
+        if (!rows.length) throw new CalcError(`Enter ${what || 'a matrix'}, e.g.  1 2 ; 3 4`);
+        const w = rows[0].length;
+        if (rows.some(r => r.length !== w)) throw new CalcError('All rows must have the same number of entries');
+        if (rows.length > 8 || w > 8) throw new CalcError('Matrices up to 8×8 are supported');
+        return rows.map(r => r.map(c => { const val = parseLimit(c, 'Matrix entry').value; if (!Number.isFinite(val)) throw new CalcError('Matrix entries must be finite numbers'); return val; }));
+    }
+    const matTex = M => `\\begin{bmatrix}${M.map(r => r.map(x => nice(x, 6, 1e-9).tex).join('&')).join('\\\\')}\\end{bmatrix}`;
+    const matTxt = M => '[ ' + M.map(r => '[' + r.map(x => nice(x, 6, 1e-9).text).join(', ') + ']').join(', ') + ' ]';
+
+    function rref(M) {
+        const A = M.map(r => r.slice()), m = A.length, n = A[0].length, pivots = [];
+        let row = 0;
+        for (let c = 0; c < n && row < m; c++) {
+            let p = row; for (let i = row + 1; i < m; i++) if (Math.abs(A[i][c]) > Math.abs(A[p][c])) p = i;
+            if (Math.abs(A[p][c]) < 1e-10) continue;
+            [A[row], A[p]] = [A[p], A[row]];
+            const d = A[row][c]; A[row] = A[row].map(x => x / d);
+            for (let i = 0; i < m; i++) if (i !== row) { const f0 = A[i][c]; A[i] = A[i].map((x, j) => x - f0 * A[row][j]); }
+            pivots.push(c); row++;
+        }
+        return { A: A.map(r => r.map(x => (Math.abs(x) < 1e-12 ? 0 : x))), pivots };
+    }
+
+    function runMatrix(src, opt) {
+        const M = parseMatrix(src);
+        const m = M.length, n = M[0].length, op = opt.op || 'det';
+        const sq = () => { if (m !== n) throw new CalcError('This operation needs a square matrix'); };
+        const r = makeResult('matrix', 'Matrix algebra');
+        const mm = x => math.matrix(x);
+        r.items.push({ label: 'A =', text: matTxt(M), tex: `A=${matTex(M)}` });
+        r.meta.push(`Size ${m}×${n}`);
+        if (op === 'det') {
+            sq(); const d = math.det(M); r.title = 'Determinant';
+            r.main = { label: 'det(A) =', text: nice(d, 8, 1e-9).text, tex: `\\det A=${nice(d, 8, 1e-9).tex}` };
+            if (Math.abs(d) < 1e-10) r.meta.push('det = 0 → the matrix is singular (not invertible); its rows are linearly dependent.');
+            r.steps.push({ title: 'Method', text: m === 2 ? 'For 2×2: ad − bc.' : 'Expand by cofactors / LU decomposition with partial pivoting.', tex: m === 2 ? `\\det\\begin{bmatrix}a&b\\\\c&d\\end{bmatrix}=ad-bc` : '' });
+            r.steps.push({ title: 'Result', text: nice(d, 10, 1e-9).text, tex: '' });
+        } else if (op === 'inverse') {
+            sq(); const d = math.det(M); r.title = 'Inverse';
+            if (Math.abs(d) < 1e-10) throw new CalcError('The matrix is singular (det = 0) and has no inverse');
+            const inv = math.inv(M);
+            r.main = { label: 'A⁻¹ =', text: matTxt(inv), tex: `A^{-1}=${matTex(inv)}` };
+            r.items.push({ label: 'det(A) =', text: nice(d, 8, 1e-9).text, tex: '' });
+            const prod = math.multiply(M, inv); const idErr = Math.max(...prod.flatMap((row, i) => row.map((x, j) => Math.abs(x - (i === j ? 1 : 0)))));
+            r.meta.push(`Verified: max |A·A⁻¹ − I| = ${idErr.toExponential(2)}`);
+            r.steps.push({ title: 'Gauss–Jordan elimination', text: 'Row-reduce [A | I] until the left block becomes I; the right block is A⁻¹.', tex: '' });
+            r.steps.push({ title: 'Check', text: 'A · A⁻¹ = I', tex: '' });
+        } else if (op === 'transpose') {
+            r.title = 'Transpose'; const t = math.transpose(M);
+            r.main = { label: 'Aᵀ =', text: matTxt(t), tex: `A^{T}=${matTex(t)}` };
+        } else if (op === 'trace') {
+            sq(); const t = M.reduce((s0, row, i) => s0 + row[i], 0); r.title = 'Trace';
+            r.main = { label: 'tr(A) =', text: nice(t, 8, 1e-9).text, tex: `\\operatorname{tr}A=${nice(t, 8, 1e-9).tex}` };
+        } else if (op === 'rank' || op === 'rref') {
+            const { A, pivots } = rref(M); r.title = op === 'rank' ? 'Rank' : 'Reduced row echelon form';
+            if (op === 'rank') r.main = { label: 'rank(A) =', text: String(pivots.length), tex: `\\operatorname{rank}A=${pivots.length}` };
+            else r.main = { label: 'rref(A) =', text: matTxt(A), tex: `\\operatorname{rref}A=${matTex(A)}` };
+            r.items.push({ label: 'Pivot columns:', text: pivots.map(p => p + 1).join(', ') || 'none', tex: '' });
+            r.items.push({ label: 'Nullity:', text: String(n - pivots.length), tex: '' });
+            r.steps.push({ title: 'Gauss–Jordan elimination', text: 'Swap rows for the largest pivot, scale it to 1 and clear the column.', tex: '' });
+            r.steps.push({ title: 'Result', text: `${pivots.length} pivot${pivots.length === 1 ? '' : 's'} → rank ${pivots.length}`, tex: '' });
+            if (op === 'rank') r.items.push({ label: 'rref(A) =', text: matTxt(A), tex: `\\operatorname{rref}A=${matTex(A)}` });
+        } else if (op === 'eigen') {
+            sq(); r.title = 'Eigenvalues & eigenvectors';
+            let e;
+            try { e = math.eigs(M); } catch (err) { throw new CalcError('Could not compute eigenvalues for this matrix'); }
+            const vals = Array.isArray(e.values) ? e.values : e.values.toArray();
+            const fmtC = z => (typeof z === 'number' ? nice(z, 6, 1e-9).text : `${nice(z.re, 5, 1e-9).text} ${z.im < 0 ? '−' : '+'} ${nice(Math.abs(z.im), 5, 1e-9).text}i`);
+            r.main = { label: 'λ =', text: vals.map(fmtC).join(',  '), tex: `\\lambda=${vals.map(z => (typeof z === 'number' ? nice(z, 6, 1e-9).tex : `${nice(z.re, 5, 1e-9).tex}${z.im < 0 ? '-' : '+'}${nice(Math.abs(z.im), 5, 1e-9).tex}i`)).join(',\;')}` };
+            const evs = e.eigenvectors || [];
+            evs.forEach((ev, i) => {
+                const vec = Array.isArray(ev.vector) ? ev.vector : ev.vector.toArray();
+                const nrm = Math.hypot(...vec.map(x => (typeof x === 'number' ? x : x.re)));
+                const sc = vec.map(x => (typeof x === 'number' ? x / (nrm || 1) : x.re / (nrm || 1)));
+                r.items.push({ label: `v${i + 1} (λ = ${fmtC(ev.value)}):`, text: '(' + sc.map(x => fmt(x, 5)).join(', ') + ')', tex: '' });
+            });
+            const tr = M.reduce((s0, row, i) => s0 + row[i], 0), dt = math.det(M);
+            r.meta.push(`Check: Σλ = trace = ${fmt(tr, 6)},  Πλ = det = ${fmt(dt, 6)}`);
+            r.steps.push({ title: 'Characteristic equation', text: 'det(A − λI) = 0', tex: `\\det(A-\\lambda I)=0` });
+            r.steps.push({ title: 'Solve for λ, then (A − λI)v = 0', text: 'Eigenvectors are shown normalised to unit length.', tex: '' });
+        } else if (op === 'charpoly') {
+            sq(); r.title = 'Characteristic polynomial';
+            // Faddeev–LeVerrier
+            const I = M.map((row, i) => row.map((_, j) => (i === j ? 1 : 0)));
+            let Mk = M.map(row => row.map(() => 0)); const c = [1];
+            for (let k = 1; k <= n; k++) {
+                const AM = math.multiply(M, math.add(Mk, math.multiply(c[k - 1], I)));
+                Mk = k === 1 ? I.map(row => row.map(x => x)) : math.add(math.multiply(M, Mk), math.multiply(c[k - 1], I));
+                const AMk = math.multiply(M, Mk);
+                c.push(-AMk.reduce((s0, row, i) => s0 + row[i], 0) / k);
+                void AM;
+            }
+            const poly = simplifyNode(parse(c.map((co, k) => (Math.abs(co) < 1e-10 ? null : `${snapCoef(co)}*t^${n - k}`)).filter(Boolean).join(' + ')));
+            r.main = { label: 'p(λ) =', text: strOf(poly).replace(/\bt\b/g, 'λ'), tex: `p(\\lambda)=${texOf(poly).replace(/\bt\b/g, '\\lambda')}` };
+            const ev = math.eigs(M).values; r.meta.push('Roots of p are the eigenvalues: ' + (Array.isArray(ev) ? ev : ev.toArray()).map(z => (typeof z === 'number' ? fmt(z, 5) : `${fmt(z.re, 4)}±${fmt(Math.abs(z.im), 4)}i`)).join(', '));
+        } else if (op === 'solve') {
+            sq(); const b = parseMatrix(opt.b || '', 'a right-hand side b, e.g.  1 ; 2');
+            if (b.length !== m || b[0].length !== 1) throw new CalcError(`b must be a column of ${m} numbers separated by ;`);
+            r.title = 'Solve A·x = b';
+            const d = math.det(M);
+            if (Math.abs(d) < 1e-10) throw new CalcError('A is singular – the system has no unique solution (try RREF on the augmented matrix)');
+            const x = math.lusolve(M, b).map(rw => rw[0]);
+            r.main = { label: 'x =', text: '(' + x.map(t => nice(t, 8, 1e-9).text).join(', ') + ')', tex: `\\mathbf{x}=\\begin{bmatrix}${x.map(t => nice(t, 8, 1e-9).tex).join('\\\\')}\\end{bmatrix}` };
+            const res = Math.max(...math.multiply(M, x).map((t, i) => Math.abs(t - b[i][0])));
+            r.meta.push(`Verified: max |A·x − b| = ${res.toExponential(2)}`);
+            r.steps.push({ title: 'LU decomposition', text: 'Factor A = LU with partial pivoting, then forward- and back-substitute.', tex: '' });
+        } else if (op === 'power') {
+            sq(); const k = parseInt(opt.power, 10); if (!Number.isInteger(k) || k < -20 || k > 20) throw new CalcError('Power must be an integer between −20 and 20');
+            r.title = `Matrix power A^${k}`; const P = k >= 0 ? math.pow(M, k) : math.pow(math.inv(M), -k);
+            r.main = { label: `A^${k} =`, text: matTxt(P), tex: `A^{${k}}=${matTex(P)}` };
+        } else throw new CalcError('Unknown matrix operation');
+        return finalizeText(r);
+    }
+
+    // ------------------------------- Multi-function grapher -------------------------------
+    function intersections(fa, fb, lo, hi, N) {
+        return signChanges(x => fa(x) - fb(x), lo, hi, N || 1500).filter(c => !c.exact || true).map(c => c.x).filter(x => Number.isFinite(fa(x)) && Math.abs(fa(x) - fb(x)) < 1e-6 * Math.max(1, Math.abs(fa(x))));
+    }
+
+    function runGraph(src, opt) {
+        const parts = String(src).split(/[;\n]+/).map(s => s.trim()).filter(Boolean);
+        if (!parts.length) throw new CalcError('Enter one or more functions separated by ;');
+        if (parts.length > 8) throw new CalcError('Up to 8 functions at a time');
+        const nodes = parts.map(p => parse(p.replace(/^\s*(y|f\(x\)|g\(x\)|h\(x\))\s*=\s*/, '')));
+        const all = sortVars([...new Set(nodes.flatMap(freeVars))]);
+        const indep = all.includes('x') ? 'x' : (all[0] || 'x');
+        const params = all.filter(n => n !== indep);
+        if (params.length > 6) throw new CalcError('Up to 6 parameters (sliders) at a time');
+        const r = makeResult('graph', parts.length > 1 ? 'Graph of several functions' : 'Graph');
+        r.main = { label: '', text: nodes.map(strOf).join(';  '), tex: nodes.map((nd, i) => `f_{${i + 1}}(${indep})=${texOf(nd)}`).join(',\;') };
+        const defaults = {}; params.forEach(p => { defaults[p] = 1; });
+        nodes.forEach((nd, i) => {
+            let d = null; try { if (freeVars(nd).includes(indep)) d = diff(nd, indep); } catch (e) { /* not differentiable */ }
+            if (d) r.items.push({ label: `f${i + 1}′ =`, text: strOf(d), tex: `f_{${i + 1}}'(${indep})=${texOf(d)}` });
+        });
+        if (params.length) r.meta.push(`Parameters: ${params.join(', ')} – drag the sliders under the plot to see the graph respond.`);
+        r.steps.push({ title: 'How to explore', text: 'Plot several functions at once, separated by ;. Any extra letter becomes a slider. Intersections are marked automatically, and you can pan/zoom freely.', tex: '' });
+        const curves = nodes.map((nd, i) => ({ name: `f${i + 1}(${indep})`, expr: strOf(nd), vars: [indep, ...params], fn: compile(nd, [indep, ...params]) }));
+        r.plot = { variable: indep, curves, params: params.map(p => ({ name: p, value: 1, min: -5, max: 5, step: 0.05 })), paramVars: params, interactive: true, xRange: [-10, 10] };
+        return finalizeText(r);
+    }
+
     // ------------------------------------------------------------------
     // Public API
     // ------------------------------------------------------------------
@@ -2148,10 +2586,11 @@
 
     return {
         CalcError, parse, inspect, clean, freeVars, compile, diff, fmt, nice, strOf, texOf,
-        serialize, hydrate, antiderivative, integrateNumeric, integrateRobust, tanhSinhFinite, rk45, checkAntiderivative,
+        serialize, hydrate, intersections, antiderivative, integrateNumeric, integrateRobust, tanhSinhFinite, rk45, checkAntiderivative,
         run: {
             derivative: runDerivative, integral: runIntegral, series: runSeries, limit: runLimit,
-            analysis: runAnalysis, ode: runODE, multivariable: runMultivariable
+            analysis: runAnalysis, ode: runODE, multivariable: runMultivariable,
+            riemann: runRiemann, applications: runApplications, root: runRoot, fourier: runFourier, matrix: runMatrix, graph: runGraph
         }
     };
 });

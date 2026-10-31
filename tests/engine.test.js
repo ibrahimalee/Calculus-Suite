@@ -317,3 +317,73 @@ test('formatting helpers', () => {
     assert.equal(E.nice(Math.PI / 2).text, 'π/2');
     assert.equal(E.nice(-Math.PI).text, '-π');
 });
+
+test('Riemann sums converge to the integral', () => {
+    const exact = 1 / 3;
+    const val = (rule, n) => parseFloat(E.run.riemann('x^2', { lower: '0', upper: '1', n: String(n), rule }).main.text.replace('Approximation ≈', ''));
+    close(val('left', 10), 0.285, 1e-9); close(val('right', 10), 0.385, 1e-9);
+    close(val('mid', 10), 0.3325, 1e-9); close(val('trap', 10), 0.335, 1e-9);
+    close(val('simpson', 10), exact, 1e-5);
+    assert.ok(Math.abs(val('left', 2000) - exact) < 1e-3);
+    const r = E.run.riemann('x^2', { lower: '0', upper: '1', n: '8', rule: 'mid' });
+    assert.equal(r.plot.bars.length, 8);
+    assert.ok(r.items.some(i => /Exact/.test(i.label)));
+    assert.throws(() => E.run.riemann('x', { lower: '2', upper: '1' }), E.CalcError);
+});
+
+test('applications of integration', () => {
+    const v = (src, o) => parseFloat(E.run.applications(src, o).main.text.split('≈').pop());
+    close(v('x', { op: 'area', g: 'x^2', lower: '0', upper: '1' }), 1 / 6, 1e-5);
+    close(v('sin(x)', { op: 'area', lower: '0', upper: '2*pi' }), 4, 1e-6);
+    close(v('sqrt(x)', { op: 'volumex', lower: '0', upper: '4' }), 8 * Math.PI, 1e-6);
+    close(v('x', { op: 'volumey', lower: '0', upper: '1' }), 2 * Math.PI / 3, 1e-6);
+    close(v('x', { op: 'arclength', lower: '0', upper: '1' }), Math.SQRT2, 1e-6);
+    close(v('x^2', { op: 'arclength', lower: '0', upper: '1' }), 1.4789428575, 1e-6);
+    close(v('x', { op: 'surface', lower: '0', upper: '1' }), Math.PI * Math.SQRT2, 1e-6);
+    close(v('x^2', { op: 'average', lower: '0', upper: '3' }), 3, 1e-6);
+    assert.ok(E.run.applications('x^2', { op: 'average', lower: '0', upper: '3' }).plot.hline);
+});
+
+test('root finding', () => {
+    const root = (src, o) => parseFloat(E.run.root(src, o).main.text.replace(/^[^≈]*≈/, ''));
+    close(root('x^2-2', { method: 'newton', x0: '1' }), Math.SQRT2, 1e-10);
+    close(root('cos(x)-x', { method: 'bisection', a: '0', b: '1' }), 0.7390851332, 1e-8);
+    close(root('x^3-x-2', { method: 'secant', x0: '1', x1: '2' }), 1.5213797068, 1e-9);
+    assert.ok(E.run.root('x^2+1', { method: 'newton', x0: '1', steps: '8' }).warnings.length > 0);
+    assert.throws(() => E.run.root('x^2+1', { method: 'bisection', a: '0', b: '1' }), E.CalcError);
+});
+
+test('Fourier series', () => {
+    const saw = E.run.fourier('x', { terms: '30' });
+    const S = saw.plot.curves[1].fn;
+    close(S(1), 1, 3e-2);
+    const abs = E.run.fourier('abs(x)', { terms: '10' });
+    close(abs.plot.curves[1].fn(2), 2, 2e-2);
+    assert.ok(abs.meta.some(m => /even/.test(m)));
+    assert.ok(saw.meta.some(m => /odd/.test(m)));
+});
+
+test('matrix algebra', () => {
+    const main = (m, o) => E.run.matrix(m, o).main.text;
+    assert.equal(main('1 2 ; 3 4', { op: 'det' }), '-2');
+    assert.equal(main('1 2 ; 3 4', { op: 'inverse' }), '[ [-2, 1], [3/2, -1/2] ]');
+    assert.equal(main('2 1 ; 1 3', { op: 'solve', b: '3 ; 5' }), '(4/5, 7/5)');
+    assert.equal(main('1 2 3 ; 4 5 6 ; 7 8 9', { op: 'rank' }), '2');
+    assert.equal(main('1 1 ; 1 0', { op: 'power', power: '10' }), '[ [89, 55], [55, 34] ]');
+    assert.equal(main('1 2 ; 3 4', { op: 'transpose' }), '[ [1, 3], [2, 4] ]');
+    assert.equal(main('2 1 ; 1 2', { op: 'eigen' }), '1,  3');
+    assert.match(main('1 2 ; 3 4', { op: 'charpoly' }), /λ/);
+    assert.throws(() => E.run.matrix('1 2 ; 2 4', { op: 'inverse' }), E.CalcError);
+    assert.throws(() => E.run.matrix('1 2 3 ; 4 5', { op: 'det' }), E.CalcError);
+    assert.throws(() => E.run.matrix('1 2 3 ; 4 5 6', { op: 'det' }), E.CalcError);
+});
+
+test('grapher: several functions with parameters', () => {
+    const r = E.run.graph('a*sin(b*x) ; x^2/5', {});
+    assert.deepEqual(r.plot.paramVars, ['a', 'b']);
+    assert.equal(r.plot.curves.length, 2);
+    close(r.plot.curves[0].fn(Math.PI / 2, 2, 1), 2);
+    const xs = E.intersections(E.compile(E.parse('x'), ['x']), E.compile(E.parse('x^2'), ['x']), -2, 3);
+    assert.equal(xs.length, 2);
+    assert.throws(() => E.run.graph('', {}), E.CalcError);
+});
