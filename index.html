@@ -2,34 +2,171 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="0; url=CalculusSuite.html">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculus Suite Pro</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            background: #f5f5f7;
-            color: #1d1d1f;
-            text-align: center;
-        }
-
-        a {
-            color: #007aff;
-            text-decoration: none;
-            font-weight: 600;
-        }
-    </style>
+    <title>Calculus Suite Pro – derivatives, integrals, series, limits, ODEs &amp; 3D plots</title>
+    <meta name="description" content="Free, offline-capable calculus workstation: step-by-step derivatives, integrals, Taylor series, limits, function analysis, differential equations and multivariable calculus with live 2D/3D plots.">
+    <meta name="theme-color" content="#667eea">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23667eea'/%3E%3Ctext x='50' y='70' font-size='62' text-anchor='middle' fill='white' font-family='serif'%3E%E2%88%AB%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="js/lib-guard.js"></script>
 </head>
 <body>
-    <div>
-        <p>Redirecting to <strong>Calculus Suite Pro</strong>...</p>
-        <p>If you are not redirected automatically, <a href="CalculusSuite.html">click here</a>.</p>
+    <div class="hero-bg"></div>
+    <a class="skip-link" href="#functionInput">Skip to input</a>
+
+    <div class="container" id="app">
+        <header>
+            <div class="hero-pill">Symbolic · Numeric · Visual</div>
+            <h1>⚡ Calculus Suite Pro</h1>
+            <p class="subtitle">Derivatives, integrals, series, limits, differential equations and multivariable calculus – with step-by-step reasoning and live 2D / 3D plots. Everything runs in your browser.</p>
+            <div class="hero-meta">
+                <span>Step-by-step solutions</span>
+                <span>Works offline</span>
+                <span>Shareable links</span>
+            </div>
+            <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">☀️</button>
+            <button class="help-btn" id="helpBtn" type="button" aria-label="Open syntax help" title="Syntax help (?)">?</button>
+        </header>
+
+        <noscript><div class="alert alert-error"><span class="alert-icon">⚠</span><span>Calculus Suite Pro needs JavaScript to run.</span></div></noscript>
+
+        <div class="main-grid">
+            <aside class="sidebar" aria-label="Inputs">
+                <div class="section">
+                    <label class="label" for="functionInput"><span>📝</span><span id="inputLabel">f(x)</span></label>
+                    <textarea id="functionInput" rows="2" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="e.g. x^2 * sin(x)"></textarea>
+                    <div class="input-hint" id="inputHint"></div>
+                    <div id="preview" class="preview-box" aria-live="polite">Enter a function to begin…</div>
+                    <div class="keypad" id="keypad" aria-label="Symbol keypad"></div>
+                    <select id="examples" class="examples-select" aria-label="Load an example"></select>
+                </div>
+
+                <div class="section">
+                    <div class="label"><span>⚡</span><span>Quick Templates</span></div>
+                    <div class="templates-grid" id="templates"></div>
+                </div>
+
+                <div class="section">
+                    <label class="label" for="operationMode"><span>🎯</span><span>Operation Mode</span></label>
+                    <select id="operationMode"></select>
+                    <div id="modeOptions" class="mode-options"></div>
+                </div>
+
+                <div class="section">
+                    <div class="label"><span>⚙️</span><span>Settings</span></div>
+                    <div class="settings-section">
+                        <div class="setting-row">
+                            <div class="setting-label"><label for="precision">Precision (digits)</label><span class="setting-value" id="precisionValue">6</span></div>
+                            <input type="range" class="slider" id="precision" min="2" max="12" value="6">
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label"><label for="resolution">Plot resolution</label><span class="setting-value" id="resolutionValue">400</span></div>
+                            <input type="range" class="slider" id="resolution" min="100" max="1000" value="400" step="100">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="btn-grid">
+                    <button class="btn btn-primary" id="computeBtn" type="button"><span>🚀</span><span>Compute</span></button>
+                    <button class="btn btn-secondary" id="clearBtn" type="button"><span>🗑️</span><span>Clear</span></button>
+                </div>
+                <div class="shortcut-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> compute · <kbd>Ctrl</kbd>+<kbd>K</kbd> clear · <kbd>?</kbd> help</div>
+
+                <div class="section history-section">
+                    <div class="label history-head"><span>🕘</span><span>History</span><button class="mini-btn" id="clearHistory" type="button">Clear</button></div>
+                    <div id="historyList" class="history-list"></div>
+                </div>
+            </aside>
+
+            <main class="workspace">
+                <div class="tabs" role="tablist">
+                    <button class="tab active" id="tab-results" data-tab="results" role="tab" aria-selected="true" type="button">📊 Results</button>
+                    <button class="tab" id="tab-plot" data-tab="plot" role="tab" aria-selected="false" type="button">📈 2D Plot</button>
+                    <button class="tab" id="tab-plot3d" data-tab="plot3d" role="tab" aria-selected="false" type="button">🎮 3D Plot</button>
+                    <button class="tab" id="tab-steps" data-tab="steps" role="tab" aria-selected="false" type="button">📚 Steps</button>
+                </div>
+
+                <div id="results" class="tab-content active" role="tabpanel" aria-live="polite">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🧮</div>
+                        <h3>Ready to Compute</h3>
+                        <p>Enter a function, pick an operation and press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> – or load an example.</p>
+                    </div>
+                </div>
+
+                <div id="plot" class="tab-content" role="tabpanel">
+                    <div class="plot-container">
+                        <div class="plot-controls">
+                            <label>x from <input type="text" id="xMin" placeholder="auto" inputmode="decimal" size="6"></label>
+                            <label>to <input type="text" id="xMax" placeholder="auto" inputmode="decimal" size="6"></label>
+                            <button class="mini-btn" id="resetRange" type="button">Reset range</button>
+                            <span class="plot-tip">Drag to pan, scroll to zoom, double-click to reset.</span>
+                        </div>
+                        <div id="plot2d" class="plot-area"></div>
+                        <div id="plotPhase" class="plot-area plot-phase" style="display:none"></div>
+                    </div>
+                </div>
+
+                <div id="plot3d" class="tab-content" role="tabpanel">
+                    <div class="plot-container">
+                        <div class="plot-controls">
+                            <label><input type="radio" name="view3d" value="surface" checked> Surface</label>
+                            <label><input type="radio" name="view3d" value="contour"> Contour map</label>
+                            <span class="plot-tip">Drag to rotate, scroll to zoom.</span>
+                        </div>
+                        <div id="plot3dDiv" class="plot-area plot-3d"></div>
+                    </div>
+                </div>
+
+                <div id="steps" class="tab-content" role="tabpanel">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📖</div>
+                        <h3>Step-by-Step Solutions</h3>
+                        <p>The reasoning behind each result appears here</p>
+                    </div>
+                </div>
+            </main>
+        </div>
     </div>
+
+    <dialog id="helpDialog" class="help-dialog" aria-labelledby="helpTitle">
+        <div class="help-head"><h2 id="helpTitle">Syntax &amp; tips</h2><button class="mini-btn" id="helpClose" type="button">Close ✕</button></div>
+        <div class="help-body">
+            <table>
+                <tr><th>You type</th><th>Meaning</th></tr>
+                <tr><td><code>x^2</code>, <code>x**2</code>, <code>x²</code></td><td>powers</td></tr>
+                <tr><td><code>2x</code>, <code>2 sin(x)</code>, <code>x(x+1)</code></td><td>implicit multiplication</td></tr>
+                <tr><td><code>sin cos tan sec csc cot</code></td><td>trigonometric functions (radians)</td></tr>
+                <tr><td><code>asin acos atan</code> or <code>arcsin …</code></td><td>inverse trig</td></tr>
+                <tr><td><code>sinh cosh tanh</code></td><td>hyperbolic</td></tr>
+                <tr><td><code>ln(x)</code>, <code>log(x)</code>, <code>log10</code>, <code>log2</code></td><td>logarithms (<code>log</code> = natural log)</td></tr>
+                <tr><td><code>e^x</code>, <code>exp(x)</code>, <code>pi</code>, <code>π</code></td><td>constants &amp; exponential</td></tr>
+                <tr><td><code>sqrt(x)</code>, <code>√x</code>, <code>cbrt(x)</code>, <code>abs(x)</code>, <code>|x|</code></td><td>roots &amp; absolute value</td></tr>
+                <tr><td><code>inf</code>, <code>-inf</code>, <code>∞</code></td><td>infinity (limits &amp; improper integrals)</td></tr>
+                <tr><td><code>P ; Q ; R</code></td><td>components of a vector field or ODE system</td></tr>
+                <tr><td><code>yp</code></td><td>y′ inside a second-order ODE</td></tr>
+            </table>
+            <h3>Good to know</h3>
+            <ul>
+                <li><strong>Symbolic results are verified.</strong> Antiderivatives are re-checked by differentiation at sample points before they are shown.</li>
+                <li><strong>Limits, roots and extrema are numerical</strong> – excellent for exploration, but not formal proofs.</li>
+                <li>Not every integral has an elementary closed form (e.g. <code>e^(x²)</code>). Use limits to get a numerical value.</li>
+                <li>Use <strong>Share</strong> on a result to copy a link that reproduces the whole calculation.</li>
+                <li>Long computations run in a background thread and are stopped automatically after 25&nbsp;s.</li>
+            </ul>
+        </div>
+    </dialog>
+
+    <footer class="cupertino-footer">
+        <div class="footer-inner">
+            <div class="footer-copy">Crafted for mathematicians who care about every pixel and decimal.</div>
+            <div class="footer-contact">
+                <a href="mailto:crankyhydra@gmail.com">crankyhydra@gmail.com</a>
+                <span class="footer-bullet">•</span>
+                <a href="https://github.com/Ibrahemeogoblin" target="_blank" rel="noopener">github.com/Ibrahemeogoblin</a>
+            </div>
+        </div>
+    </footer>
 </body>
 </html>
-

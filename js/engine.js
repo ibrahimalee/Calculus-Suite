@@ -214,7 +214,7 @@
     }
 
     function numDeriv(f, x) {
-        const h = 1e-3 * Math.max(1, Math.abs(x));
+        const h = 1e-4 * Math.max(1, Math.abs(x));
         return (-f(x + 2 * h) + 8 * f(x + h) - 8 * f(x - h) + f(x - 2 * h)) / (12 * h);
     }
 
@@ -229,8 +229,8 @@
         if (x === 0) return '0';
         const a = Math.abs(x);
         if (a >= 1e9 || a < 1e-6) return x.toExponential(Math.max(1, digits - 1)).replace(/\.?0+e/, 'e');
-        let s = x.toFixed(digits);
-        if (s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, '');
+        let s = a >= 1 ? x.toFixed(digits) : x.toPrecision(Math.max(1, digits));
+        if (s.indexOf('e') < 0 && s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, '');
         return s === '-0' ? '0' : s;
     }
 
@@ -410,7 +410,7 @@
         let good = 0, bad = 0;
         for (const x of CHECK_POINTS) {
             const a = numDeriv(fF, x), b = ff(x);
-            if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+            if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(b) > 1e5) continue;
             if (Math.abs(a - b) <= 1e-5 * Math.max(1, Math.abs(b))) good++; else bad++;
         }
         return bad === 0 && good >= 3;
@@ -548,12 +548,16 @@
             return { ok: true, F, method: label, steps: (extra || []).concat(steps) };
         };
         if (!dependsOn(node, v)) {
-            const F = OP('*', 'multiply', [node, S(v)]);
+            const F = simplifyNode(OP('*', 'multiply', [node, S(v)]));
             return { ok: true, F, method: 'Constant rule', steps: [{ title: 'Constant rule', text: `∫ c dx = c·x`, tex: `\\int c\\,d${v}=c${v}` }] };
         }
         if (method === 'auto' || method === 'table') {
             const t = tableLookup(node, v);
             if (t) return finish(t, 'Standard integral table', [{ title: 'Standard form', text: 'The integrand matches a known integral.', tex: `\\int ${texOf(node)}\\,d${v}=${texOf(absLogs(t))}` }]);
+        }
+        if (method === 'auto' || method === 'partial') {
+            const pf = integrateRational(node, v);
+            if (pf) return finish(pf.F, 'Partial fractions', pf.steps);
         }
         if (method === 'auto' || method === 'cas') {
             const out = runAlgebrite(`integral(${toAlgebrite(node)}, ${v})`);
@@ -584,6 +588,212 @@
             steps.length = 0;
         }
         return { ok: false, method, steps: [] };
+    }
+
+
+    // ------------------------------------------------------------------
+    // Rational functions: polynomial division + partial fractions
+    // ------------------------------------------------------------------
+    const polyTrim = p => { p = p.slice(); while (p.length > 1 && Math.abs(p[p.length - 1]) < 1e-13) p.pop(); return p; };
+    const polyAdd = (a, b) => { const n = Math.max(a.length, b.length), r = []; for (let i = 0; i < n; i++) r.push((a[i] || 0) + (b[i] || 0)); return polyTrim(r); };
+    const polyScale = (a, k) => polyTrim(a.map(c => c * k));
+    const polyMul = (a, b) => { const r = new Array(a.length + b.length - 1).fill(0); a.forEach((x, i) => b.forEach((y, j) => { r[i + j] += x * y; })); return polyTrim(r); };
+    const polyEval = (p, x) => p.reduceRight((acc, c) => acc * x + c, 0);
+    function polyDivMod(n, d) {
+        n = polyTrim(n); d = polyTrim(d);
+        if (n.length < d.length) return [[0], n];
+        const q = new Array(n.length - d.length + 1).fill(0), r = n.slice();
+        for (let i = n.length - d.length; i >= 0; i--) {
+            const c = r[i + d.length - 1] / d[d.length - 1];
+            q[i] = c;
+            for (let j = 0; j < d.length; j++) r[i + j] -= c * d[j];
+        }
+        return [polyTrim(q), polyTrim(r.slice(0, Math.max(1, d.length - 1)))];
+    }
+
+    /** AST -> {n, d} polynomial fraction in v, or null when the expression is not rational. */
+    function toRational(node, v) {
+        const one = [1];
+        const make = (n, d) => ({ n: polyTrim(n), d: polyTrim(d) });
+        const add = (a, b) => make(polyAdd(polyMul(a.n, b.d), polyMul(b.n, a.d)), polyMul(a.d, b.d));
+        const mul = (a, b) => make(polyMul(a.n, b.n), polyMul(a.d, b.d));
+        const inv = a => (a.n.length === 1 && Math.abs(a.n[0]) < 1e-14 ? null : make(a.d, a.n));
+        const rec = n => {
+            n = unwrap(n);
+            if (n.type === 'ConstantNode') return make([n.value], one);
+            if (n.type === 'SymbolNode') {
+                if (n.name === v) return make([0, 1], one);
+                if (CONSTS.has(n.name)) { const c = compile(n, [])(); return Number.isFinite(c) ? make([c], one) : null; }
+                return null; // other free symbols – treat as non-rational for simplicity
+            }
+            if (n.type !== 'OperatorNode') return null;
+            const a = n.args.map(rec);
+            if (a.some(x => !x)) return null;
+            switch (n.fn) {
+                case 'add': return add(a[0], a[1]);
+                case 'subtract': return add(a[0], make(polyScale(a[1].n, -1), a[1].d));
+                case 'unaryMinus': return make(polyScale(a[0].n, -1), a[0].d);
+                case 'unaryPlus': return a[0];
+                case 'multiply': return a.reduce((x, y) => mul(x, y));
+                case 'divide': { const iv = inv(a[1]); return iv ? mul(a[0], iv) : null; }
+                case 'pow': {
+                    const e = unwrap(n.args[1]);
+                    if (e.type === 'OperatorNode' && e.fn === 'unaryMinus' && unwrap(e.args[0]).type === 'ConstantNode') {
+                        const k = unwrap(e.args[0]).value;
+                        if (!Number.isInteger(k) || k > 12) return null;
+                        let r = make(one, one); for (let i = 0; i < k; i++) r = mul(r, a[0]);
+                        return inv(r);
+                    }
+                    if (e.type !== 'ConstantNode' || !Number.isInteger(e.value) || e.value < 0 || e.value > 12) return null;
+                    let r = make(one, one); for (let i = 0; i < e.value; i++) r = mul(r, a[0]);
+                    return r;
+                }
+                default: return null;
+            }
+        };
+        return rec(node);
+    }
+
+    /** All complex roots of a polynomial (Aberth/Durand–Kerner), returned as [{re, im}]. */
+    function polyRoots(p) {
+        p = polyTrim(p);
+        const n = p.length - 1;
+        if (n < 1) return [];
+        const lead = p[n], c = p.map(x => x / lead);
+        const f = z => { let re = 1, im = 0; for (let i = n - 1; i >= 0; i--) { const r2 = re * z[0] - im * z[1] + c[i], i2 = re * z[1] + im * z[0]; re = r2; im = i2; } return [re, im]; };
+        const R = 1 + Math.max(...c.slice(0, n).map(Math.abs));
+        let z = [];
+        for (let k = 0; k < n; k++) { const t = 2 * Math.PI * k / n + 0.4; z.push([R * 0.5 * Math.cos(t), R * 0.5 * Math.sin(t)]); }
+        for (let it = 0; it < 2000; it++) {
+            let delta = 0;
+            for (let i = 0; i < n; i++) {
+                const [fr, fi] = f(z[i]);
+                let dr = 1, di = 0;
+                for (let j = 0; j < n; j++) {
+                    if (j === i) continue;
+                    const ar = z[i][0] - z[j][0], ai = z[i][1] - z[j][1];
+                    const nr = dr * ar - di * ai, ni = dr * ai + di * ar; dr = nr; di = ni;
+                }
+                const den = dr * dr + di * di || 1e-300;
+                const qr = (fr * dr + fi * di) / den, qi = (fi * dr - fr * di) / den;
+                z[i] = [z[i][0] - qr, z[i][1] - qi];
+                delta = Math.max(delta, Math.hypot(qr, qi));
+            }
+            if (delta < 1e-15 * Math.max(1, R)) break;
+        }
+        return z.map(([re, im]) => ({ re, im }));
+    }
+
+    const snapCoef = x => {
+        if (!Number.isFinite(x)) return 'NaN';
+        for (let k = 1; k <= 60; k++) {
+            const n = Math.round(x * k);
+            if (Math.abs(x - n / k) < 1e-9 * Math.max(1, Math.abs(x))) return k === 1 ? String(n) : `(${n}/${k})`;
+        }
+        return `(${x.toPrecision(13)})`;
+    };
+
+    function integrateRational(node, v) {
+        const rat = toRational(node, v);
+        if (!rat) return null;
+        const Q0 = rat.d;
+        if (Q0.length < 2) return null; // plain polynomial: let the normal pipeline handle it
+        const [quo, rem] = polyDivMod(rat.n, Q0);
+        const lc = Q0[Q0.length - 1];
+        const Qm = polyScale(Q0, 1 / lc);               // monic denominator
+        const R = polyScale(rem, 1 / lc);               // remainder / lc over monic Q
+        const roots = polyRoots(Qm);
+        // group roots
+        const groups = []; // {kind:'real', r, m} | {kind:'quad', a, b, m}
+        const used = new Array(roots.length).fill(false);
+        const scale = Math.max(1, ...roots.map(r => Math.hypot(r.re, r.im)));
+        const tol = 1e-4 * scale;
+        for (let i = 0; i < roots.length; i++) {
+            if (used[i]) continue;
+            const cl = [i]; used[i] = true;
+            for (let j = i + 1; j < roots.length; j++) if (!used[j] && Math.hypot(roots[j].re - roots[i].re, roots[j].im - roots[i].im) < tol) { cl.push(j); used[j] = true; }
+            const re = cl.reduce((s, k) => s + roots[k].re, 0) / cl.length, im = cl.reduce((s, k) => s + roots[k].im, 0) / cl.length;
+            if (Math.abs(im) < 1e-7 * scale) groups.push({ kind: 'real', r: Math.abs(re) < 1e-12 ? 0 : re, m: cl.length });
+            else if (im > 0) groups.push({ kind: 'quad', a: re, b: im, m: cl.length });
+        }
+        const degCheck = groups.reduce((s, g) => s + (g.kind === 'real' ? g.m : 2 * g.m), 0);
+        if (degCheck !== Qm.length - 1) return null;
+        // snap near-integer / simple-fraction roots for cleaner output
+        const snapRoot = x => { for (let k = 1; k <= 12; k++) { const n = Math.round(x * k); if (Math.abs(x - n / k) < 1e-8 * Math.max(1, Math.abs(x))) return n / k; } return x; };
+        groups.forEach(g => { if (g.kind === 'real') g.r = snapRoot(g.r); else { g.a = snapRoot(g.a); g.b = snapRoot(g.b); } });
+        const factorPoly = g => (g.kind === 'real' ? [-g.r, 1] : [g.a * g.a + g.b * g.b, -2 * g.a, 1]);
+        const powPoly = (p, k) => { let r = [1]; for (let i = 0; i < k; i++) r = polyMul(r, p); return r; };
+        // unknowns
+        const cols = [], desc = [];
+        groups.forEach((g, gi) => {
+            for (let j = 1; j <= g.m; j++) {
+                let others = [1];
+                groups.forEach((h, hi) => { others = polyMul(others, powPoly(factorPoly(h), hi === gi ? h.m - j : h.m)); });
+                if (g.kind === 'real') { cols.push(others); desc.push({ g, j, type: 'A' }); }
+                else { cols.push(polyMul(others, [0, 1])); desc.push({ g, j, type: 'B' }); cols.push(others); desc.push({ g, j, type: 'C' }); }
+            }
+        });
+        const N = cols.length;
+        const M = [], rhs = [];
+        for (let k = 0; k < N; k++) { M.push(cols.map(c => c[k] || 0)); rhs.push([R[k] || 0]); }
+        let sol;
+        try { sol = math.lusolve(M, rhs).map(r => r[0]); } catch (e) { return null; }
+        if (!sol.every(Number.isFinite)) return null;
+
+        // integrate term by term
+        const terms = [], steps = [];
+        const addTerm = t => terms.push(t);
+        if (quo.length > 1 || Math.abs(quo[0]) > 1e-12) {
+            quo.forEach((c, k) => { if (Math.abs(c) > 1e-12) addTerm(`${snapCoef(c / (k + 1))}*${v}^${k + 1}`); });
+        }
+        const coefOf = {};
+        desc.forEach((d, i) => { coefOf[`${groups.indexOf(d.g)}_${d.j}_${d.type}`] = sol[i]; });
+        const pieces = [];
+        groups.forEach((g, gi) => {
+            for (let j = 1; j <= g.m; j++) {
+                if (g.kind === 'real') {
+                    const A = coefOf[`${gi}_${j}_A`];
+                    if (Math.abs(A) < 1e-12) continue;
+                    const base = g.r === 0 ? v : `(${v} - ${snapCoef(g.r)})`;
+                    pieces.push(`${snapCoef(A)}/${j === 1 ? base : base + '^' + j}`);
+                    addTerm(j === 1 ? `${snapCoef(A)}*log(abs(${g.r === 0 ? v : `${v} - ${snapCoef(g.r)}`}))` : `${snapCoef(A / (1 - j))}*${base}^${1 - j}`);
+                } else {
+                    const B = coefOf[`${gi}_${j}_B`], Cc = coefOf[`${gi}_${j}_C`];
+                    if (Math.abs(B) < 1e-12 && Math.abs(Cc) < 1e-12) continue;
+                    const pq = `(${v}^2 - ${snapCoef(2 * g.a)}*${v} + ${snapCoef(g.a * g.a + g.b * g.b)})`;
+                    pieces.push(`(${snapCoef(B)}*${v} + ${snapCoef(Cc)})/${j === 1 ? pq : pq + '^' + j}`);
+                    const u = `(${v} - ${snapCoef(g.a)})`, d = g.b, E0 = Cc + B * g.a; // Bx+C = B(x-a) + (C+Ba)
+                    const U2D2 = `(${u}^2 + ${snapCoef(d * d)})`;
+                    if (Math.abs(B) > 1e-12) addTerm(j === 1 ? `${snapCoef(B / 2)}*log(${U2D2})` : `${snapCoef(B / 2 / (1 - j))}*${U2D2}^${1 - j}`);
+                    if (Math.abs(E0) > 1e-12) {
+                        // J_j = ∫ du/(u²+d²)^j via reduction formula
+                        let J = `(${snapCoef(1 / d)})*atan(${u}/${snapCoef(d)})`;
+                        for (let k = 2; k <= j; k++) {
+                            J = `(${u}/(${snapCoef(2 * d * d * (k - 1))}*${U2D2}^${k - 1}) + ${snapCoef((2 * k - 3) / (2 * d * d * (k - 1)))}*(${J}))`;
+                        }
+                        addTerm(`${snapCoef(E0)}*(${J})`);
+                    }
+                }
+            }
+        });
+        if (!terms.length) return null;
+        let F;
+        try { F = parse(terms.join(' + ')); } catch (e) { return null; }
+        F = simplifyNode(F);
+        if (!checkAntiderivative(F, node, v)) return null;
+        // explanation
+        const polyStr = p => p.map((c, k) => (Math.abs(c) < 1e-12 ? null : `${snapCoef(c)}${k ? '*' + v + (k > 1 ? '^' + k : '') : ''}`)).filter(Boolean).join(' + ').replace(/\+ -/g, '- ') || '0';
+        if (quo.length > 1 || Math.abs(quo[0]) > 1e-12) {
+            steps.push({ title: 'Polynomial long division', text: `The numerator has degree ≥ the denominator, so divide: quotient ${polyStr(quo)}, remainder ${polyStr(rem)}.`, tex: '' });
+        }
+        steps.push({
+            title: 'Factor the denominator',
+            text: 'Roots of the denominator: ' + groups.map(g => (g.kind === 'real' ? `${v} = ${fmt(g.r, 6)}${g.m > 1 ? ` (multiplicity ${g.m})` : ''}` : `${v} = ${fmt(g.a, 6)} ± ${fmt(g.b, 6)}i${g.m > 1 ? ` (multiplicity ${g.m})` : ''}`)).join(', ') + '.',
+            tex: ''
+        });
+        steps.push({ title: 'Partial fraction decomposition', text: `${strOf(node)} = ${quo.length > 1 || Math.abs(quo[0]) > 1e-12 ? polyStr(quo) + ' + ' : ''}${pieces.join(' + ').replace(/\+ -/g, '- ')}`, tex: '' });
+        steps.push({ title: 'Integrate term by term', text: 'Simple poles give logarithms, irreducible quadratics give logarithms and arctangents, and repeated factors give powers.', tex: `${texOf(F)}` });
+        return { F, steps };
     }
 
     // ------------------------------------------------------------------
@@ -763,13 +973,19 @@
     }
     const GL = gaussLegendre(16);
 
+    /**
+     * Gauss–Legendre on [a,b] after the smoothstep substitution x = a + (b-a)(3t²-2t³),
+     * which clusters nodes at the ends so sqrt-type endpoint behaviour converges fast.
+     */
     function gl(f, a, b, panels) {
-        panels = panels || 6;
+        panels = panels || 4;
+        const L = b - a;
+        const g = t => { const x = a + L * t * t * (3 - 2 * t); return f(x) * 6 * L * t * (1 - t); };
         let total = 0;
-        const w = (b - a) / panels;
+        const w = 1 / panels;
         for (let p = 0; p < panels; p++) {
-            const lo = a + p * w, c = lo + w / 2, h = w / 2;
-            for (let i = 0; i < GL.xs.length; i++) total += GL.ws[i] * h * f(c + h * GL.xs[i]);
+            const lo = p * w, c = lo + w / 2, h = w / 2;
+            for (let i = 0; i < GL.xs.length; i++) total += GL.ws[i] * h * g(c + h * GL.xs[i]);
         }
         return total;
     }
@@ -781,7 +997,12 @@
         return { kind, title, main: null, items: [], meta: [], warnings: [], steps: [], plot: null, text: '' };
     }
 
+    const INLINE_LABEL = /^(y-intercept|Roots|Local |Saddle|Flat|Critical points|Inflection|Vertical|As x|Recognised|General solution|Particular solution|Implicit solution|Constants|Monotonicity|Concavity)/;
+
     function finalizeText(r) {
+        // `tex` is normally a complete statement (the UI then hides the label); value-only
+        // lines are flagged `inline` so the UI shows "label + value".
+        r.items.forEach(i => { if (i.tex && INLINE_LABEL.test(i.label)) i.inline = true; });
         const lines = [r.title];
         if (r.main) lines.push(`${r.main.label} ${r.main.text}`);
         r.items.forEach(i => lines.push(`${i.label} ${i.text}`));
@@ -941,7 +1162,7 @@
         const r = makeResult('integral', 'Indefinite integral');
         const f = compile(node, [v]);
         if (!res.ok) {
-            r.main = { label: `∫ f(${v}) d${v}`, text: 'No closed form found', tex: `\\int ${texOf(node)}\\,d${v}` };
+            r.main = { label: `∫ f(${v}) d${v}`, text: 'No closed form found', tex: '' };
             r.warnings.push(method === 'auto'
                 ? 'No elementary antiderivative was found. Many integrals (e.g. e^(x²)) have none – use the definite integral for a numerical value.'
                 : `The "${method}" strategy could not solve this integral. Try "Auto".`);
@@ -1285,7 +1506,7 @@
         const f = compile(node, [v]), f1 = compile(d1, [v]), f2 = compile(d2, [v]);
         const N = 4000, span = hi - lo, tol = span * 1e-6;
         const r = makeResult('analysis', 'Function analysis');
-        r.main = { label: `Analysis of f(${v}) on [${fmt(lo)}, ${fmt(hi)}]`, text: strOf(node), tex: `f(${v})=${texOf(node)}` };
+        r.main = { label: `Analysis of f(${v}) on [${fmt(lo)}, ${fmt(hi)}]`, text: strOf(node), tex: `f(${v})=${texOf(node)},\\quad ${v}\\in[${fmt(lo)},\\,${fmt(hi)}]` };
         r.items.push({ label: `f′(${v}) =`, text: strOf(d1), tex: `f'(${v})=${texOf(d1)}` });
         r.items.push({ label: `f″(${v}) =`, text: strOf(d2), tex: `f''(${v})=${texOf(d2)}` });
 
@@ -1340,7 +1561,7 @@
         const y0 = f(0);
         if (lo <= 0 && hi >= 0 && Number.isFinite(y0)) r.items.push({ label: 'y-intercept:', text: fmtPt(0, y0), tex: texPt(0, y0) });
         r.items.push({ label: 'Roots (f = 0):', text: rootList.length ? rootList.map(x => nice(x, 6).text).join(',  ') : 'none in this interval', tex: rootList.length ? rootList.map(x => `${v}=${nice(x, 6).tex}`).join(',\\; ') : '\\text{none}' });
-        critList.forEach(c => r.items.push({ label: `${c.type[0].toUpperCase()}${c.type.slice(1)}:`, text: fmtPt(c.x, c.y), tex: `\\text{${c.type}}:\\;${texPt(c.x, c.y)}` }));
+        critList.forEach(c => r.items.push({ label: `${c.type[0].toUpperCase()}${c.type.slice(1)}:`, text: fmtPt(c.x, c.y), tex: texPt(c.x, c.y) }));
         if (!critList.length) r.items.push({ label: 'Critical points:', text: 'none in this interval', tex: '\\text{none}' });
         r.items.push({ label: 'Inflection points:', text: inflList.length ? inflList.map(c => fmtPt(c.x, c.y)).join(',  ') : 'none in this interval', tex: inflList.length ? inflList.map(c => texPt(c.x, c.y)).join(',\\; ') : '\\text{none}' });
         if (asymList.length) r.items.push({ label: 'Vertical asymptotes:', text: asymList.map(x => `${v} = ${nice(x, 6).text}`).join(',  '), tex: asymList.map(x => `${v}=${nice(x, 6).tex}`).join(',\\; ') });
@@ -1825,8 +2046,8 @@
             [yaN, ybN].forEach(nd => { const bad = freeVars(nd).filter(n => n !== vx); if (bad.length) throw new CalcError(`Inner limits may only depend on ${vx}`); });
             if (!Number.isFinite(xa.value) || !Number.isFinite(xb.value)) throw new CalcError('Outer limits must be finite');
             const yaF = compile(yaN, [vx]), ybF = compile(ybN, [vx]);
-            const inner = x => gl(y => f(...vars.map(n => (n === vx ? x : n === vy ? y : 0))), yaF(x), ybF(x), 6);
-            const val = gl(inner, xa.value, xb.value, 6);
+            const inner = x => gl(y => f(...vars.map(n => (n === vx ? x : n === vy ? y : 0))), yaF(x), ybF(x), 4);
+            const val = gl(inner, xa.value, xb.value, 4);
             r.title = 'Double integral';
             const limTex = `\\int_{${texOf(xa.node)}}^{${texOf(xb.node)}}\\int_{${texOf(yaN)}}^{${texOf(ybN)}}`;
             r.main = { label: 'Value ≈', text: fmt(val, opt.digits), tex: `${limTex} ${texOf(node)}\\,d${vy}\\,d${vx}\\approx ${fmt(val, opt.digits)}` };
@@ -1837,7 +2058,7 @@
                 r.items.push({ label: 'Exact:', text: strOf(exNode), tex: `${texOf(exNode)}` });
                 r.meta.push('Exact value found symbolically and verified numerically.');
             } else {
-                r.meta.push('Method: nested 16-point Gauss–Legendre quadrature (6 panels per axis).');
+                r.meta.push('Method: nested 16-point Gauss–Legendre quadrature with endpoint clustering.');
             }
             r.items.push({ label: 'Region:', text: `${fmt(xa.value)} ≤ ${vx} ≤ ${fmt(xb.value)},  ${strOf(yaN)} ≤ ${vy} ≤ ${strOf(ybN)}`, tex: '' });
             r.steps.push({ title: 'Set up the iterated integral', text: `∫ ${strOf(xa.node)}→${strOf(xb.node)} ( ∫ ${strOf(yaN)}→${strOf(ybN)} ${strOf(node)} d${vy} ) d${vx}`, tex: `${limTex}${texOf(node)}\\,d${vy}\\,d${vx}` });

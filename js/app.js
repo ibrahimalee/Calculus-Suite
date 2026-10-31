@@ -1,1615 +1,941 @@
-// ==================== STATE MANAGEMENT ====================
-let state = {
-    currentFunction: '',
-    compiledFunction: null,
-    lastResult: null,
-    isDarkMode: false
-};
+/*
+ * Calculus Suite Pro – user interface
+ *
+ * All maths lives in js/engine.js (tested in Node). This file only wires the
+ * DOM, plotting, history and sharing around it. Every piece of dynamic text is
+ * escaped before it reaches innerHTML.
+ */
+(function () {
+    'use strict';
 
-// ==================== INITIALIZATION ====================
-document.addEventListener('DOMContentLoaded', () => {
-    loadThemePreference();
-    updateModeOptions();
-});
+    const $ = id => document.getElementById(id);
+    const engine = Runner.getEngine();
 
-function loadThemePreference() {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark') {
-        document.body.classList.add('dark');
-        document.querySelector('.theme-toggle').textContent = '🌙';
-        state.isDarkMode = true;
-    }
-}
+    // ------------------------------------------------------------------
+    // Mode definitions
+    // ------------------------------------------------------------------
+    const OPS_MULTI = [
+        ['gradient', 'Gradient ∇f (+ tangent plane, directional derivative)'],
+        ['partial', 'Partial derivatives (first & second order)'],
+        ['hessian', 'Hessian matrix'],
+        ['laplacian', 'Laplacian ∇²f'],
+        ['critical', 'Critical points (max / min / saddle)'],
+        ['double', 'Double integral ∬ f dy dx'],
+        ['divergence', 'Divergence ∇·F (vector field)'],
+        ['curl', 'Curl ∇×F (vector field)']
+    ];
+    const VECTOR_OPS = ['divergence', 'curl'];
 
-// ==================== THEME TOGGLE ====================
-function toggleTheme() {
-    state.isDarkMode = !state.isDarkMode;
-    document.body.classList.toggle('dark');
-    document.querySelector('.theme-toggle').textContent = state.isDarkMode ? '🌙' : '☀️';
-    localStorage.setItem('theme', state.isDarkMode ? 'dark' : 'light');
-}
-
-// ==================== NUCLEAR-GRADE SAFE EVALUATION ====================
-function safeEvaluate(functionString, variables) {
-    try {
-        // Strategy 1: Direct evaluation
-        let result = math.evaluate(functionString, variables);
-
-        // Strategy 2: Handle all possible return types
-        if (typeof result === 'number') {
-            return result;
+    const MODES = {
+        derivative: {
+            label: '∂ Derivative', icon: '∂',
+            input: () => ({ label: 'f(x)', placeholder: 'e.g. x^2 * sin(x)', hint: 'Differentiate any expression. Use another variable via the option below.' }),
+            fields: [
+                { key: 'order', label: 'Order of derivative', type: 'number', def: '1', min: 1, max: 10 },
+                { key: 'point', label: 'Evaluate / tangent line at (optional)', type: 'text', def: '', placeholder: 'e.g. 2 or pi/4' },
+                { key: 'variable', label: 'Variable (blank = auto)', type: 'text', def: '', placeholder: 'x' }
+            ],
+            examples: [
+                { label: 'x²·sin(x)', fn: 'x^2*sin(x)', opts: { order: '1', point: '1' } },
+                { label: 'Second derivative of eˣ·cos(x)', fn: 'e^x*cos(x)', opts: { order: '2' } },
+                { label: 'xˣ (logarithmic differentiation)', fn: 'x^x', opts: { point: '2' } },
+                { label: 'arctan(x)·ln(x)', fn: 'atan(x)*ln(x)', opts: {} },
+                { label: 'Partial: x²y with respect to y', fn: 'x^2*y', opts: { variable: 'y' } }
+            ]
+        },
+        integral: {
+            label: '∫ Integral', icon: '∫',
+            input: () => ({ label: 'f(x)', placeholder: 'e.g. x*e^x', hint: 'Leave both limits empty for an indefinite integral. Limits accept pi, e and inf.' }),
+            fields: [
+                { key: 'method', label: 'Strategy', type: 'select', def: 'auto', options: [['auto', 'Auto (try everything)'], ['substitution', 'U-substitution'], ['parts', 'Integration by parts'], ['partial', 'Partial fractions (rational functions)'], ['cas', 'Computer algebra only']], show: v => !(v.lower || v.upper) },
+                { key: 'lower', label: 'Lower limit (optional)', type: 'text', def: '', placeholder: 'e.g. 0 or -inf' },
+                { key: 'upper', label: 'Upper limit (optional)', type: 'text', def: '', placeholder: 'e.g. pi or inf' },
+                { key: 'variable', label: 'Variable (blank = auto)', type: 'text', def: '', placeholder: 'x' }
+            ],
+            examples: [
+                { label: '∫ x²·sin(x) dx  (by parts)', fn: 'x^2*sin(x)', opts: { lower: '', upper: '' } },
+                { label: '∫ 2x·cos(x²) dx  (u-substitution)', fn: '2*x*cos(x^2)', opts: { method: 'substitution', lower: '', upper: '' } },
+                { label: '∫ 1/(x²+1) dx', fn: '1/(x^2+1)', opts: { lower: '', upper: '' } },
+                { label: '∫₀^π sin(x) dx', fn: 'sin(x)', opts: { lower: '0', upper: 'pi' } },
+                { label: 'Gaussian: ∫ e^(−x²) over ℝ', fn: 'e^(-x^2)', opts: { lower: '-inf', upper: 'inf' } },
+                { label: 'Improper: ∫₀¹ 1/√x dx', fn: '1/sqrt(x)', opts: { lower: '0', upper: '1' } },
+                { label: 'Diverges: ∫₁^∞ 1/x dx', fn: '1/x', opts: { lower: '1', upper: 'inf' } }
+            ]
+        },
+        series: {
+            label: 'Σ Taylor series', icon: 'Σ',
+            input: () => ({ label: 'f(x)', placeholder: 'e.g. sin(x)', hint: 'Taylor polynomial about a point (Maclaurin series when a = 0).' }),
+            fields: [
+                { key: 'point', label: 'Expansion point a', type: 'text', def: '0', placeholder: '0' },
+                { key: 'terms', label: 'Degree n (1–20)', type: 'number', def: '5', min: 1, max: 20 },
+                { key: 'variable', label: 'Variable (blank = auto)', type: 'text', def: '', placeholder: 'x' }
+            ],
+            examples: [
+                { label: 'sin(x) – Maclaurin, degree 7', fn: 'sin(x)', opts: { point: '0', terms: '7' } },
+                { label: 'eˣ about x = 1', fn: 'e^x', opts: { point: '1', terms: '5' } },
+                { label: '1/(1−x) (geometric series)', fn: '1/(1-x)', opts: { point: '0', terms: '6' } },
+                { label: 'ln(x) about x = 1', fn: 'log(x)', opts: { point: '1', terms: '6' } },
+                { label: 'cos(x) about π/2', fn: 'cos(x)', opts: { point: 'pi/2', terms: '5' } }
+            ]
+        },
+        limit: {
+            label: 'lim Limit', icon: 'lim',
+            input: () => ({ label: 'f(x)', placeholder: 'e.g. sin(x)/x', hint: 'Numerical limit analysis from both sides (also at ±∞).' }),
+            fields: [
+                { key: 'point', label: 'x approaches', type: 'text', def: '0', placeholder: '0, pi, inf, -inf' },
+                { key: 'direction', label: 'Direction', type: 'select', def: 'both', options: [['both', 'Two-sided'], ['left', 'From the left (x → a⁻)'], ['right', 'From the right (x → a⁺)']] },
+                { key: 'variable', label: 'Variable (blank = auto)', type: 'text', def: '', placeholder: 'x' }
+            ],
+            examples: [
+                { label: 'sin(x)/x as x → 0', fn: 'sin(x)/x', opts: { point: '0', direction: 'both' } },
+                { label: '(1 + 1/x)ˣ as x → ∞', fn: '(1+1/x)^x', opts: { point: 'inf', direction: 'both' } },
+                { label: '(1 − cos x)/x² as x → 0', fn: '(1-cos(x))/x^2', opts: { point: '0', direction: 'both' } },
+                { label: '1/x as x → 0⁺', fn: '1/x', opts: { point: '0', direction: 'right' } },
+                { label: '|x|/x as x → 0 (does not exist)', fn: 'abs(x)/x', opts: { point: '0', direction: 'both' } },
+                { label: '√(x²+x) − x as x → ∞', fn: 'sqrt(x^2+x)-x', opts: { point: 'inf', direction: 'both' } }
+            ]
+        },
+        analysis: {
+            label: '📈 Function analysis', icon: 'f',
+            input: () => ({ label: 'f(x)', placeholder: 'e.g. x^3 - 3x', hint: 'Finds roots, extrema, inflection points, asymptotes, monotonicity and concavity.' }),
+            fields: [
+                { key: 'min', label: 'Search from x =', type: 'text', def: '-10' },
+                { key: 'max', label: 'to x =', type: 'text', def: '10' },
+                { key: 'variable', label: 'Variable (blank = auto)', type: 'text', def: '', placeholder: 'x' }
+            ],
+            examples: [
+                { label: 'Cubic x³ − 3x', fn: 'x^3-3x', opts: { min: '-10', max: '10' } },
+                { label: 'Double well x⁴ − 2x²', fn: 'x^4-2*x^2', opts: { min: '-3', max: '3' } },
+                { label: 'Rational 1/(x²−1)', fn: '1/(x^2-1)', opts: { min: '-5', max: '5' } },
+                { label: 'x·e^(−x)', fn: 'x*e^(-x)', opts: { min: '-2', max: '8' } },
+                { label: 'tan(x) – asymptotes', fn: 'tan(x)', opts: { min: '-5', max: '5' } },
+                { label: 'sin(x)/x', fn: 'sin(x)/x', opts: { min: '-15', max: '15' } }
+            ]
+        },
+        ode: {
+            label: '∂ Differential equations', icon: 'y′',
+            input: v => ({
+                first: { label: "y′ = f(x, y)", placeholder: 'e.g. x + y   or   x*y   or   y*(1-y)', hint: 'Right-hand side of dy/dx. Linear and separable equations are solved in closed form; all are solved numerically.' },
+                second: { label: "y″ = f(x, y, yp)", placeholder: 'e.g. -y   or   -0.5*yp - 4*y', hint: 'Write y′ as yp. Constant-coefficient homogeneous equations also get a closed form.' },
+                system: { label: 'System  x′, y′, (z′) = …  (separate with ;)', placeholder: 'e.g. y ; -x      or      x*(1-0.5*y) ; y*(0.5*x-1)', hint: 'State variables are x, y, z and time is t.' }
+            }[v.odeType || 'first']),
+            fields: [
+                { key: 'odeType', label: 'Equation type', type: 'select', def: 'first', options: [['first', 'First order  y′ = f(x, y)'], ['second', 'Second order  y″ = f(x, y, y′)'], ['system', 'System of ODEs (2–3 equations)']] },
+                { key: 'x0', label: 'Start x₀ (or t₀)', type: 'text', def: '0' },
+                { key: 'xEnd', label: 'End', type: 'text', def: '10' },
+                { key: 'y0', label: 'Initial y(x₀)', type: 'text', def: '1', show: v => v.odeType !== 'system' },
+                { key: 'v0', label: "Initial y′(x₀)", type: 'text', def: '0', show: v => v.odeType === 'second' },
+                { key: 'initial', label: 'Initial values (x, y, z)', type: 'text', def: '1, 0', show: v => v.odeType === 'system', placeholder: '1, 0' }
+            ],
+            examples: [
+                { label: "Linear: y′ = x + y", fn: 'x+y', opts: { odeType: 'first', x0: '0', xEnd: '3', y0: '1' } },
+                { label: "Separable: y′ = x·y", fn: 'x*y', opts: { odeType: 'first', x0: '0', xEnd: '2', y0: '1' } },
+                { label: 'Logistic growth: y′ = y(1 − y)', fn: 'y*(1-y)', opts: { odeType: 'first', x0: '0', xEnd: '8', y0: '0.1' } },
+                { label: 'No closed form: y′ = sin(x·y)', fn: 'sin(x*y)', opts: { odeType: 'first', x0: '0', xEnd: '10', y0: '1' } },
+                { label: 'Spring: y″ = −y', fn: '-y', opts: { odeType: 'second', x0: '0', xEnd: '12', y0: '1', v0: '0' } },
+                { label: 'Damped oscillator', fn: '-0.4*yp-4*y', opts: { odeType: 'second', x0: '0', xEnd: '15', y0: '1', v0: '0' } },
+                { label: 'Rotation system', fn: 'y ; -x', opts: { odeType: 'system', x0: '0', xEnd: '12', initial: '1, 0' } },
+                { label: 'Predator–prey (Lotka–Volterra)', fn: 'x*(1-0.5*y) ; y*(0.5*x-1)', opts: { odeType: 'system', x0: '0', xEnd: '30', initial: '3, 1' } }
+            ]
+        },
+        multivariable: {
+            label: '∇ Multivariable', icon: '∇',
+            input: v => (VECTOR_OPS.includes(v.op)
+                ? { label: 'Vector field  F = (P ; Q ; R)', placeholder: 'e.g. -y ; x     or     x*y ; y*z ; z*x', hint: 'Give 2 or 3 components separated by ;' }
+                : { label: 'f(x, y, …)', placeholder: 'e.g. x^2*y + sin(y)', hint: 'A scalar function of two or three variables.' }),
+            fields: [
+                { key: 'op', label: 'Operation', type: 'select', def: 'gradient', options: OPS_MULTI },
+                { key: 'vars', label: 'Variables (comma-separated, blank = auto)', type: 'text', def: '', placeholder: 'x, y' },
+                { key: 'point', label: 'Evaluate at point (optional)', type: 'text', def: '', placeholder: 'e.g. 1, 2', show: v => ['gradient', 'divergence'].includes(v.op) },
+                { key: 'direction', label: 'Direction vector (optional)', type: 'text', def: '', placeholder: 'e.g. 1, 1', show: v => v.op === 'gradient' },
+                { key: 'xLow', label: 'x from', type: 'text', def: '0', show: v => v.op === 'double' },
+                { key: 'xHigh', label: 'x to', type: 'text', def: '1', show: v => v.op === 'double' },
+                { key: 'yLow', label: 'y from (may depend on x)', type: 'text', def: '0', show: v => v.op === 'double' },
+                { key: 'yHigh', label: 'y to (may depend on x)', type: 'text', def: 'x', show: v => v.op === 'double' },
+                { key: 'radius', label: 'Search / plot radius', type: 'number', def: '5', show: v => ['critical', 'gradient', 'partial', 'hessian', 'laplacian'].includes(v.op) }
+            ],
+            examples: [
+                { label: 'Gradient of x²y + sin y at (1, 0)', fn: 'x^2*y+sin(y)', opts: { op: 'gradient', vars: '', point: '1, 0', direction: '1, 1' } },
+                { label: 'Hessian of x³ − 3xy + y³', fn: 'x^3-3*x*y+y^3', opts: { op: 'hessian', vars: '' } },
+                { label: 'Critical points of x³ − 3x + y²', fn: 'x^3-3*x+y^2', opts: { op: 'critical', vars: '', radius: '4' } },
+                { label: 'Critical points of sin x · sin y', fn: 'sin(x)*sin(y)', opts: { op: 'critical', vars: '', radius: '3' } },
+                { label: 'Double integral of xy over a triangle', fn: 'x*y', opts: { op: 'double', vars: 'x, y', xLow: '0', xHigh: '1', yLow: '0', yHigh: 'x' } },
+                { label: 'Area of the unit disc', fn: '1', opts: { op: 'double', vars: 'x, y', xLow: '-1', xHigh: '1', yLow: '-sqrt(1-x^2)', yHigh: 'sqrt(1-x^2)' } },
+                { label: 'Laplacian of x² − y² (harmonic)', fn: 'x^2-y^2', opts: { op: 'laplacian', vars: '' } },
+                { label: 'Curl of the rotation field (−y, x)', fn: '-y ; x', opts: { op: 'curl', vars: '' } },
+                { label: 'Divergence of (xy, yz, zx)', fn: 'x*y ; y*z ; z*x', opts: { op: 'divergence', vars: '' } }
+            ]
         }
-
-        // Strategy 3: If it's a function, try to invoke it
-        if (typeof result === 'function') {
-            try {
-                result = result();
-                if (typeof result === 'number') return result;
-            } catch (e) {
-                // Continue to next strategy
-            }
-        }
-
-        // Strategy 4: If it's a complex number
-        if (result && typeof result === 'object' && 're' in result) {
-            return typeof result.re === 'number' ? result.re : Number(result.re);
-        }
-
-        // Strategy 5: If it's a math.js type (Unit, BigNumber, Fraction)
-        if (result && typeof result.toNumber === 'function') {
-            return result.toNumber();
-        }
-
-        // Strategy 6: Parse and re-evaluate with explicit scope
-        const node = math.parse(functionString);
-        const compiled = node.compile();
-        result = compiled.evaluate(variables);
-
-        if (typeof result === 'number') {
-            return result;
-        }
-
-        // Strategy 7: String coercion and parse
-        const strResult = String(result);
-        const numResult = parseFloat(strResult);
-        if (!isNaN(numResult) && isFinite(numResult)) {
-            return numResult;
-        }
-
-        // Strategy 8: Last resort - try numeric evaluation
-        try {
-            // Replace variables with their values in the string
-            let expr = functionString;
-            for (const [varName, varValue] of Object.entries(variables)) {
-                const regex = new RegExp('\\b' + varName + '\\b', 'g');
-                expr = expr.replace(regex, `(${varValue})`);
-            }
-            result = math.evaluate(expr);
-            if (typeof result === 'number') return result;
-            if (typeof result.toNumber === 'function') return result.toNumber();
-        } catch (e) {
-            // Continue to error
-        }
-
-        throw new Error(`Cannot evaluate to number. Got type: ${typeof result}, value: ${result}`);
-
-    } catch (error) {
-        throw new Error(`Evaluation failed: ${error.message}`);
-    }
-}
-
-// ==================== ALTERNATIVE: PURE JAVASCRIPT EVALUATOR ====================
-function createJSFunction(mathExpression) {
-    // Convert math notation to JavaScript
-    let jsExpr = mathExpression
-        .replace(/\^/g, '**')
-        .replace(/log\(/g, 'Math.log(')
-        .replace(/sin\(/g, 'Math.sin(')
-        .replace(/cos\(/g, 'Math.cos(')
-        .replace(/tan\(/g, 'Math.tan(')
-        .replace(/sqrt\(/g, 'Math.sqrt(')
-        .replace(/abs\(/g, 'Math.abs(')
-        .replace(/exp\(/g, 'Math.exp(')
-        .replace(/\be\b/g, 'Math.E');
-
-    try {
-        // Create a function that can be called with variables
-        return new Function('x', 'y', 'z', `"use strict"; return (${jsExpr});`);
-    } catch (e) {
-        throw new Error('Cannot create JavaScript function: ' + e.message);
-    }
-}
-
-function hybridEvaluate(functionString, variables) {
-    // Try math.js first (for symbolic capabilities)
-    try {
-        const result = safeEvaluate(functionString, variables);
-        if (typeof result === 'number' && isFinite(result)) {
-            return result;
-        }
-    } catch (e) {
-        // Fall through to JavaScript evaluation
-    }
-
-    // Fallback to pure JavaScript evaluation
-    try {
-        const jsFunc = createJSFunction(functionString);
-        const result = jsFunc(
-            variables.x !== undefined ? variables.x : 0,
-            variables.y !== undefined ? variables.y : 0,
-            variables.z !== undefined ? variables.z : 0
-        );
-
-        if (typeof result === 'number' && isFinite(result)) {
-            return result;
-        }
-
-        throw new Error('JavaScript evaluation produced non-finite result');
-    } catch (e) {
-        throw new Error(`Both math.js and JavaScript evaluation failed: ${e.message}`);
-    }
-}
-
-// ==================== INPUT VALIDATION ====================
-function normalizeFunction(input) {
-    return input
-        .replace(/\s+/g, '')
-        .replace(/(\d)([a-zA-Z(])/g, '$1*$2')
-        .replace(/\)(\d)/g, ')*$1')
-        .replace(/\)([a-zA-Z(])/g, ')*$1');
-}
-
-function validateFunction() {
-    const input = document.getElementById('functionInput').value.trim();
-    const preview = document.getElementById('preview');
-
-    if (!input) {
-        preview.textContent = 'Enter a function to begin...';
-        preview.className = 'preview-box';
-        state.currentFunction = '';
-        state.compiledFunction = null;
-        return false;
-    }
-
-    try {
-        const normalized = normalizeFunction(input);
-
-        // Test with multiple evaluation strategies
-        let testPassed = false;
-        let testResult;
-
-        // Test 1: Try at x=1
-        try {
-            testResult = hybridEvaluate(normalized, { x: 1, y: 1, z: 1 });
-            testPassed = typeof testResult === 'number' && isFinite(testResult);
-        } catch (e) {
-            // Try another point
-        }
-
-        // Test 2: If first test failed, try x=0
-        if (!testPassed) {
-            try {
-                testResult = hybridEvaluate(normalized, { x: 0.5, y: 0.5, z: 0.5 });
-                testPassed = typeof testResult === 'number' && isFinite(testResult);
-            } catch (e) {
-                // Continue
-            }
-        }
-
-        if (!testPassed) {
-            throw new Error('Function cannot be evaluated numerically');
-        }
-
-        state.currentFunction = normalized;
-        state.compiledFunction = normalized; // Store string, not compiled object
-
-        preview.innerHTML = `<strong>✓</strong> Valid: ${normalized} <span style="opacity:0.6">(test: f(1) = ${testResult.toFixed(4)})</span>`;
-        preview.className = 'preview-box valid';
-        return true;
-    } catch (error) {
-        preview.innerHTML = `<strong>⚠</strong> ${error.message}`;
-        preview.className = 'preview-box error';
-        state.currentFunction = '';
-        state.compiledFunction = null;
-        return false;
-    }
-}
-
-// ==================== TEMPLATE INSERTION ====================
-function insertTemplate(template) {
-    document.getElementById('functionInput').value = template;
-    validateFunction();
-}
-
-// ==================== SETTING UPDATES ====================
-function updatePrecision(value) {
-    document.getElementById('precisionValue').textContent = value;
-}
-
-function updateResolution(value) {
-    document.getElementById('resolutionValue').textContent = value;
-}
-
-// ==================== MODE OPTIONS ====================
-function updateModeOptions() {
-    const mode = document.getElementById('operationMode').value;
-    const container = document.getElementById('modeOptions');
-
-    const options = {
-        basic: `
-            <div class="option-group">
-                <label class="option-label">Operation Type</label>
-                <select id="basicOp">
-                    <option value="derivative">First Derivative</option>
-                    <option value="derivative2">Second Derivative</option>
-                    <option value="integral">Indefinite Integral</option>
-                    <option value="definite">Definite Integral</option>
-                </select>
-            </div>
-            <div class="option-group" id="limitsGroup" style="display:none;">
-                <label class="option-label">Lower Limit</label>
-                <input type="number" id="lowerLimit" placeholder="0" step="0.1">
-                <label class="option-label" style="margin-top:8px;">Upper Limit</label>
-                <input type="number" id="upperLimit" placeholder="1" step="0.1">
-            </div>
-        `,
-        advanced: `
-            <div class="option-group">
-                <label class="option-label">Integration Method</label>
-                <select id="integrationMethod">
-                    <option value="auto">Auto-detect</option>
-                    <option value="substitution">U-Substitution</option>
-                    <option value="parts">Integration by Parts</option>
-                    <option value="partial">Partial Fractions</option>
-                    <option value="trig">Trig Substitution</option>
-                </select>
-            </div>
-            <div class="option-group">
-                <label class="option-label">Lower Limit (optional)</label>
-                <input type="text" id="advLower" placeholder="Leave empty for indefinite">
-                <label class="option-label" style="margin-top:8px;">Upper Limit (optional)</label>
-                <input type="text" id="advUpper" placeholder="Leave empty for indefinite">
-            </div>
-        `,
-        differential: `
-            <div class="option-group">
-                <label class="option-label">Equation Type</label>
-                <select id="odeType">
-                    <option value="firstOrder">First Order ODE</option>
-                    <option value="secondOrder">Second Order ODE</option>
-                    <option value="system">System of ODEs</option>
-                </select>
-            </div>
-            <div class="option-group">
-                <label class="option-label">Initial Conditions</label>
-                <input type="text" id="initialCond" placeholder="e.g., y(0)=1">
-            </div>
-        `,
-        series: `
-            <div class="option-group">
-                <label class="option-label">Series Type</label>
-                <select id="seriesType">
-                    <option value="taylor">Taylor Series</option>
-                    <option value="maclaurin">Maclaurin Series</option>
-                    <option value="power">Power Series</option>
-                </select>
-            </div>
-            <div class="option-group">
-                <label class="option-label">Expansion Point (a)</label>
-                <input type="number" id="expansionPoint" value="0" step="0.1">
-                <label class="option-label" style="margin-top:8px;">Number of Terms</label>
-                <input type="number" id="numTerms" value="5" min="1" max="20">
-            </div>
-        `,
-        multivariable: `
-            <div class="option-group">
-                <label class="option-label">Operation</label>
-                <select id="multiOp">
-                    <option value="partial">Partial Derivatives</option>
-                    <option value="gradient">Gradient Vector</option>
-                    <option value="divergence">Divergence</option>
-                    <option value="curl">Curl</option>
-                    <option value="double">Double Integral</option>
-                </select>
-            </div>
-            <div class="option-group">
-                <label class="option-label">Variables (comma-separated)</label>
-                <input type="text" id="multiVars" placeholder="x,y">
-            </div>
-        `
     };
 
-    container.innerHTML = options[mode] || options.basic;
-    container.classList.remove('hidden');
+    const TEMPLATES = [
+        ['x²', 'x^2'], ['sin', 'sin(x)'], ['cos', 'cos(x)'], ['eˣ', 'e^x'], ['ln', 'ln(x)'], ['1/x', '1/x'],
+        ['√x', 'sqrt(x)'], ['cubic', 'x^3-2*x'], ['tan', 'tan(x)'], ['gauss', 'e^(-x^2)'], ['|x|', 'abs(x)'], ['sinc', 'sin(x)/x']
+    ];
+    const KEYPAD = [['π', 'pi'], ['e', 'e'], ['^', '^'], ['√', 'sqrt('], ['(', '('], [')', ')'], ['|x|', 'abs('], ['ln', 'ln('], ['sin', 'sin('], ['cos', 'cos('], ['tan', 'tan('], ['∞', 'inf']];
 
-    // Add event listener for basic operation change
-    if (mode === 'basic') {
-        const basicOp = document.getElementById('basicOp');
-        basicOp.addEventListener('change', function() {
-            const limitsGroup = document.getElementById('limitsGroup');
-            limitsGroup.style.display = this.value === 'definite' ? 'block' : 'none';
-        });
-    }
-}
-
-// ==================== MAIN COMPUTE FUNCTION ====================
-async function compute() {
-    if (!validateFunction()) {
-        showAlert('Please enter a valid function first', 'error');
-        return;
-    }
-
-    const mode = document.getElementById('operationMode').value;
-    const computeBtn = document.getElementById('computeBtn');
-
-    // Show loading state
-    computeBtn.classList.add('loading');
-    computeBtn.innerHTML = '<div class="spinner"></div><span>Computing...</span>';
-
-    try {
-        let result;
-
-        switch(mode) {
-            case 'basic':
-                result = await computeBasic();
-                break;
-            case 'advanced':
-                result = await computeAdvanced();
-                break;
-            case 'differential':
-                result = await computeDifferential();
-                break;
-            case 'series':
-                result = await computeSeries();
-                break;
-            case 'multivariable':
-                result = await computeMultivariable();
-                break;
-        }
-
-        state.lastResult = result;
-        displayResult(result);
-        switchTab('results');
-
-    } catch (error) {
-        showAlert('Computation error: ' + error.message, 'error');
-    } finally {
-        computeBtn.classList.remove('loading');
-        computeBtn.innerHTML = '<span>🚀</span><span>Compute</span>';
-    }
-}
-
-// ==================== BASIC CALCULUS ====================
-async function computeBasic() {
-    const operation = document.getElementById('basicOp').value;
-
-    switch(operation) {
-        case 'derivative':
-            return computeDerivative(1);
-        case 'derivative2':
-            return computeDerivative(2);
-        case 'integral':
-            return computeSymbolicIntegral();
-        case 'definite':
-            return computeDefiniteIntegral();
-    }
-}
-
-function computeDerivative(order) {
-    try {
-        let node = math.parse(state.currentFunction);
-        let result = node;
-
-        for (let i = 0; i < order; i++) {
-            result = math.derivative(result, 'x');
-        }
-
-        const simplified = math.simplify(result);
-
-        return {
-            type: order === 1 ? 'derivative' : 'derivative2',
-            symbolic: simplified.toString(),
-            original: state.currentFunction,
-            steps: generateDerivativeSteps(order)
-        };
-    } catch (error) {
-        throw new Error('Unable to compute derivative: ' + error.message);
-    }
-}
-
-function computeSymbolicIntegral() {
-    try {
-        // Attempt symbolic integration with Algebrite
-        const expr = state.currentFunction
-            .replace(/\*/g, ' ')
-            .replace(/log/g, 'ln');
-
-        const result = Algebrite.run(`integral(${expr}, x)`);
-        const resultStr = String(result);
-
-        // Check if Algebrite actually integrated it
-        if (resultStr.includes('integral(') || resultStr === expr) {
-            // Try common patterns
-            const pattern = tryCommonIntegrals(state.currentFunction);
-            if (pattern) {
-                return {
-                    type: 'integral',
-                    symbolic: pattern + ' + C',
-                    method: 'Pattern Matching',
-                    original: state.currentFunction,
-                    steps: generateIntegralSteps('pattern')
-                };
-            }
-
-            return {
-                type: 'integral',
-                symbolic: 'Unable to find symbolic integral',
-                note: 'Try using definite integral with numerical methods',
-                method: 'N/A',
-                original: state.currentFunction,
-                steps: []
-            };
-        }
-
-        return {
-            type: 'integral',
-            symbolic: resultStr + ' + C',
-            method: 'Symbolic (Algebrite)',
-            original: state.currentFunction,
-            steps: generateIntegralSteps('symbolic')
-        };
-    } catch (error) {
-        throw new Error('Integration failed: ' + error.message);
-    }
-}
-
-function tryCommonIntegrals(func) {
-    const patterns = {
-        'x': '(x^2)/2',
-        'x^2': '(x^3)/3',
-        'x^3': '(x^4)/4',
-        'sin(x)': '-cos(x)',
-        'cos(x)': 'sin(x)',
-        'e^x': 'e^x',
-        '1/x': 'ln(|x|)',
-        'tan(x)': '-ln(|cos(x)|)',
-        'sec(x)^2': 'tan(x)',
-        '1/sqrt(1-x^2)': 'asin(x)',
-        '1/(1+x^2)': 'atan(x)'
+    // ------------------------------------------------------------------
+    // State
+    // ------------------------------------------------------------------
+    const state = {
+        mode: 'derivative',
+        opts: {},          // opts[mode][key] -> string
+        result: null,
+        liveSpec: null,
+        view3d: 'surface',
+        busy: false
     };
-
-    return patterns[func] || null;
-}
-
-function computeDefiniteIntegral() {
-    const lower = parseFloat(document.getElementById('lowerLimit').value);
-    const upper = parseFloat(document.getElementById('upperLimit').value);
-
-    if (isNaN(lower) || isNaN(upper)) {
-        throw new Error('Please enter valid numerical limits');
-    }
-
-    if (lower >= upper) {
-        throw new Error('Lower limit must be less than upper limit');
-    }
-
-    const points = parseInt(document.getElementById('resolution').value);
-    const n = points % 2 === 0 ? points : points + 1;
-    const h = (upper - lower) / n;
-    let sum = 0;
-    let errors = [];
-
-    try {
-        const funcStr = state.currentFunction;
-
-        for (let i = 0; i <= n; i++) {
-            const x = lower + i * h;
-
-            let y;
-            try {
-                y = hybridEvaluate(funcStr, { x: x });
-            } catch (evalError) {
-                errors.push(`x=${x.toFixed(6)}: ${evalError.message}`);
-                continue;
-            }
-
-            if (!isFinite(y)) {
-                errors.push(`x=${x.toFixed(6)}: non-finite value (${y})`);
-                continue;
-            }
-
-            // Simpson's rule coefficients
-            if (i === 0 || i === n) {
-                sum += y;
-            } else if (i % 2 === 0) {
-                sum += 2 * y;
-            } else {
-                sum += 4 * y;
-            }
-        }
-
-        if (errors.length > n * 0.1) {
-            throw new Error(`Too many evaluation errors (${errors.length}/${n}). Sample: ${errors[0]}`);
-        }
-
-        const result = (h / 3) * sum;
-        const precision = parseInt(document.getElementById('precision').value);
-
-        return {
-            type: 'definite',
-            value: result.toFixed(precision),
-            lower: lower,
-            upper: upper,
-            method: "Simpson's Rule (Hybrid Evaluation)",
-            points: n,
-            warnings: errors.length > 0 ? `${errors.length} points skipped` : null,
-            original: state.currentFunction,
-            steps: generateDefiniteSteps(lower, upper, result, n)
-        };
-    } catch (error) {
-        throw new Error('Numerical integration failed: ' + error.message);
-    }
-}
-
-// ==================== ADVANCED INTEGRATION ====================
-async function computeAdvanced() {
-    const method = document.getElementById('integrationMethod').value;
-    const lower = document.getElementById('advLower').value.trim();
-    const upper = document.getElementById('advUpper').value.trim();
-
-    // If limits provided, do numerical
-    if (lower && upper) {
-        const lowerVal = parseFloat(lower);
-        const upperVal = parseFloat(upper);
-
-        if (isNaN(lowerVal) || isNaN(upperVal)) {
-            throw new Error('Invalid numerical limits');
-        }
-
-        return computeDefiniteWithMethod(lowerVal, upperVal, method);
-    }
-
-    // Otherwise attempt symbolic with method hint
-    return computeSymbolicWithMethod(method);
-}
-
-function computeSymbolicWithMethod(method) {
-    try {
-        const expr = state.currentFunction.replace(/\*/g, ' ').replace(/log/g, 'ln');
-        const result = Algebrite.run(`integral(${expr}, x)`);
-        const resultStr = String(result);
-
-        if (resultStr.includes('integral(')) {
-            return {
-                type: 'advanced',
-                symbolic: 'Unable to find closed form',
-                method: method,
-                suggestion: getMethodSuggestion(method),
-                original: state.currentFunction,
-                steps: []
-            };
-        }
-
-        return {
-            type: 'advanced',
-            symbolic: resultStr + ' + C',
-            method: method,
-            original: state.currentFunction,
-            steps: generateAdvancedSteps(method)
-        };
-    } catch (error) {
-        throw new Error('Advanced integration failed: ' + error.message);
-    }
-}
-
-function computeDefiniteWithMethod(lower, upper, method) {
-    const points = parseInt(document.getElementById('resolution').value);
-    const n = points % 2 === 0 ? points : points + 1;
-    const h = (upper - lower) / n;
-    let sum = 0;
-    let errors = [];
-
-    try {
-        const funcStr = state.currentFunction;
-
-        for (let i = 0; i <= n; i++) {
-            const x = lower + i * h;
-
-            let y;
-            try {
-                y = hybridEvaluate(funcStr, { x: x });
-            } catch (evalError) {
-                errors.push(`x=${x.toFixed(6)}`);
-                continue;
-            }
-
-            if (!isFinite(y)) {
-                errors.push(`x=${x.toFixed(6)}: infinity`);
-                continue;
-            }
-
-            if (i === 0 || i === n) {
-                sum += y;
-            } else if (i % 2 === 0) {
-                sum += 2 * y;
-            } else {
-                sum += 4 * y;
-            }
-        }
-
-        if (errors.length > n * 0.1) {
-            throw new Error(`Too many discontinuities (${errors.length} points failed)`);
-        }
-
-        const result = (h / 3) * sum;
-        const precision = parseInt(document.getElementById('precision').value);
-
-        return {
-            type: 'advanced',
-            value: result.toFixed(precision),
-            lower: lower,
-            upper: upper,
-            method: method + " (Hybrid Numerical)",
-            points: n,
-            warnings: errors.length > 0 ? `${errors.length} points skipped due to discontinuities` : null,
-            original: state.currentFunction,
-            steps: generateAdvancedSteps(method, true)
-        };
-    } catch (error) {
-        throw new Error('Advanced integration failed: ' + error.message);
-    }
-}
-
-function getMethodSuggestion(method) {
-    const suggestions = {
-        'substitution': 'Try identifying u = g(x) where du appears in the integrand',
-        'parts': 'Use ∫u dv = uv - ∫v du. Choose u using LIATE rule',
-        'partial': 'Decompose rational function into partial fractions',
-        'trig': 'Use trigonometric identities or substitutions'
-    };
-    return suggestions[method] || 'Consider numerical methods';
-}
-
-// ==================== DIFFERENTIAL EQUATIONS ====================
-async function computeDifferential() {
-    const odeType = document.getElementById('odeType').value;
-    const initialCond = document.getElementById('initialCond').value.trim();
-
-    return {
-        type: 'differential',
-        odeType: odeType,
-        equation: state.currentFunction,
-        solution: 'Analytical ODE solver not fully implemented',
-        note: 'For complete ODE solutions, consider using specialized software',
-        initialConditions: initialCond || 'None specified',
-        steps: generateODESteps(odeType)
-    };
-}
-
-// ==================== SERIES EXPANSION ====================
-async function computeSeries() {
-    const seriesType = document.getElementById('seriesType').value;
-    const point = parseFloat(document.getElementById('expansionPoint').value) || 0;
-    const terms = parseInt(document.getElementById('numTerms').value) || 5;
-
-    try {
-        const expr = state.currentFunction.replace(/\*/g, ' ').replace(/log/g, 'ln');
-
-        // Use Algebrite for Taylor series
-        const seriesExpr = `taylor(${expr}, x, ${point}, ${terms})`;
-        const result = Algebrite.run(seriesExpr);
-        const resultStr = String(result);
-
-        return {
-            type: 'series',
-            seriesType: seriesType,
-            expansion: resultStr,
-            point: point,
-            terms: terms,
-            original: state.currentFunction,
-            steps: generateSeriesSteps(seriesType, point, terms)
-        };
-    } catch (error) {
-        // Fallback: compute derivatives manually
-        return computeSeriesNumerical(point, terms);
-    }
-}
-
-function computeSeriesNumerical(point, terms) {
-    try {
-        const seriesTerms = [];
-        let node = math.parse(state.currentFunction);
-
-        for (let n = 0; n < terms; n++) {
-            const derivative = n === 0 ? node : math.derivative(node, 'x');
-            const value = derivative.evaluate({ x: point });
-            const factorial = math.factorial(n);
-            const coefficient = value / factorial;
-
-            if (Math.abs(coefficient) > 1e-10) {
-                seriesTerms.push({
-                    order: n,
-                    coefficient: coefficient,
-                    term: `${coefficient.toFixed(4)} * (x - ${point})^${n}`
-                });
-            }
-
-            if (n < terms - 1) {
-                node = derivative;
-            }
-        }
-
-        return {
-            type: 'series',
-            seriesType: 'taylor',
-            terms: seriesTerms,
-            point: point,
-            numTerms: terms,
-            original: state.currentFunction,
-            steps: generateSeriesSteps('taylor', point, terms)
-        };
-    } catch (error) {
-        throw new Error('Series computation failed: ' + error.message);
-    }
-}
-
-// ==================== MULTIVARIABLE CALCULUS ====================
-async function computeMultivariable() {
-    const operation = document.getElementById('multiOp').value;
-    const varsInput = document.getElementById('multiVars').value;
-    const vars = varsInput.split(',').map(v => v.trim()).filter(v => v);
-
-    if (vars.length < 2) {
-        throw new Error('Please specify at least 2 variables (e.g., x,y)');
-    }
-
-    try {
-        switch(operation) {
-            case 'partial':
-                return computePartialDerivatives(vars);
-            case 'gradient':
-                return computeGradient(vars);
-            case 'divergence':
-                return computeDivergence(vars);
-            case 'curl':
-                return computeCurl(vars);
-            case 'double':
-                return computeDoubleIntegral(vars);
-            default:
-                throw new Error('Unknown operation');
-        }
-    } catch (error) {
-        throw new Error('Multi-variable computation failed: ' + error.message);
-    }
-}
-
-function computePartialDerivatives(vars) {
-    try {
-        const node = math.parse(state.currentFunction);
-        const partials = {};
-
-        for (const v of vars) {
-            try {
-                const partial = math.derivative(node, v);
-                partials[v] = math.simplify(partial).toString();
-            } catch (e) {
-                partials[v] = `Unable to compute ∂/∂${v}`;
-            }
-        }
-
-        return {
-            type: 'multivariable',
-            operation: 'Partial Derivatives',
-            variables: vars,
-            result: partials,
-            original: state.currentFunction,
-            steps: generateMultivariableSteps('partial', vars)
-        };
-    } catch (error) {
-        throw new Error('Partial derivative computation failed: ' + error.message);
-    }
-}
-
-function computeGradient(vars) {
-    try {
-        const node = math.parse(state.currentFunction);
-        const gradient = [];
-
-        for (const v of vars) {
-            try {
-                const partial = math.derivative(node, v);
-                gradient.push(math.simplify(partial).toString());
-            } catch (e) {
-                gradient.push('0');
-            }
-        }
-
-        return {
-            type: 'multivariable',
-            operation: 'Gradient Vector',
-            variables: vars,
-            result: gradient,
-            notation: `∇f = (${gradient.join(', ')})`,
-            original: state.currentFunction,
-            steps: generateMultivariableSteps('gradient', vars)
-        };
-    } catch (error) {
-        throw new Error('Gradient computation failed: ' + error.message);
-    }
-}
-
-function computeDivergence(vars) {
-    // For divergence, we need a vector field
-    // Treat the function as one component and compute symbolic divergence
-    try {
-        const node = math.parse(state.currentFunction);
-        let divergence = 0;
-
-        for (const v of vars) {
-            try {
-                const partial = math.derivative(node, v);
-                const simplified = math.simplify(partial);
-                divergence = `${divergence} + ∂(${state.currentFunction})/∂${v}`;
-            } catch (e) {
-                // Continue
-            }
-        }
-
-        return {
-            type: 'multivariable',
-            operation: 'Divergence',
-            variables: vars,
-            result: `Div F = ${divergence}`,
-            note: 'For full divergence, provide vector field components',
-            original: state.currentFunction,
-            steps: generateMultivariableSteps('divergence', vars)
-        };
-    } catch (error) {
-        throw new Error('Divergence computation failed: ' + error.message);
-    }
-}
-
-function computeCurl(vars) {
-    if (vars.length !== 2 && vars.length !== 3) {
-        throw new Error('Curl requires 2D or 3D vector field');
-    }
-
-    try {
-        const node = math.parse(state.currentFunction);
-
-        if (vars.length === 2) {
-            // 2D curl (scalar vorticity)
-            const dx = math.derivative(node, vars[0]);
-            const dy = math.derivative(node, vars[1]);
-
-            return {
-                type: 'multivariable',
-                operation: 'Curl (2D Vorticity)',
-                variables: vars,
-                result: `∂f/∂${vars[1]} - ∂f/∂${vars[0]}`,
-                note: '2D curl computed as scalar vorticity',
-                original: state.currentFunction,
-                steps: generateMultivariableSteps('curl', vars)
-            };
-        } else {
-            return {
-                type: 'multivariable',
-                operation: 'Curl (3D)',
-                variables: vars,
-                result: 'Full 3D curl requires vector field components',
-                note: 'Provide separate Fx, Fy, Fz components for complete 3D curl',
-                original: state.currentFunction,
-                steps: generateMultivariableSteps('curl', vars)
-            };
-        }
-    } catch (error) {
-        throw new Error('Curl computation failed: ' + error.message);
-    }
-}
-
-function computeDoubleIntegral(vars) {
-    if (vars.length < 2) {
-        throw new Error('Double integral requires at least 2 variables');
-    }
-
-    // For demonstration, compute a simple rectangular region
-    return {
-        type: 'multivariable',
-        operation: 'Double Integral',
-        variables: vars,
-        result: 'Numerical double integration requires region specification',
-        note: 'For rectangular regions, use iterated single integrals',
-        suggestion: 'First integrate with respect to one variable, then the other',
-        original: state.currentFunction,
-        steps: generateMultivariableSteps('double', vars)
-    };
-}
-
-// ==================== STEP GENERATION ====================
-function generateDerivativeSteps(order) {
-    return [
-        { num: 1, title: 'Apply differentiation rules', content: `Taking the ${order === 1 ? 'first' : 'second'} derivative of f(x) = ${state.currentFunction}` },
-        { num: 2, title: 'Use power rule, chain rule, product rule as needed', content: 'Apply appropriate differentiation techniques' },
-        { num: 3, title: 'Simplify result', content: 'Combine like terms and simplify the expression' }
-    ];
-}
-
-function generateIntegralSteps(method) {
-    if (method === 'symbolic') {
-        return [
-            { num: 1, title: 'Identify integration pattern', content: 'Analyze the function structure' },
-            { num: 2, title: 'Apply integration rules', content: 'Use appropriate integration techniques' },
-            { num: 3, title: 'Add constant of integration', content: 'Remember to add +C for indefinite integrals' }
-        ];
-    }
-    return [
-        { num: 1, title: 'Match pattern', content: 'Found matching integral pattern in lookup table' },
-        { num: 2, title: 'Apply formula', content: 'Use standard integral formula' },
-        { num: 3, title: 'Add constant', content: 'Add +C for indefinite integral' }
-    ];
-}
-
-function generateDefiniteSteps(lower, upper, result, points) {
-    return [
-        { num: 1, title: 'Set up definite integral', content: `∫[${lower}, ${upper}] f(x) dx` },
-        { num: 2, title: 'Apply Simpson\'s Rule', content: `Using ${points} sample points for numerical integration` },
-        { num: 3, title: 'Compute weighted sum', content: 'Calculate weighted sum of function values at sample points' },
-        { num: 4, title: 'Final result', content: `Result ≈ ${result}` }
-    ];
-}
-
-function generateAdvancedSteps(method, isNumerical = false) {
-    const base = [
-        { num: 1, title: `Method: ${method}`, content: `Using ${method} integration technique` },
-        { num: 2, title: 'Apply method', content: isNumerical ? 'Numerical evaluation using Simpson\'s Rule' : 'Symbolic integration attempt' },
-        { num: 3, title: 'Simplify', content: 'Simplify and verify the result' }
-    ];
-    return base;
-}
-
-function generateODESteps(odeType) {
-    return [
-        { num: 1, title: `${odeType} ODE`, content: 'Identify the order and type of differential equation' },
-        { num: 2, title: 'Solution method', content: 'For complete ODE solutions, specialized solvers are recommended' },
-        { num: 3, title: 'Note', content: 'This tool provides basic ODE analysis. Use dedicated ODE solvers for complete solutions' }
-    ];
-}
-
-function generateSeriesSteps(seriesType, point, terms) {
-    return [
-        { num: 1, title: `${seriesType} expansion`, content: `Expanding around point a = ${point}` },
-        { num: 2, title: 'Compute derivatives', content: `Computing first ${terms} derivatives at x = ${point}` },
-        { num: 3, title: 'Build series', content: 'Construct series using Taylor/Maclaurin formula' },
-        { num: 4, title: 'Result', content: `Series with ${terms} terms` }
-    ];
-}
-
-function generateMultivariableSteps(operation, vars) {
-    return [
-        { num: 1, title: `${operation} computation`, content: `Operating on function with variables: ${vars.join(', ')}` },
-        { num: 2, title: 'Multi-variable calculus', content: 'Requires specialized implementation for complete solutions' },
-        { num: 3, title: 'Note', content: 'Partial derivatives and gradients can be approximated numerically' }
-    ];
-}
-
-// ==================== DISPLAY RESULTS ====================
-function displayResult(result) {
-    const container = document.getElementById('results');
-    const stepsContainer = document.getElementById('steps');
-
-    let html = '';
-
-    // Build result card based on type
-    if (result.type === 'derivative' || result.type === 'derivative2') {
-        html += `
-            <div class="result-card">
-                <div class="result-title">
-                    <div class="result-icon">∂</div>
-                    <span>${result.type === 'derivative' ? 'First' : 'Second'} Derivative</span>
-                </div>
-                <div class="result-content">
-                    <strong>${result.type === 'derivative' ? "f'(x)" : "f''(x)"} =</strong> ${escapeHtml(result.symbolic)}
-                </div>
-                <div class="result-meta">
-                    Original function: ${escapeHtml(result.original)}
-                </div>
-            </div>
-        `;
-    } else if (result.type === 'integral') {
-        html += `
-            <div class="result-card">
-                <div class="result-title">
-                    <div class="result-icon">∫</div>
-                    <span>Indefinite Integral</span>
-                </div>
-                <div class="result-content">
-                    <strong>∫ f(x) dx =</strong> ${escapeHtml(result.symbolic)}
-                </div>
-                <div class="result-meta">
-                    Method: ${result.method}<br>
-                    ${result.note ? result.note : ''}
-                </div>
-            </div>
-        `;
-    } else if (result.type === 'definite') {
-        html += `
-            <div class="result-card">
-                <div class="result-title">
-                    <div class="result-icon">∫</div>
-                    <span>Definite Integral</span>
-                </div>
-                <div class="result-content">
-                    <strong>∫<sub>${result.lower}</sub><sup>${result.upper}</sup> f(x) dx ≈</strong> ${result.value}
-                </div>
-                <div class="result-meta">
-                    Method: ${result.method} (${result.points} points)<br>
-                    Original: ${escapeHtml(result.original)}
-                </div>
-            </div>
-        `;
-    } else if (result.type === 'advanced') {
-        html += `
-            <div class="result-card">
-                <div class="result-title">
-                    <div class="result-icon">∫</div>
-                    <span>Advanced Integration</span>
-                </div>
-                <div class="result-content">
-                    ${result.value ? `<strong>Result ≈</strong> ${result.value}` : `<strong>Result:</strong> ${escapeHtml(result.symbolic)}`}
-                </div>
-                <div class="result-meta">
-                    Method: ${result.method}<br>
-                    ${result.suggestion ? result.suggestion : ''}
-                    ${result.lower !== undefined ? `Limits: [${result.lower}, ${result.upper}]` : ''}
-                </div>
-            </div>
-        `;
-    } else if (result.type === 'series') {
-        if (result.expansion) {
-            html += `
-                <div class="result-card">
-                    <div class="result-title">
-                        <div class="result-icon">Σ</div>
-                        <span>Series Expansion</span>
-                    </div>
-                    <div class="result-content">
-                        ${escapeHtml(result.expansion)}
-                    </div>
-                    <div class="result-meta">
-                        Type: ${result.seriesType}<br>
-                        Expansion point: x = ${result.point}<br>
-                        Terms: ${result.terms}
-                    </div>
-                </div>
-            `;
-        } else if (result.terms) {
-            html += `
-                <div class="result-card">
-                    <div class="result-title">
-                        <div class="result-icon">Σ</div>
-                        <span>Series Expansion</span>
-                    </div>
-                    <div class="result-content">
-                        ${result.terms.map(t => escapeHtml(t.term)).join(' + ')}
-                    </div>
-                    <div class="result-meta">
-                        Expansion point: x = ${result.point}<br>
-                        Terms computed: ${result.numTerms}
-                    </div>
-                </div>
-            `;
-        }
-    } else if (result.type === 'differential') {
-        html += `
-            <div class="result-card">
-                <div class="result-title">
-                    <div class="result-icon">∂</div>
-                    <span>Differential Equation</span>
-                </div>
-                <div class="result-content">
-                    ${escapeHtml(result.solution)}
-                </div>
-                <div class="result-meta">
-                    Type: ${result.odeType}<br>
-                    Initial conditions: ${result.initialConditions}<br>
-                    ${result.note}
-                </div>
-            </div>
-        `;
-    } else if (result.type === 'multivariable') {
-        html += `
-            <div class="result-card">
-                <div class="result-title">
-                    <div class="result-icon">∇</div>
-                    <span>${result.operation}</span>
-                </div>
-                <div class="result-content">
-        `;
-
-        if (result.operation === 'Partial Derivatives' && typeof result.result === 'object') {
-            html += '<strong>Partial Derivatives:</strong><br><br>';
-            for (const [varName, derivative] of Object.entries(result.result)) {
-                html += `∂f/∂${varName} = ${escapeHtml(derivative)}<br><br>`;
-            }
-        } else if (result.operation === 'Gradient Vector' && Array.isArray(result.result)) {
-            html += `<strong>${result.notation || 'Gradient'}</strong><br><br>`;
-            result.result.forEach((component, idx) => {
-                html += `Component ${idx + 1}: ${escapeHtml(component)}<br>`;
-            });
-        } else {
-            html += escapeHtml(String(result.result));
-        }
-
-        html += `
-                </div>
-                <div class="result-meta">
-                    Variables: ${result.variables.join(', ')}<br>
-                    ${result.note ? result.note + '<br>' : ''}
-                    ${result.suggestion ? result.suggestion : ''}
-                </div>
-            </div>
-        `;
-    }
-
-    container.innerHTML = html;
-
-    // Display steps
-    displaySteps(stepsContainer, result.steps || []);
-}
-
-function displaySteps(container, steps) {
-    if (!steps || steps.length === 0) {
-        container.classList.remove('show-timeline');
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">📖</div>
-                <h3>No detailed steps available</h3>
-                <p>Step-by-step solutions not available for this computation</p>
-            </div>
-        `;
-        return;
-    }
-
-    container.classList.add('show-timeline');
-    let html = '';
-    steps.forEach((step, index) => {
-        html += `
-            <div class="step-card" style="--delay:${index * 80}ms">
-                <div class="step-header">
-                    <div class="step-number">${step.num}</div>
-                    <div class="step-title">${step.title}</div>
-                </div>
-                <div class="step-content">${step.content}</div>
-            </div>
-        `;
+    Object.keys(MODES).forEach(m => {
+        state.opts[m] = {};
+        MODES[m].fields.forEach(f => { state.opts[m][f.key] = f.def; });
     });
 
-    container.innerHTML = html;
-}
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const digits = () => parseInt($('precision').value, 10) || 6;
+    const resolution = () => parseInt($('resolution').value, 10) || 400;
+    const isDark = () => document.body.classList.contains('dark');
 
-// ==================== PLOTTING WITH LIBRARY VALIDATION ====================
-function checkPlotlyAvailable() {
-    if (typeof Plotly === 'undefined') {
-        throw new Error('Plotly library not loaded. Please refresh the page.');
-    }
-    return true;
-}
-
-function switchTab(tabName) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-
-    event.target.classList.add('active');
-    document.getElementById(tabName).classList.add('active');
-
-    if (tabName === 'plot' && state.currentFunction) {
-        plot2D();
-    } else if (tabName === 'plot3d' && state.currentFunction) {
-        plot3D();
-    }
-}
-
-function plot2D() {
-    if (!state.currentFunction) {
-        showAlert('Please enter a valid function first', 'error');
-        return;
+    function toast(msg, kind) {
+        const t = document.createElement('div');
+        t.className = 'toast ' + (kind || '');
+        t.textContent = msg;
+        t.setAttribute('role', 'status');
+        document.body.appendChild(t);
+        requestAnimationFrame(() => t.classList.add('show'));
+        setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2200);
     }
 
-    const plotDiv = document.getElementById('plot2d');
+    // ------------------------------------------------------------------
+    // Theme
+    // ------------------------------------------------------------------
+    function applyTheme(dark) {
+        document.body.classList.toggle('dark', dark);
+        $('themeToggle').textContent = dark ? '🌙' : '☀️';
+        $('themeToggle').setAttribute('aria-pressed', String(dark));
+        try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) { /* storage unavailable */ }
+    }
+    function initTheme() {
+        let saved = null;
+        try { saved = localStorage.getItem('theme'); } catch (e) { /* ignore */ }
+        const dark = saved ? saved === 'dark' : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        applyTheme(dark);
+        $('themeToggle').addEventListener('click', () => { applyTheme(!isDark()); refreshActivePlot(); });
+    }
 
-    try {
-        checkPlotlyAvailable();
-
-        const resolution = parseInt(document.getElementById('resolution').value);
-        const xMin = -10;
-        const xMax = 10;
-        const step = (xMax - xMin) / resolution;
-
-        const xValues = [];
-        const yValues = [];
-        let skipCount = 0;
-
-        const funcStr = state.currentFunction;
-
-        for (let i = 0; i <= resolution; i++) {
-            const x = xMin + i * step;
-
+    // ------------------------------------------------------------------
+    // TeX helpers
+    // ------------------------------------------------------------------
+    function renderTex(root) {
+        root.querySelectorAll('[data-tex]').forEach(el => {
+            const tex = el.getAttribute('data-tex');
+            if (!tex || typeof katex === 'undefined') return;
             try {
-                const y = hybridEvaluate(funcStr, { x: x });
-
-                if (isFinite(y) && Math.abs(y) < 1e10) {
-                    xValues.push(x);
-                    yValues.push(y);
-                } else {
-                    skipCount++;
-                }
-            } catch (e) {
-                skipCount++;
-            }
-        }
-
-        if (xValues.length < 10) {
-            throw new Error('Function has too many discontinuities to plot');
-        }
-
-        const trace = {
-            x: xValues,
-            y: yValues,
-            type: 'scatter',
-            mode: 'lines',
-            line: {
-                color: '#667eea',
-                width: 3
-            },
-            name: 'f(x)'
-        };
-
-        const isDark = document.body.classList.contains('dark');
-        const textColor = isDark ? '#f5f5f7' : '#1d1d1f';
-        const borderColor = isDark ? '#38383a' : '#d2d2d7';
-
-        const layout = {
-            title: {
-                text: `f(x) = ${state.currentFunction}`,
-                font: {
-                    family: '-apple-system, BlinkMacSystemFont',
-                    size: 18,
-                    color: textColor
-                }
-            },
-            xaxis: {
-                title: 'x',
-                gridcolor: borderColor,
-                zerolinecolor: borderColor,
-                color: textColor
-            },
-            yaxis: {
-                title: 'f(x)',
-                gridcolor: borderColor,
-                zerolinecolor: borderColor,
-                color: textColor
-            },
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(0,0,0,0)',
-            font: {
-                color: textColor
-            },
-            margin: { t: 60, r: 40, b: 60, l: 60 }
-        };
-
-        const config = {
-            responsive: true,
-            displayModeBar: true,
-            displaylogo: false,
-            modeBarButtonsToRemove: ['lasso2d', 'select2d']
-        };
-
-        Plotly.newPlot(plotDiv, [trace], layout, config);
-
-        if (skipCount > 0) {
-            plotDiv.insertAdjacentHTML('afterend', 
-                `<div style="padding:10px;text-align:center;color:var(--text-secondary);font-size:12px;">
-                    ℹ️ ${skipCount} points skipped due to discontinuities
-                </div>`
-            );
-        }
-
-    } catch (error) {
-        console.error('Plot error:', error);
-        plotDiv.innerHTML = `
-            <div class="alert alert-error">
-                <span class="alert-icon">⚠</span>
-                <div>
-                    <strong>Unable to plot</strong><br>
-                    ${escapeHtml(error.message)}
-                    ${error.message.includes('Plotly') ? '<br><small>Try refreshing the page to reload plotting library</small>' : ''}
-                </div>
-            </div>
-        `;
+                katex.render(tex, el, { throwOnError: true, displayMode: el.classList.contains('tex-display'), output: 'html' });
+                el.classList.add('rendered');
+            } catch (e) { /* keep plain-text fallback */ }
+        });
     }
-}
+    const texSpan = (tex, fallback, display) =>
+        tex ? `<span class="tex ${display ? 'tex-display' : ''}" data-tex="${esc(tex)}">${esc(fallback)}</span>` : `<span class="plain">${esc(fallback)}</span>`;
 
-function plot3D() {
-    const func = state.currentFunction;
-    const plotDiv = document.getElementById('plot3dDiv');
+    // ------------------------------------------------------------------
+    // Option panel
+    // ------------------------------------------------------------------
+    function currentValues() { return state.opts[state.mode]; }
 
-    if (!func.includes('y')) {
-        plotDiv.innerHTML = `
-            <div class="alert alert-warning">
-                <span class="alert-icon">ℹ️</span>
-                <span>Function must contain variables x and y for 3D plotting (e.g., sin(x)*cos(y))</span>
-            </div>
-        `;
-        return;
+    function renderOptions() {
+        const mode = MODES[state.mode];
+        const vals = currentValues();
+        const html = mode.fields.filter(f => !f.show || f.show(vals)).map(f => {
+            const id = 'opt_' + f.key;
+            let control;
+            if (f.type === 'select') {
+                control = `<select id="${id}" data-key="${f.key}">${f.options.map(([v, l]) => `<option value="${esc(v)}" ${vals[f.key] === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+            } else {
+                control = `<input id="${id}" data-key="${f.key}" type="${f.type === 'number' ? 'number' : 'text'}" value="${esc(vals[f.key])}" ` +
+                    `placeholder="${esc(f.placeholder || '')}" ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''} autocomplete="off" spellcheck="false">`;
+            }
+            return `<div class="option-group"><label class="option-label" for="${id}">${esc(f.label)}</label>${control}</div>`;
+        }).join('');
+        const box = $('modeOptions');
+        box.innerHTML = html;
+        box.querySelectorAll('[data-key]').forEach(el => {
+            const handler = () => {
+                vals[el.dataset.key] = el.value;
+                const f = mode.fields.find(x => x.key === el.dataset.key);
+                const affectsLayout = mode.fields.some(g => g.show) || el.dataset.key === 'odeType' || el.dataset.key === 'op';
+                if (el.tagName === 'SELECT' || (affectsLayout && ['lower', 'upper'].includes(f.key))) {
+                    const focusKey = el.dataset.key, pos = el.selectionStart;
+                    renderOptions();
+                    const again = box.querySelector(`[data-key="${focusKey}"]`);
+                    if (again && el.tagName !== 'SELECT') { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) { /* number inputs */ } }
+                    updateInputLabels();
+                    validateInput();
+                }
+                saveSession();
+            };
+            el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', handler);
+            el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); compute(); } });
+        });
     }
 
-    try {
-        checkPlotlyAvailable();
-
-        const gridSize = 40;
-        const range = 5;
-        const step = (2 * range) / gridSize;
-
-        const xValues = [];
-        const yValues = [];
-        const zValues = [];
-        let skipCount = 0;
-
-        for (let i = 0; i <= gridSize; i++) {
-            const row = [];
-            const x = -range + i * step;
-            xValues.push(x);
-
-            for (let j = 0; j <= gridSize; j++) {
-                const y = -range + j * step;
-
-                if (i === 0) {
-                    yValues.push(y);
-                }
-
-                try {
-                    const z = hybridEvaluate(func, { x: x, y: y });
-                    if (isFinite(z) && Math.abs(z) < 1e6) {
-                        row.push(z);
-                    } else {
-                        row.push(null);
-                        skipCount++;
-                    }
-                } catch (e) {
-                    row.push(null);
-                    skipCount++;
-                }
-            }
-            zValues.push(row);
-        }
-
-        const validValues = [];
-        zValues.forEach(row => row.forEach(value => {
-            if (typeof value === 'number' && isFinite(value)) {
-                validValues.push(value);
-            }
-        }));
-
-        if (validValues.length < 25) {
-            throw new Error('3D surface needs more valid sample points. Adjust the function or domain.');
-        }
-
-        let zMin = Math.min(...validValues);
-        let zMax = Math.max(...validValues);
-
-        if (!isFinite(zMin) || !isFinite(zMax)) {
-            zMin = -1;
-            zMax = 1;
-        }
-
-        if (zMin === zMax) {
-            const padding = Math.max(1, Math.abs(zMin) * 0.1 || 1);
-            zMin -= padding;
-            zMax += padding;
-        }
-
-        const isDark = document.body.classList.contains('dark');
-        const textColor = isDark ? '#f5f5f7' : '#0f172a';
-        const gridColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.12)';
-        const axisLineColor = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(15,23,42,0.4)';
-        const sceneBackground = isDark ? 'rgba(5,8,15,0.95)' : 'rgba(255,255,255,0.92)';
-        const surfaceColorscale = isDark
-            ? [
-                [0, '#1d4ed8'],
-                [0.5, '#a855f7'],
-                [1, '#f472b6']
-            ]
-            : [
-                [0, '#0f172a'],
-                [0.5, '#2563eb'],
-                [1, '#60a5fa']
-            ];
-
-        const trace = {
-            x: xValues,
-            y: yValues,
-            z: zValues,
-            type: 'surface',
-            colorscale: surfaceColorscale,
-            showscale: true,
-            opacity: 0.98,
-            lighting: {
-                ambient: 0.5,
-                diffuse: 0.8,
-                specular: 0.3,
-                roughness: 0.6
-            },
-            contours: {
-                z: {
-                    show: true,
-                    usecolormap: true,
-                    highlightcolor: isDark ? '#22d3ee' : '#0ea5e9',
-                    project: { z: true }
-                }
-            }
-        };
-
-        const layout = {
-            title: {
-                text: `f(x,y) = ${func}`,
-                font: {
-                    family: '-apple-system, BlinkMacSystemFont',
-                    size: 18,
-                    color: textColor
-                }
-            },
-            scene: {
-                xaxis: { 
-                    title: 'x',
-                    color: textColor,
-                    gridcolor: gridColor,
-                    zerolinecolor: axisLineColor,
-                    linecolor: axisLineColor,
-                    range: [-range, range],
-                    tickfont: { color: textColor }
-                },
-                yaxis: { 
-                    title: 'y',
-                    color: textColor,
-                    gridcolor: gridColor,
-                    zerolinecolor: axisLineColor,
-                    linecolor: axisLineColor,
-                    range: [-range, range],
-                    tickfont: { color: textColor }
-                },
-                zaxis: { 
-                    title: 'f(x,y)',
-                    color: textColor,
-                    gridcolor: gridColor,
-                    zerolinecolor: axisLineColor,
-                    linecolor: axisLineColor,
-                    range: [zMin, zMax],
-                    tickfont: { color: textColor }
-                },
-                bgcolor: sceneBackground,
-                aspectmode: 'cube'
-            },
-            paper_bgcolor: sceneBackground,
-            font: {
-                color: textColor
-            },
-            margin: { t: 60, r: 20, b: 20, l: 20 }
-        };
-
-        const config = {
-            responsive: true,
-            displayModeBar: true,
-            displaylogo: false,
-            modeBarButtonsToRemove: ['lasso2d', 'select2d']
-        };
-
-        Plotly.newPlot(plotDiv, [trace], layout, config);
-
-    } catch (error) {
-        console.error('3D Plot error:', error);
-        plotDiv.innerHTML = `
-            <div class="alert alert-error">
-                <span class="alert-icon">⚠</span>
-                <div>
-                    <strong>Unable to create 3D plot</strong><br>
-                    ${escapeHtml(error.message)}
-                    ${error.message.includes('Plotly') ? '<br><small>Try refreshing the page to reload plotting library</small>' : ''}
-                </div>
-            </div>
-        `;
+    function updateInputLabels() {
+        const spec = MODES[state.mode].input(currentValues());
+        $('inputLabel').textContent = spec.label;
+        $('functionInput').placeholder = spec.placeholder;
+        $('inputHint').textContent = spec.hint;
     }
-}
 
-// ==================== ALERTS ====================
-function showAlert(message, type = 'error') {
-    const container = document.getElementById('results');
-    const icons = {
-        error: '⚠',
-        success: '✓',
-        warning: 'ℹ️'
-    };
+    function setMode(mode, keepInput) {
+        if (!MODES[mode]) mode = 'derivative';
+        state.mode = mode;
+        $('operationMode').value = mode;
+        renderOptions();
+        updateInputLabels();
+        renderExamples();
+        if (!keepInput) validateInput();
+        saveSession();
+    }
 
-    container.innerHTML = `
-        <div class="alert alert-${type}">
-            <span class="alert-icon">${icons[type]}</span>
-            <span>${escapeHtml(message)}</span>
-        </div>
-    `;
-}
+    function renderExamples() {
+        const sel = $('examples');
+        sel.innerHTML = '<option value="">Try an example…</option>' +
+            MODES[state.mode].examples.map((e, i) => `<option value="${i}">${esc(e.label)}</option>`).join('');
+    }
 
-// ==================== UTILITY FUNCTIONS ====================
-function escapeHtml(text) {
-    const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-    };
-    return String(text).replace(/[&<>"']/g, m => map[m]);
-}
-
-function clearAll() {
-    document.getElementById('functionInput').value = '';
-    document.getElementById('preview').textContent = 'Enter a function to begin...';
-    document.getElementById('preview').className = 'preview-box';
-
-    state.currentFunction = '';
-    state.compiledFunction = null;
-    state.lastResult = null;
-
-    document.getElementById('results').innerHTML = `
-        <div class="empty-state">
-            <div class="empty-state-icon">🧮</div>
-            <h3>Ready to Compute</h3>
-            <p>Enter a function and select an operation to begin</p>
-        </div>
-    `;
-
-    const stepsElement = document.getElementById('steps');
-    stepsElement.classList.remove('show-timeline');
-    stepsElement.innerHTML = `
-        <div class="empty-state">
-            <div class="empty-state-icon">📖</div>
-            <h3>Step-by-Step Solutions</h3>
-            <p>Computation steps will appear here</p>
-        </div>
-    `;
-
-    document.getElementById('plot2d').innerHTML = '';
-    document.getElementById('plot3dDiv').innerHTML = '';
-}
-
-// ==================== KEYBOARD SHORTCUTS ====================
-document.addEventListener('keydown', function(e) {
-    // Ctrl/Cmd + Enter to compute
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
+    function loadExample(i) {
+        const ex = MODES[state.mode].examples[i];
+        if (!ex) return;
+        const vals = currentValues();
+        MODES[state.mode].fields.forEach(f => { vals[f.key] = f.def; });
+        Object.assign(vals, ex.opts);
+        $('functionInput').value = ex.fn;
+        renderOptions();
+        updateInputLabels();
+        validateInput();
         compute();
     }
 
-    // Ctrl/Cmd + K to clear
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        clearAll();
+    // ------------------------------------------------------------------
+    // Input validation & live preview
+    // ------------------------------------------------------------------
+    function splitParts(src) { return src.split(/[;\n]+/).map(s => s.trim()).filter(Boolean); }
+    function multiPartMode() {
+        const v = currentValues();
+        return (state.mode === 'ode' && v.odeType === 'system') || (state.mode === 'multivariable' && VECTOR_OPS.includes(v.op));
     }
-});
 
-// ==================== AUTO-SAVE ====================
-let autoSaveTimeout;
-document.getElementById('functionInput').addEventListener('input', function() {
-    clearTimeout(autoSaveTimeout);
-    autoSaveTimeout = setTimeout(() => {
-        localStorage.setItem('lastFunction', this.value);
-    }, 1000);
-});
-
-// Load last function on startup
-window.addEventListener('load', function() {
-    const lastFunction = localStorage.getItem('lastFunction');
-    if (lastFunction) {
-        document.getElementById('functionInput').value = lastFunction;
-        validateFunction();
+    function validateInput() {
+        const src = $('functionInput').value;
+        const preview = $('preview');
+        state.liveSpec = null;
+        if (!src.trim()) {
+            preview.className = 'preview-box';
+            preview.textContent = 'Enter a function to begin…';
+            return false;
+        }
+        try {
+            const parts = multiPartMode() ? splitParts(src) : [src];
+            const infos = parts.map(p => engine.inspect(p));
+            const tex = infos.map(i => i.tex).join(',\\;');
+            const vars = [...new Set(infos.flatMap(i => i.vars))];
+            const sample = infos.length === 1 && Number.isFinite(infos[0].sampleValue)
+                ? ` · f(${vars.length ? vars.map(() => infos[0].sampleAt).join(', ') : ''}) = ${engine.fmt(infos[0].sampleValue, 5)}` : '';
+            preview.className = 'preview-box valid';
+            preview.innerHTML = `<span class="preview-tex">${texSpan(tex, infos.map(i => i.text).join(' ; '), false)}</span>` +
+                `<span class="preview-meta">${vars.length ? 'variables: ' + esc(vars.join(', ')) : 'constant'}${esc(sample)}</span>`;
+            renderTex(preview);
+            if (infos.length === 1 && !multiPartMode()) state.liveSpec = infos[0];
+            return true;
+        } catch (e) {
+            preview.className = 'preview-box error';
+            preview.innerHTML = `<strong>⚠</strong> ${esc(e.message)}`;
+            return false;
+        }
     }
-});
 
+    // ------------------------------------------------------------------
+    // Compute
+    // ------------------------------------------------------------------
+    function gatherOptions() {
+        const vals = Object.assign({}, currentValues());
+        vals.digits = digits();
+        const m = state.mode;
+        if (m === 'ode') {
+            vals.odeType = vals.odeType || 'first';
+        }
+        if (m === 'derivative') vals.variable = (vals.variable || '').trim() || undefined;
+        if (m === 'integral' || m === 'series' || m === 'limit' || m === 'analysis') vals.variable = (vals.variable || '').trim() || undefined;
+        return vals;
+    }
+
+    async function compute() {
+        if (state.busy) { Runner.cancel(); return; }
+        if (!validateInput()) { showError('Please enter a valid expression first.'); return; }
+        const btn = $('computeBtn');
+        state.busy = true;
+        btn.classList.add('loading');
+        btn.innerHTML = '<div class="spinner"></div><span>Cancel</span>';
+        $('results').setAttribute('aria-busy', 'true');
+        try {
+            const src = $('functionInput').value;
+            const mode = state.mode === 'multivariable' ? 'multivariable' : state.mode;
+            const result = await Runner.run(mode, src, gatherOptions());
+            state.result = result;
+            displayResult(result);
+            switchTab('results');
+            pushHistory(result);
+            updateShareHash();
+            prepareAuxiliaryTabs(result);
+        } catch (err) {
+            if (err.message !== 'Cancelled') showError(err.message, !err.user);
+            else showError('Computation cancelled.');
+        } finally {
+            state.busy = false;
+            btn.classList.remove('loading');
+            btn.innerHTML = '<span>🚀</span><span>Compute</span>';
+            $('results').removeAttribute('aria-busy');
+        }
+    }
+
+    function showError(message, unexpected) {
+        $('results').innerHTML = `<div class="alert alert-error" role="alert"><span class="alert-icon">⚠</span><div><strong>${unexpected ? 'Unexpected error' : 'Could not compute'}</strong><br>${esc(message)}</div></div>`;
+        switchTab('results');
+    }
+
+    // ------------------------------------------------------------------
+    // Result rendering
+    // ------------------------------------------------------------------
+    const KIND_ICON = { derivative: '∂', integral: '∫', definite: '∫', series: 'Σ', limit: 'lim', analysis: 'f', ode: 'y′', multivariable: '∇', vector: '∇' };
+
+    function displayResult(r) {
+        const rows = r.items.map(i => `
+            <div class="result-row">${i.tex && !i.inline ? '' : `<span class="row-label">${esc(i.label)}</span> `}${texSpan(i.tex, i.text, false)}</div>`).join('');
+        const html = `
+            <div class="result-card">
+                <div class="result-title">
+                    <div class="result-icon">${esc(KIND_ICON[r.kind] || '=')}</div>
+                    <span>${esc(r.title)}</span>
+                    <div class="result-actions">
+                        <button class="mini-btn" data-act="copy" title="Copy result as text">📋 Copy</button>
+                        <button class="mini-btn" data-act="copytex" title="Copy LaTeX">TeX</button>
+                        <button class="mini-btn" data-act="share" title="Copy a link to this calculation">🔗 Share</button>
+                    </div>
+                </div>
+                ${r.main ? `<div class="result-content">${r.main.tex ? '' : `<span class="row-label">${esc(r.main.label)}</span> `}${texSpan(r.main.tex, r.main.text, true)}</div>` : ''}
+                ${rows ? `<div class="result-rows">${rows}</div>` : ''}
+                ${r.meta.length ? `<div class="result-meta">${r.meta.map(m => esc(m)).join('<br>')}</div>` : ''}
+                ${r.warnings.map(w => `<div class="alert alert-warning"><span class="alert-icon">ℹ️</span><span>${esc(w)}</span></div>`).join('')}
+            </div>`;
+        const container = $('results');
+        container.innerHTML = html;
+        renderTex(container);
+        container.querySelector('[data-act="copy"]').addEventListener('click', () => copyText(r.text, 'Result copied'));
+        container.querySelector('[data-act="copytex"]').addEventListener('click', () => copyText(r.main && r.main.tex ? r.main.tex : r.text, 'LaTeX copied'));
+        container.querySelector('[data-act="share"]').addEventListener('click', shareLink);
+        displaySteps(r.steps);
+    }
+
+    function displaySteps(steps) {
+        const el = $('steps');
+        if (!steps || !steps.length) {
+            el.classList.remove('show-timeline');
+            el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📖</div><h3>No steps for this computation</h3><p>Try a different operation</p></div>';
+            return;
+        }
+        el.classList.add('show-timeline');
+        el.innerHTML = steps.map((s, i) => `
+            <div class="step-card" style="--delay:${Math.min(i, 12) * 60}ms">
+                <div class="step-header"><div class="step-number">${i + 1}</div><div class="step-title">${esc(s.title)}</div></div>
+                <div class="step-content">${esc(s.text)}</div>
+                ${s.tex ? `<div class="step-tex">${texSpan(s.tex, '', true)}</div>` : ''}
+            </div>`).join('');
+        renderTex(el);
+    }
+
+    async function copyText(text, msg) {
+        try {
+            await navigator.clipboard.writeText(text);
+            toast(msg, 'ok');
+        } catch (e) {
+            const ta = document.createElement('textarea');
+            ta.value = text; document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); toast(msg, 'ok'); } catch (e2) { toast('Copy failed', 'err'); }
+            ta.remove();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Persistence: session, history, share links
+    // ------------------------------------------------------------------
+    function snapshot() { return { m: state.mode, f: $('functionInput').value, o: state.opts[state.mode] }; }
+
+    function saveSession() {
+        try { localStorage.setItem('cs_session', JSON.stringify({ m: state.mode, f: $('functionInput').value, opts: state.opts })); } catch (e) { /* ignore */ }
+    }
+
+    function restoreSnapshot(s) {
+        if (!s || !MODES[s.m]) return false;
+        state.mode = s.m;
+        MODES[s.m].fields.forEach(f => { state.opts[s.m][f.key] = f.def; });
+        Object.keys(s.o || {}).forEach(k => { if (typeof s.o[k] === 'string') state.opts[s.m][k] = s.o[k]; });
+        $('functionInput').value = String(s.f || '');
+        setMode(s.m, true);
+        validateInput();
+        return true;
+    }
+
+    function encodeHash(s) { return btoa(unescape(encodeURIComponent(JSON.stringify(s)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+    function decodeHash(h) {
+        try {
+            const b = h.replace(/-/g, '+').replace(/_/g, '/');
+            return JSON.parse(decodeURIComponent(escape(atob(b + '==='.slice((b.length + 3) % 4)))));
+        } catch (e) { return null; }
+    }
+    function updateShareHash() {
+        try { history.replaceState(null, '', '#s=' + encodeHash(snapshot())); } catch (e) { /* file:// restrictions */ }
+    }
+    function shareLink() {
+        const url = location.href.split('#')[0] + '#s=' + encodeHash(snapshot());
+        copyText(url, 'Link copied – anyone opening it sees this calculation');
+    }
+
+    function getHistory() { try { return JSON.parse(localStorage.getItem('cs_history') || '[]'); } catch (e) { return []; } }
+    function pushHistory(result) {
+        const entry = { s: snapshot(), t: result.main ? `${result.main.label} ${result.main.text}` : result.title, ts: Date.now() };
+        const list = getHistory().filter(h => !(h.s.m === entry.s.m && h.s.f === entry.s.f && JSON.stringify(h.s.o) === JSON.stringify(entry.s.o)));
+        list.unshift(entry);
+        try { localStorage.setItem('cs_history', JSON.stringify(list.slice(0, 30))); } catch (e) { /* ignore */ }
+        renderHistory();
+    }
+    function renderHistory() {
+        const list = getHistory();
+        const box = $('historyList');
+        if (!list.length) { box.innerHTML = '<div class="history-empty">Your calculations will appear here.</div>'; return; }
+        box.innerHTML = list.map((h, i) => `
+            <button class="history-item" data-i="${i}" title="${esc(h.t)}">
+                <span class="history-mode">${esc((MODES[h.s.m] || {}).icon || '=')}</span>
+                <span class="history-fn">${esc(h.s.f.length > 40 ? h.s.f.slice(0, 40) + '…' : h.s.f)}</span>
+            </button>`).join('');
+        box.querySelectorAll('.history-item').forEach(b => b.addEventListener('click', () => {
+            const h = getHistory()[+b.dataset.i];
+            if (h && restoreSnapshot(h.s)) compute();
+        }));
+    }
+
+    // ------------------------------------------------------------------
+    // Tabs
+    // ------------------------------------------------------------------
+    function switchTab(name) {
+        document.querySelectorAll('.tab').forEach(t => {
+            const on = t.dataset.tab === name;
+            t.classList.toggle('active', on);
+            t.setAttribute('aria-selected', String(on));
+        });
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === name));
+        if (name === 'plot') plot2D();
+        if (name === 'plot3d') plot3D();
+    }
+    function activeTab() { const t = document.querySelector('.tab.active'); return t ? t.dataset.tab : 'results'; }
+    function refreshActivePlot() { const t = activeTab(); if (t === 'plot') plot2D(); if (t === 'plot3d') plot3D(); }
+
+    function prepareAuxiliaryTabs(result) {
+        // Hint which plot tab is meaningful for this result
+        const has2d = !!(result.plot || result.plot2field);
+        const has3d = !!result.plot3;
+        $('tab-plot').classList.toggle('dim', !has2d && !state.liveSpec);
+        $('tab-plot3d').classList.toggle('dim', !has3d && !(state.liveSpec && state.liveSpec.vars.length >= 2));
+    }
+
+    // ------------------------------------------------------------------
+    // Plotting
+    // ------------------------------------------------------------------
+    const COLORS = ['#007aff', '#ff9500', '#34c759', '#af52de', '#ff3b30', '#5ac8fa'];
+
+    function plotTheme() {
+        const dark = isDark();
+        return {
+            text: dark ? '#f5f5f7' : '#1d1d1f',
+            grid: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.09)',
+            zero: dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)',
+            bg: dark ? 'rgba(10,10,14,0.0)' : 'rgba(255,255,255,0.0)',
+            scene: dark ? 'rgba(5,8,15,0.95)' : 'rgba(255,255,255,0.92)'
+        };
+    }
+
+    function quantile(sorted, q) { return sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor(q * (sorted.length - 1))))]; }
+
+    function sampleCurve(fn, lo, hi, n) {
+        const xs = [], ys = [];
+        for (let i = 0; i <= n; i++) {
+            const x = lo + (hi - lo) * i / n;
+            const y = fn(x);
+            xs.push(x); ys.push(Number.isFinite(y) ? y : null);
+        }
+        // break the line across vertical asymptotes (huge jumps with a sign change)
+        const finite = ys.filter(y => y !== null).map(Math.abs).sort((a, b) => a - b);
+        const med = finite.length ? finite[Math.floor(finite.length / 2)] : 1;
+        const thr = Math.max(20 * med, 50);
+        for (let i = 1; i < ys.length; i++) {
+            const a = ys[i - 1], b = ys[i];
+            if (a !== null && b !== null && Math.sign(a) !== Math.sign(b) && Math.abs(a) > thr && Math.abs(b) > thr) {
+                ys[i - 1] = null;
+            }
+        }
+        return { xs, ys };
+    }
+
+    function arrowSegments(x, y, dx, dy, head) {
+        const len = Math.hypot(dx, dy);
+        if (!len || !Number.isFinite(len)) return null;
+        const ex = x + dx, ey = y + dy, ang = Math.atan2(dy, dx), h = head || len * 0.3;
+        return [
+            [x, y], [ex, ey],
+            [ex - h * Math.cos(ang - 0.45), ey - h * Math.sin(ang - 0.45)], [ex, ey],
+            [ex - h * Math.cos(ang + 0.45), ey - h * Math.sin(ang + 0.45)], [ex, ey]
+        ];
+    }
+
+    function liveSpec2D() {
+        const info = state.liveSpec;
+        if (!info || info.vars.length > 1) return null;
+        const v = info.vars[0] || 'x';
+        return { variable: v, curves: [{ name: `f(${v})`, fn: engine.compile(info.node, [v]) }] };
+    }
+
+    function plot2D() {
+        const div = $('plot2d'), phase = $('plotPhase');
+        phase.style.display = 'none';
+        const r = state.result;
+        let spec = r && r.plot ? r.plot : null;
+        let field = r && r.plot2field ? r.plot2field : null;
+        if (!spec && !field) spec = liveSpec2D();
+        if (!spec && !field) {
+            Plotly.purge(div);
+            div.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📈</div><h3>Nothing to plot yet</h3><p>${state.liveSpec && state.liveSpec.vars.length > 1 ? 'This expression has several variables – see the 3D tab.' : 'Enter a function of one variable or run a computation.'}</p></div>`;
+            return;
+        }
+        if (div.querySelector('.empty-state')) div.innerHTML = '';
+        const th = plotTheme();
+        const traces = [], shapes = [], annotations = [];
+        let lo, hi;
+        const userLo = parseFloat($('xMin').value), userHi = parseFloat($('xMax').value);
+        if (field) {
+            lo = Number.isFinite(userLo) ? userLo : -5; hi = Number.isFinite(userHi) ? userHi : 5;
+        } else if (Number.isFinite(userLo) && Number.isFinite(userHi) && userLo < userHi) {
+            lo = userLo; hi = userHi;
+        } else if (spec.xRange && Number.isFinite(spec.xRange[0]) && Number.isFinite(spec.xRange[1]) && spec.xRange[0] < spec.xRange[1]) {
+            [lo, hi] = spec.xRange;
+        } else { lo = -10; hi = 10; }
+        const n = Math.min(4000, Math.max(200, resolution() * 2));
+        const allY = [];
+
+        if (field) {
+            const [vx, vy] = field.vars;
+            const N = 15, step = (hi - lo) / (N - 1);
+            const mags = [];
+            const cells = [];
+            for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+                const x = lo + i * step, y = lo + j * step;
+                const u = field.fns[0](x, y), w = field.fns[1](x, y);
+                if (Number.isFinite(u) && Number.isFinite(w)) { cells.push([x, y, u, w]); mags.push(Math.hypot(u, w)); }
+            }
+            const maxMag = Math.max(...mags, 1e-12);
+            const px = [], py = [];
+            cells.forEach(([x, y, u, w]) => {
+                const k = 0.8 * step / maxMag;
+                const seg = arrowSegments(x, y, u * k, w * k);
+                if (seg) { seg.forEach(p => { px.push(p[0]); py.push(p[1]); }); px.push(null); py.push(null); }
+            });
+            traces.push({ x: px, y: py, mode: 'lines', type: 'scatter', line: { color: COLORS[0], width: 1.6 }, name: 'F', hoverinfo: 'skip' });
+            allY.push(lo, hi);
+        }
+
+        if (spec) {
+            (spec.curves || []).forEach((c, i) => {
+                let s;
+                if (c.data) {
+                    const t0 = c.data.t[0], t1 = c.data.t[c.data.t.length - 1];
+                    s = sampleCurve(c.fn, Math.min(t0, t1), Math.max(t0, t1), n);
+                } else s = sampleCurve(c.fn, lo, hi, n);
+                s.ys.forEach(y => { if (y !== null) allY.push(y); });
+                traces.push({
+                    x: s.xs, y: s.ys, mode: 'lines', type: 'scatter', name: c.name, connectgaps: false,
+                    line: { color: COLORS[i % COLORS.length], width: i === 0 ? 3 : 2.2, dash: c.dash || 'solid' }
+                });
+            });
+            if (spec.shade && spec.shade.fn) {
+                const a = Math.max(spec.shade.a, lo), b = Math.min(spec.shade.b, hi);
+                if (b > a) {
+                    const s = sampleCurve(spec.shade.fn, a, b, Math.max(200, n / 2));
+                    traces.push({ x: s.xs, y: s.ys.map(y => (y === null || Math.abs(y) > 1e6 ? null : y)), type: 'scatter', mode: 'lines', fill: 'tozeroy', fillcolor: 'rgba(0,122,255,0.22)', line: { width: 0 }, name: 'area', hoverinfo: 'skip' });
+                }
+            }
+            if (spec.points && spec.points.length) {
+                traces.push({
+                    x: spec.points.map(p => p.x), y: spec.points.map(p => p.y), mode: 'markers', type: 'scatter', name: 'points of interest',
+                    text: spec.points.map(p => p.name), hovertemplate: '%{text}<br>(%{x:.5g}, %{y:.5g})<extra></extra>',
+                    marker: { size: 11, color: spec.points.map(p => p.color || COLORS[1]), symbol: spec.points.map(p => (p.open ? 'circle-open' : 'circle')), line: { width: 2, color: spec.points.map(p => p.color || COLORS[1]) } }
+                });
+                spec.points.forEach(p => allY.push(p.y));
+            }
+            (spec.vlines || []).forEach(x => shapes.push({ type: 'line', x0: x, x1: x, yref: 'paper', y0: 0, y1: 1, line: { color: '#ff3b30', width: 1.5, dash: 'dash' } }));
+            (spec.hlines || []).concat(spec.hline !== undefined ? [spec.hline] : []).forEach(y => shapes.push({ type: 'line', y0: y, y1: y, xref: 'paper', x0: 0, x1: 1, line: { color: '#8e8e93', width: 1.5, dash: 'dot' } }));
+
+            // y-range: clip runaway values near asymptotes
+            if (spec.slopeField && spec.slopeField.fn) {
+                const ysf = allY.slice().sort((a, b) => a - b);
+                const yl = ysf.length ? quantile(ysf, 0) : -1, yh = ysf.length ? quantile(ysf, 1) : 1;
+                const padY = (yh - yl) * 0.25 || 1;
+                const y0 = yl - padY, y1 = yh + padY;
+                const nx = 22, ny = 16, cw = (hi - lo) / nx, ch = (y1 - y0) / ny;
+                const px = [], py = [];
+                for (let i = 0; i <= nx; i++) for (let j = 0; j <= ny; j++) {
+                    const x = lo + i * cw, y = y0 + j * ch, m = spec.slopeField.fn(x, y);
+                    if (!Number.isFinite(m)) continue;
+                    const mn = m * (hi - lo) / (y1 - y0), norm = Math.hypot(1, mn), hl = 0.38;
+                    const ux = (hi - lo) * hl / nx / norm, uy = (y1 - y0) * hl / ny * mn / norm;
+                    px.push(x - ux, x + ux, null); py.push(y - uy, y + uy, null);
+                }
+                traces.unshift({ x: px, y: py, mode: 'lines', type: 'scatter', line: { color: isDark() ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.18)', width: 1 }, name: 'slope field', hoverinfo: 'skip' });
+                allY.push(y0, y1);
+            }
+        }
+
+        const sorted = allY.filter(Number.isFinite).sort((a, b) => a - b);
+        let yRange = null;
+        if (sorted.length > 5) {
+            const q1 = quantile(sorted, 0.03), q2 = quantile(sorted, 0.97), span = (q2 - q1) || 1;
+            if (sorted[sorted.length - 1] - sorted[0] > 6 * span) yRange = [q1 - 0.6 * span, q2 + 0.6 * span];
+        }
+        const xTitle = field ? field.vars[0] : (spec && spec.variable) || 'x';
+        const layout = {
+            title: { text: r && r.title && state.result.plot ? r.title : (spec ? 'Graph' : 'Vector field'), font: { size: 16, color: th.text } },
+            xaxis: { title: xTitle, gridcolor: th.grid, zerolinecolor: th.zero, color: th.text, range: [lo, hi] },
+            yaxis: { title: field ? field.vars[1] : '', gridcolor: th.grid, zerolinecolor: th.zero, color: th.text, ...(yRange ? { range: yRange } : {}), ...(field ? { range: [lo, hi], scaleanchor: 'x' } : {}) },
+            paper_bgcolor: th.bg, plot_bgcolor: th.bg, font: { color: th.text },
+            margin: { t: 50, r: 30, b: 50, l: 55 }, shapes, annotations,
+            legend: { orientation: 'h', y: -0.18 }, hovermode: 'closest'
+        };
+        Plotly.react(div, traces, layout, { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['lasso2d', 'select2d'], toImageButtonOptions: { filename: 'calculus-suite-plot', scale: 2 } });
+
+        // phase portrait for ODE systems
+        if (spec && spec.phase) {
+            phase.style.display = 'block';
+            Plotly.react(phase, [{
+                x: spec.phase.x, y: spec.phase.y, mode: 'lines', type: 'scatter', line: { color: COLORS[2], width: 2.5 }, name: 'trajectory'
+            }, {
+                x: [spec.phase.x[0]], y: [spec.phase.y[0]], mode: 'markers', type: 'scatter', marker: { size: 11, color: COLORS[4] }, name: 'start'
+            }], {
+                title: { text: `Phase portrait (${spec.phase.labels[0]} vs ${spec.phase.labels[1]})`, font: { size: 15, color: th.text } },
+                xaxis: { title: spec.phase.labels[0], gridcolor: th.grid, color: th.text, zerolinecolor: th.zero },
+                yaxis: { title: spec.phase.labels[1], gridcolor: th.grid, color: th.text, zerolinecolor: th.zero },
+                paper_bgcolor: th.bg, plot_bgcolor: th.bg, font: { color: th.text }, margin: { t: 45, r: 30, b: 50, l: 55 }, legend: { orientation: 'h', y: -0.2 }
+            }, { responsive: true, displaylogo: false });
+        }
+    }
+
+    function plot3D() {
+        const div = $('plot3dDiv');
+        const r = state.result;
+        let spec = r && r.plot3 ? r.plot3 : null;
+        if (!spec) {
+            const info = state.liveSpec;
+            if (info && info.vars.length >= 2) {
+                spec = { vars: info.vars.slice(0, 3), fn: engine.compile(info.node, info.vars), live: true };
+            }
+        }
+        const msg = (icon, title, text) => { Plotly.purge(div); div.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${icon}</div><h3>${title}</h3><p>${text}</p></div>`; };
+        if (!spec) return msg('🎮', 'No surface to show', 'Enter a function of two variables, e.g. <code>sin(x)*cos(y)</code>, or use the Multivariable mode.');
+        if (div.querySelector('.empty-state')) div.innerHTML = '';
+        const th = plotTheme();
+        const sceneBase = {
+            bgcolor: th.scene,
+            xaxis: { gridcolor: th.grid, zerolinecolor: th.zero, color: th.text },
+            yaxis: { gridcolor: th.grid, zerolinecolor: th.zero, color: th.text },
+            zaxis: { gridcolor: th.grid, zerolinecolor: th.zero, color: th.text }
+        };
+        const baseLayout = { paper_bgcolor: th.scene, font: { color: th.text }, margin: { t: 50, r: 10, b: 10, l: 10 } };
+        const config = { responsive: true, displaylogo: false, toImageButtonOptions: { filename: 'calculus-suite-3d', scale: 2 } };
+
+        if (spec.field) { // 3D vector field
+            const R = 3, k = 5, xs = [], ys = [], zs = [], us = [], vs = [], ws = [];
+            for (let i = 0; i < k; i++) for (let j = 0; j < k; j++) for (let l = 0; l < k; l++) {
+                const x = -R + 2 * R * i / (k - 1), y = -R + 2 * R * j / (k - 1), z = -R + 2 * R * l / (k - 1);
+                const u = spec.fns[0](x, y, z), v = spec.fns[1](x, y, z), w = spec.fns[2](x, y, z);
+                if ([u, v, w].every(Number.isFinite)) { xs.push(x); ys.push(y); zs.push(z); us.push(u); vs.push(v); ws.push(w); }
+            }
+            Plotly.react(div, [{ type: 'cone', x: xs, y: ys, z: zs, u: us, v: vs, w: ws, sizemode: 'scaled', sizeref: 0.8, colorscale: 'Viridis', showscale: false }],
+                { ...baseLayout, title: { text: 'Vector field F', font: { size: 16, color: th.text } }, scene: { ...sceneBase, aspectmode: 'cube' } }, config);
+            return;
+        }
+
+        let xr, yr;
+        if (spec.xRange && spec.yRange) {
+            xr = spec.xRange.slice(); yr = spec.yRange.slice();
+            if (xr[0] === xr[1]) xr = [xr[0] - 1, xr[1] + 1];
+            if (yr[0] === yr[1]) yr = [yr[0] - 1, yr[1] + 1];
+        } else { const R = spec.range || 5; xr = [-R, R]; yr = [-R, R]; }
+        const grid = Math.min(90, Math.max(25, Math.round(resolution() / 8)));
+        const xv = [], yv = [], zv = [];
+        for (let i = 0; i <= grid; i++) xv.push(xr[0] + (xr[1] - xr[0]) * i / grid);
+        for (let j = 0; j <= grid; j++) yv.push(yr[0] + (yr[1] - yr[0]) * j / grid);
+        const extra = new Array(Math.max(0, spec.vars.length - 2)).fill(0);
+        let valid = 0;
+        for (let j = 0; j <= grid; j++) { // rows follow y, columns follow x (Plotly convention)
+            const row = [];
+            for (let i = 0; i <= grid; i++) {
+                const z = spec.fn(xv[i], yv[j], ...extra);
+                if (Number.isFinite(z) && Math.abs(z) < 1e7) { row.push(z); valid++; } else row.push(null);
+            }
+            zv.push(row);
+        }
+        if (valid < 25) return msg('⚠', 'Cannot draw this surface', 'The function is undefined on almost the whole domain.');
+        const flat = [].concat(...zv).filter(z => z !== null).sort((a, b) => a - b);
+        const zlo = flat[0], zhi = flat[flat.length - 1];
+        const scale = isDark() ? [[0, '#1d4ed8'], [0.5, '#a855f7'], [1, '#f472b6']] : [[0, '#0f172a'], [0.5, '#2563eb'], [1, '#60a5fa']];
+        const traces = [];
+        if (state.view3d === 'contour') {
+            traces.push({ type: 'contour', x: xv, y: yv, z: zv, colorscale: scale, contours: { showlabels: true }, line: { width: 1 } });
+        } else {
+            traces.push({ type: 'surface', x: xv, y: yv, z: zv, colorscale: scale, opacity: 0.97, contours: { z: { show: true, usecolormap: true, project: { z: true } } }, lighting: { ambient: 0.55, diffuse: 0.8, specular: 0.25, roughness: 0.6 } });
+        }
+        if (spec.points && spec.points.length) {
+            const col = n => (n === 'local minimum' ? '#34c759' : n === 'local maximum' ? '#ff3b30' : '#ff9500');
+            if (state.view3d === 'contour') {
+                traces.push({ type: 'scatter', mode: 'markers', x: spec.points.map(p => p.x), y: spec.points.map(p => p.y), text: spec.points.map(p => p.name), marker: { size: 10, color: spec.points.map(p => col(p.name)), line: { width: 2, color: '#fff' } }, name: 'critical points' });
+            } else {
+                traces.push({ type: 'scatter3d', mode: 'markers', x: spec.points.map(p => p.x), y: spec.points.map(p => p.y), z: spec.points.map(p => p.z), text: spec.points.map(p => p.name), marker: { size: 6, color: spec.points.map(p => col(p.name)), line: { width: 1, color: '#fff' } }, name: 'critical points' });
+            }
+        }
+        const [vx, vy] = spec.vars;
+        const layout = state.view3d === 'contour'
+            ? { ...baseLayout, title: { text: `Contour map of f(${spec.vars.join(', ')})`, font: { size: 16, color: th.text } }, xaxis: { title: vx, color: th.text }, yaxis: { title: vy, color: th.text, scaleanchor: 'x' }, plot_bgcolor: th.scene, margin: { t: 50, r: 20, b: 50, l: 55 } }
+            : { ...baseLayout, title: { text: `f(${spec.vars.join(', ')})`, font: { size: 16, color: th.text } }, scene: { ...sceneBase, xaxis: { ...sceneBase.xaxis, title: vx }, yaxis: { ...sceneBase.yaxis, title: vy }, zaxis: { ...sceneBase.zaxis, title: 'f', range: [zlo - (zhi - zlo) * 0.02, zhi + (zhi - zlo) * 0.02 || 1] }, aspectmode: 'cube' } };
+        Plotly.react(div, traces, layout, config);
+    }
+
+    // ------------------------------------------------------------------
+    // Misc UI
+    // ------------------------------------------------------------------
+    function insertAtCaret(text) {
+        const ta = $('functionInput');
+        const s = ta.selectionStart, e = ta.selectionEnd;
+        ta.value = ta.value.slice(0, s) + text + ta.value.slice(e);
+        const pos = s + text.length;
+        ta.focus(); ta.setSelectionRange(pos, pos);
+        validateInput(); saveSession();
+    }
+
+    function clearAll() {
+        $('functionInput').value = '';
+        state.result = null;
+        state.liveSpec = null;
+        validateInput();
+        $('results').innerHTML = '<div class="empty-state"><div class="empty-state-icon">🧮</div><h3>Ready to Compute</h3><p>Enter a function, pick an operation and press <kbd>Ctrl</kbd>+<kbd>Enter</kbd></p></div>';
+        displaySteps([]);
+        $('steps').classList.remove('show-timeline');
+        $('steps').innerHTML = '<div class="empty-state"><div class="empty-state-icon">📖</div><h3>Step-by-Step Solutions</h3><p>The reasoning behind each result appears here</p></div>';
+        try { Plotly.purge($('plot2d')); Plotly.purge($('plot3dDiv')); Plotly.purge($('plotPhase')); } catch (e) { /* ignore */ }
+        $('plot2d').innerHTML = ''; $('plot3dDiv').innerHTML = ''; $('plotPhase').style.display = 'none';
+        try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ }
+        saveSession();
+        $('functionInput').focus();
+    }
+
+    function initUI() {
+        // mode select
+        $('operationMode').innerHTML = Object.keys(MODES).map(k => `<option value="${k}">${esc(MODES[k].label)}</option>`).join('');
+        $('operationMode').addEventListener('change', e => { setMode(e.target.value); });
+
+        // templates and keypad
+        $('templates').innerHTML = TEMPLATES.map(([l, t], i) => `<button class="template-btn" data-i="${i}" type="button">${esc(l)}</button>`).join('');
+        $('templates').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+            $('functionInput').value = TEMPLATES[+b.dataset.i][1];
+            validateInput(); saveSession();
+        }));
+        $('keypad').innerHTML = KEYPAD.map(([l, t], i) => `<button class="key-btn" data-i="${i}" type="button" aria-label="Insert ${esc(t)}">${esc(l)}</button>`).join('');
+        $('keypad').querySelectorAll('button').forEach(b => b.addEventListener('click', () => insertAtCaret(KEYPAD[+b.dataset.i][1])));
+
+        $('examples').addEventListener('change', e => { if (e.target.value !== '') loadExample(+e.target.value); e.target.value = ''; });
+
+        let debounce;
+        $('functionInput').addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(() => { validateInput(); saveSession(); }, 120); });
+
+        $('precision').addEventListener('input', e => { $('precisionValue').textContent = e.target.value; });
+        $('resolution').addEventListener('input', e => { $('resolutionValue').textContent = e.target.value; });
+        $('resolution').addEventListener('change', refreshActivePlot);
+
+        $('computeBtn').addEventListener('click', compute);
+        $('clearBtn').addEventListener('click', clearAll);
+        $('clearHistory').addEventListener('click', () => { try { localStorage.removeItem('cs_history'); } catch (e) { /* ignore */ } renderHistory(); });
+
+        document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+        $('xMin').addEventListener('change', plot2D);
+        $('xMax').addEventListener('change', plot2D);
+        $('resetRange').addEventListener('click', () => { $('xMin').value = ''; $('xMax').value = ''; plot2D(); });
+        document.querySelectorAll('[name="view3d"]').forEach(r => r.addEventListener('change', e => { state.view3d = e.target.value; plot3D(); }));
+
+        // help dialog
+        const dlg = $('helpDialog');
+        $('helpBtn').addEventListener('click', () => { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); });
+        $('helpClose').addEventListener('click', () => { if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); });
+        dlg.addEventListener('click', e => { if (e.target === dlg && dlg.close) dlg.close(); });
+
+        document.addEventListener('keydown', e => {
+            const mod = e.ctrlKey || e.metaKey;
+            if (mod && e.key === 'Enter') { e.preventDefault(); compute(); }
+            else if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); clearAll(); }
+            else if (e.key === '?' && !/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '')) { $('helpBtn').click(); }
+        });
+
+        window.addEventListener('resize', () => {
+            ['plot2d', 'plot3dDiv', 'plotPhase'].forEach(id => { const el = $(id); if (el && el.data) Plotly.Plots.resize(el); });
+        });
+        window.addEventListener('hashchange', () => {
+            const m = /^#s=(.+)$/.exec(location.hash);
+            const s = m && decodeHash(m[1]);
+            if (s && restoreSnapshot(s)) compute();
+        });
+    }
+
+    function init() {
+        initTheme();
+        initUI();
+        renderHistory();
+        setMode('derivative');
+
+        // restore: share link > last session
+        let restored = false;
+        const m = /^#s=(.+)$/.exec(location.hash);
+        const shared = m && decodeHash(m[1]);
+        if (shared && restoreSnapshot(shared)) { restored = true; }
+        else {
+            try {
+                const saved = JSON.parse(localStorage.getItem('cs_session') || 'null');
+                if (saved && MODES[saved.m]) {
+                    Object.keys(saved.opts || {}).forEach(mode => {
+                        if (!MODES[mode]) return;
+                        Object.keys(saved.opts[mode]).forEach(k => { if (k in state.opts[mode] && typeof saved.opts[mode][k] === 'string') state.opts[mode][k] = saved.opts[mode][k]; });
+                    });
+                    $('functionInput').value = saved.f || '';
+                    setMode(saved.m, true);
+                    validateInput();
+                }
+            } catch (e) { /* ignore corrupted session */ }
+        }
+        if (!$('functionInput').value) {
+            $('functionInput').value = 'x^2 * sin(x)';
+            validateInput();
+        }
+        Runner.warmUp();
+        if (restored) compute();
+        $('app').classList.add('ready');
+    }
+
+    // Debug/testing hook
+    window.__calc = { state, compute, setMode, validateInput };
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+})();

@@ -1,77 +1,63 @@
-const libraryRetryState = {};
-let libraryAlertNode = null;
+/*
+ * Library loader.
+ *
+ * Every dependency ships in /vendor so the app works offline and from file://.
+ * If a local file is missing (e.g. only the HTML was copied) we fall back to a
+ * CDN. Scripts are loaded in order, then js/engine.js, js/runner.js and
+ * js/app.js start the application.
+ */
+(function () {
+    'use strict';
 
-function showLibraryAlert(missing) {
-    if (libraryAlertNode) {
-        libraryAlertNode.remove();
-    }
-    libraryAlertNode = document.createElement('div');
-    libraryAlertNode.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#ff3b30;color:white;padding:16px 24px;border-radius:12px;z-index:99999;font-family:system-ui;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
-    libraryAlertNode.innerHTML = `<strong>⚠️ Library Loading Error</strong><br>Failed to load: ${missing.join(', ')}<br><small>Please refresh the page or check your internet connection</small>`;
-    (document.body || document.documentElement).appendChild(libraryAlertNode);
-}
+    const LIBS = [
+        { name: 'math.js', global: 'math', urls: ['vendor/math.min.js', 'https://cdn.jsdelivr.net/npm/mathjs@11.11.0/lib/browser/math.js'] },
+        { name: 'Algebrite', global: 'Algebrite', urls: ['vendor/algebrite.min.js', 'https://cdn.jsdelivr.net/npm/algebrite@1.4.0/dist/algebrite.bundle-for-browser.js'] },
+        { name: 'Plotly', global: 'Plotly', urls: ['vendor/plotly.min.js', 'https://cdn.jsdelivr.net/npm/plotly.js-dist-min@4.2.0/plotly.min.js'] },
+        { name: 'KaTeX', global: 'katex', optional: true, urls: ['vendor/katex/katex.min.js', 'https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/katex.min.js'] }
+    ];
+    const APP_SCRIPTS = ['js/engine.js', 'js/runner.js', 'js/app.js'];
 
-function dismissLibraryAlert() {
-    if (libraryAlertNode) {
-        libraryAlertNode.remove();
-        libraryAlertNode = null;
-    }
-}
-
-function validateLibraries(attempt = 0) {
-    const libraries = {
-        math: typeof math !== 'undefined',
-        Plotly: typeof Plotly !== 'undefined',
-        Algebrite: typeof Algebrite !== 'undefined'
-    };
-
-    const missing = Object.keys(libraries).filter(lib => !libraries[lib]);
-    const pending = missing.filter(lib => libraryRetryState[lib]);
-
-    if (pending.length > 0 && attempt < 6) {
-        setTimeout(() => validateLibraries(attempt + 1), 500);
-        return;
+    function loadScript(url) {
+        return new Promise((resolve, reject) => {
+            const el = document.createElement('script');
+            el.src = url;
+            el.async = false;
+            el.onload = resolve;
+            el.onerror = () => { el.remove(); reject(new Error('Failed to load ' + url)); };
+            document.head.appendChild(el);
+        });
     }
 
-    if (missing.length > 0) {
-        console.error('Failed to load libraries:', missing);
-        showLibraryAlert(missing);
-    } else {
-        dismissLibraryAlert();
-        console.log('✓ All libraries loaded successfully');
-    }
-}
-
-function handleLibraryFallback(scriptEl) {
-    const fallback = scriptEl.getAttribute('data-fallback');
-    const libName = scriptEl.getAttribute('data-library') || 'library';
-
-    if (!fallback || scriptEl.dataset.retried === 'true') {
-        console.error(`No fallback remaining for ${libName}`);
-        showLibraryAlert([libName]);
-        return;
+    async function loadLibrary(lib) {
+        if (typeof window[lib.global] !== 'undefined') return true;
+        for (const url of lib.urls) {
+            try {
+                await loadScript(url);
+                if (typeof window[lib.global] !== 'undefined') return true;
+            } catch (e) {
+                console.warn(e.message + (url === lib.urls[lib.urls.length - 1] ? '' : ' – trying fallback'));
+            }
+        }
+        return false;
     }
 
-    scriptEl.dataset.retried = 'true';
-    libraryRetryState[libName] = true;
-    console.warn(`Primary CDN failed for ${libName}. Retrying with fallback.`);
+    function showBanner(missing) {
+        const el = document.createElement('div');
+        el.className = 'lib-alert';
+        el.setAttribute('role', 'alert');
+        el.innerHTML = '<strong>⚠️ Library loading error</strong><br>Could not load: ' +
+            missing.map(m => String(m).replace(/[<>&]/g, '')).join(', ') +
+            '<br><small>Check your connection or that the vendor/ folder is deployed, then reload.</small>';
+        (document.body || document.documentElement).appendChild(el);
+    }
 
-    const replacement = document.createElement('script');
-    replacement.src = fallback;
-    replacement.setAttribute('data-library', libName);
-    replacement.onload = () => {
-        libraryRetryState[libName] = false;
-        window.dispatchEvent(new CustomEvent('library-loaded', { detail: libName }));
-    };
-    replacement.onerror = () => {
-        libraryRetryState[libName] = false;
-        showLibraryAlert([libName]);
-    };
-
-    scriptEl.insertAdjacentElement('afterend', replacement);
-    scriptEl.remove();
-}
-
-window.addEventListener('load', () => validateLibraries());
-window.addEventListener('library-loaded', () => validateLibraries());
-
+    window.libsReady = (async function () {
+        const missing = [];
+        for (const lib of LIBS) {
+            const ok = await loadLibrary(lib);
+            if (!ok) (lib.optional ? console.warn('Optional library missing: ' + lib.name) : missing.push(lib.name));
+        }
+        if (missing.length) { showBanner(missing); throw new Error('Missing libraries: ' + missing.join(', ')); }
+        for (const src of APP_SCRIPTS) await loadScript(src);
+    })().catch(err => console.error(err));
+})();

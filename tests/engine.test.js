@@ -81,6 +81,29 @@ test('indefinite integrals are verified antiderivatives', () => {
     }
 });
 
+test('rational functions use partial fractions', () => {
+    const cases = ['1/(x^2+3x+2)', 'x^3/(x^2+1)', '1/(x*(1-x))', '1/(x^3-x)', 'x^2/(x^2+1)^2', '(3x+5)/((x-1)^2*(x+2))',
+        '1/(x^4-1)', '(x^2+1)/(x^2-2x+5)', 'x/(x^2+2x+1)', '1/(x^2-2)', '(2x+3)/(x^2+x+1)', '(x^5+1)/(x^2-1)', '1/(x^2+4x+8)'];
+    for (const src of cases) {
+        const r = E.run.integral(src, {});
+        assert.ok(r.main.text.endsWith('+ C'), `${src}: ${r.main.text}`);
+        assert.match(r.meta[0], /Partial fractions|Algebrite|table/, src);
+        const F = fnOf(r.main.text.replace(/ \+ C$/, '')), f = fnOf(src);
+        let checked = 0;
+        for (const x of [-4.2, -2.6, -0.45, 0.35, 1.7, 3.3, 5.1]) {
+            const h = 1e-5, a = (F(x + h) - F(x - h)) / (2 * h), b = f(x);
+            if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(b) > 1e4) continue;
+            close(a, b, 1e-4, `${src} @ ${x}`); checked++;
+        }
+        assert.ok(checked >= 4, `${src}: only ${checked} points`);
+    }
+    const forced = E.run.integral('1/(x^2-1)', { method: 'partial' });
+    assert.match(forced.meta[0], /Partial fractions/);
+    assert.ok(forced.steps.some(s => /Partial fraction/.test(s.title)));
+    const def = E.run.integral('1/(x^2+3x+2)', { lower: '0', upper: '1' });
+    close(parseFloat(def.main.text), 2 * Math.log(2) - Math.log(3), 1e-6);
+});
+
 test('integration methods are honest about what they can solve', () => {
     const parts = E.run.integral('x*cos(x)', { method: 'parts' });
     assert.match(parts.meta.join(' '), /parts/i);
@@ -179,6 +202,12 @@ test('ODE: separable first order', () => {
     close(resultFn(g)(0.5), 2, 1e-6); // y = 1/(1-x)
     const blow = E.run.ode('y^2', { odeType: 'first', x0: '0', y0: '1', xEnd: '2' });
     assert.ok(blow.warnings.some(w => /blows up/.test(w)));
+});
+
+test('ODE: logistic equation via partial fractions', () => {
+    const r = E.run.ode('y*(1-y)', { odeType: 'first', x0: '0', y0: '0.1', xEnd: '8' });
+    assert.ok(r.items.some(i => /Implicit/.test(i.label)));
+    close(resultFn(r)(3), 1 / (1 + 9 * Math.exp(-3)), 1e-7);
 });
 
 test('ODE: no closed form falls back to numerics', () => {
