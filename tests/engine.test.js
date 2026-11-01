@@ -561,3 +561,51 @@ test('hostile inputs never hang: constant towers, huge exponents, zero-width and
     run('sums', '1/10^10^2');
     assert.ok(Date.now() - t0 < 20000, 'hostile inputs should be handled quickly');
 });
+
+// ---------------------------------------------------------------------------
+// Round 3 regressions
+// ---------------------------------------------------------------------------
+test('eigen-solver: defective, rotation, permutation and repeated-eigenvalue matrices', () => {
+    const ev = m => E.run.matrix(m, { op: 'eigen' });
+    assert.equal(ev('2 1 ; 1 2').main.text, '1,  3');
+    const defective = ev('1 1 ; 0 1');
+    assert.equal(defective.main.text, '1');
+    assert.ok(defective.meta.some(m => /defective/.test(m)));
+    assert.match(defective.items.map(i => i.text).join(' '), /only 1 independent eigenvector/);
+    assert.equal(ev('0 1 ; -1 0').main.text, '0 ± 1i');                      // complex pair
+    const perm = ev('0 1 0 ; 0 0 1 ; 1 0 0');                                  // math.eigs used to throw here
+    assert.match(perm.main.text, /1/);
+    assert.match(perm.main.text, /0\.866025i/);
+    const diag = ev('2 0 0 ; 0 2 0 ; 0 0 3');
+    assert.match(diag.items.map(i => i.text).join(' '), /multiplicity 2;  \(1, 0, 0\)  ·  \(0, 1, 0\)/);
+    assert.ok(diag.meta.some(m => /diagonalisable/.test(m)));
+    for (const m of ['1 2 3 ; 4 5 6 ; 7 8 10', '5 4 ; 1 2', '4 1 ; -2 1']) {
+        const r = ev(m);
+        const res = /max \|A·v − λ·v\| = ([\d.e+-]+)/.exec(r.meta.join(' '));
+        assert.ok(res && parseFloat(res[1]) < 1e-9, m);
+    }
+});
+
+test('repeated polynomial roots keep exact multiplicities', () => {
+    const items = s => E.run.solve(s, {}).items.filter(i => /^x ≈/.test(i.label)).map(i => i.text.replace(/\s+residual.*/, '').replace(/\(multiplicity (\d+)\)/, '×$1').replace(/\s+/g, ' ').trim());
+    assert.deepEqual(items('(x+5)^3*(x-4)*(x+4) = 0'), ['-5 ×3', '-4', '4']);
+    assert.deepEqual(items('(x-1)^2*(x-2)^2*(x-3)^2 = 0'), ['1 ×2', '2 ×2', '3 ×2']);
+    assert.deepEqual(items('(x-3)^7 = 0'), ['3 ×7']);
+    assert.deepEqual(items('x^2*(x-1)^3 = 0'), ['0 ×2', '1 ×3']);
+    assert.deepEqual(items('(2x-1)^2*(3x+2) = 0'), ['-0.6666666667', '0.5 ×2']);
+    const cx = E.run.solve('(x^2+1)^2*(x-3) = 0', {});
+    assert.ok(cx.items.some(i => i.label === 'Complex:' && /multiplicity 2/.test(i.text)));
+});
+
+test('limit results prefer clean integers over exotic constants', () => {
+    assert.equal(E.run.limit('(x^6-4096)/(x-4)', { point: '4' }).main.text, '6144');
+    assert.equal(E.run.limit('(x^5-243)/(x-3)', { point: '3' }).main.text, '405');
+});
+
+test('every result carries trust badges where something was verified', () => {
+    assert.ok(E.run.derivative('x^2*sin(x)', {}).badges.some(b => b.kind === 'ok' && /Verified/.test(b.text)));
+    assert.ok(E.run.derivative('atan(x)', { order: '4' }).badges.some(b => /power-series/.test(b.text)));
+    assert.ok(E.run.integral('x*e^x', {}).badges.some(b => b.kind === 'ok' && /antiderivative/.test(b.text)));
+    assert.ok(E.run.integral('x*e^x', {}).badges.some(b => b.kind === 'info'));
+    assert.ok(E.run.matrix('1 2 ; 3 4', { op: 'inverse' }).badges.some(b => b.kind === 'ok'));
+});
