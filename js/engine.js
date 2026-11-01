@@ -3000,7 +3000,7 @@
     function recogniseConst(x) {
         if (!Number.isFinite(x) || x === 0) return null;
         const tol = 1e-9 * Math.max(1, Math.abs(x));
-        const frac = v => { for (let d = 1; d <= 24; d++) { const n = Math.round(v * d); if (n !== 0 && Math.abs(v - n / d) < 1e-9 * Math.max(1, Math.abs(v)) / Math.max(1, Math.abs(x)) * Math.max(1, Math.abs(x))) return [n, d]; } return null; };
+        const frac = v => { for (let d = 1; d <= 5000; d++) { const n = Math.round(v * d); if (n !== 0 && Math.abs(v - n / d) < (d > 24 ? 1e-12 : 1e-9) * Math.max(1, Math.abs(v))) return [n, d]; } return null; };
         void tol;
         const cands = [['π²', Math.PI ** 2, '\\pi^2'], ['π', Math.PI, '\\pi'], ['e', Math.E, 'e'], ['ln 2', Math.LN2, '\\ln 2'], ['√2', Math.SQRT2, '\\sqrt{2}'], ['√3', Math.sqrt(3), '\\sqrt{3}'], ['√π', Math.sqrt(Math.PI), '\\sqrt{\\pi}']];
         for (const [name, val, tex] of cands) {
