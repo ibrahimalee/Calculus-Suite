@@ -328,6 +328,10 @@
         let size = 0; node.traverse(() => { size++; });
         if (size > 60) return null;
         const others = freeVars(node).filter(q => q !== v);
+        let towers = false;   // variable exponents (x^x) make repeated differentiation explode inside the CAS, which cannot be interrupted
+        node.traverse(n => { if (n.type === 'OperatorNode' && n.fn === 'pow' && dependsOn(n.args[1], v)) towers = true; });
+        if (order > 3 && towers) return null;
+        if (order > 9) return null;
         if (others.length || /\^\s*\(?\d{3,}/.test(node.toString())) return null;   // huge exponents make big-integer CAS work crawl
         const out = runAlgebrite(`d(${toAlgebrite(node)}, ${v}, ${order})`);
         const cand = out && fromAlgebrite(out);
@@ -347,10 +351,13 @@
     }
 
     function diff(node, v, order) {
+        if (!dependsOn(node, v)) return C(0);
         if ((order || 1) > 1) { const fast = diffViaCAS(node, v, order); if (fast) return fast; }
         let r = node;
         const hasOddRoot = /cbrt|nthRoot|\^\s*\(?-?\d+\s*\/\s*\d+/.test(node.toString());
         for (let i = 0; i < (order || 1); i++) {
+            let size = 0; r.traverse(() => { size++; });
+            if (size > 700) throw new CalcError('This derivative becomes too large to compute (the expression grows exponentially). Try a lower order or a simpler function.');
             r = simplifyNode(diffOnce(r, v));
             if (hasOddRoot) r = realRoots(r);
         }
@@ -460,7 +467,8 @@
     }
 
     function runAlgebrite(cmd) {
-        if (!Algebrite || overBudget() || cmd.length > 420) return null;   // huge inputs can make Algebrite spin for minutes
+        if (!Algebrite || overBudget() || cmd.length > 420) return null;
+        if (/\d{8,}/.test(cmd) || /\d\s*\)?\s*\^\s*\(?\s*\d+(\.\d+)?\s*\)?\s*\^/.test(cmd) || /\^\s*\(?\s*\d{4,}/.test(cmd)) return null;   // constant towers / huge integers: exact bignum arithmetic never returns   // huge inputs can make Algebrite spin for minutes
         try {
             if (typeof Algebrite.clearall === 'function') Algebrite.clearall();
             const out = String(Algebrite.run(cmd)).trim();
@@ -1130,7 +1138,22 @@
     // ------------------------------------------------------------------
     /** tanh-sinh quadrature; the error estimate also covers truncation of the (singular) tails. */
     function tanhSinhFinite(f, a, b) {
-        const r1 = tanhSinhCore(f, a, b, 3.4), r2 = tanhSinhCore(f, a, b, 2.8);
+        const corrected = T => {
+            const r = tanhSinhCore(f, a, b, T);
+            if (!Number.isFinite(r.value)) return r;
+            const d = (b - a) / 2, reach = 2 * d * Math.exp(-Math.PI * Math.sinh(Math.floor(T * 256) / 256));
+            let tail = 0;
+            for (const side of [-1, 1]) {
+                const end = side < 0 ? a : b, ulp = end === 0 ? 0 : Math.pow(2, Math.floor(Math.log2(Math.abs(end))) - 52), cut = Math.max(reach, ulp / 2, 1e-300);   // unreachable sliver ≈ half a floating-point spacing
+                const s1 = 10 * cut, s2 = 100 * cut;
+                const f1 = f(side < 0 ? a + s1 : b - s1), f2 = f(side < 0 ? a + s2 : b - s2);
+                if (!Number.isFinite(f1) || !Number.isFinite(f2) || f1 === 0 || f2 === 0 || Math.sign(f1) !== Math.sign(f2)) continue;
+                const pw = -Math.log(Math.abs(f2) / Math.abs(f1)) / Math.log(10);          // |f| ~ C·s^(−pw) near the end
+                if (pw > 0.05 && pw < 0.97) tail += Math.sign(f1) * Math.abs(f1) * Math.pow(s1, pw) * Math.pow(cut, 1 - pw) / (1 - pw);
+            }
+            return { value: r.value + tail, error: r.error };
+        };
+        const r1 = corrected(4.0), r2 = corrected(3.2);
         if (!Number.isFinite(r1.value)) return r1;
         return { value: r1.value, error: Math.max(r1.error, Math.abs(r1.value - r2.value)) };
     }
@@ -1139,11 +1162,16 @@
         const c = (a + b) / 2, d = (b - a) / 2;
         const point = t => {
             const u = Math.PI / 2 * Math.sinh(t);
-            const x = c + d * Math.tanh(u);
             const w = d * Math.PI / 2 * Math.cosh(t) / (Math.cosh(u) * Math.cosh(u));
-            if (!(x > a && x < b) || !isFinite(w)) return 0;
+            if (!isFinite(w)) return 0;
+            let x;
+            if (t < 0) { const e = Math.exp(2 * u); x = a + 2 * d * e / (1 + e); if (!(x > a)) return 0; }          // distance to the left end is computed directly (no cancellation)
+            else if (t > 0) { const e = Math.exp(-2 * u); x = b - 2 * d * e / (1 + e); if (!(x < b)) return 0; }
+            else x = c;
+            if (!(x > a && x < b)) return 0;
             const y = f(x);
-            return Number.isFinite(y) ? w * y : NaN;
+            if (Number.isFinite(y)) return w * y;
+            return Math.min(x - a, b - x) < 1e-9 * (b - a) ? 0 : NaN;   // 0/0 style junk right at an endpoint contributes nothing measurable
         };
         let h = 1, sum = 0;
         for (let k = -Math.floor(T); k <= Math.floor(T); k++) sum += point(k * h);
@@ -1439,6 +1467,14 @@
     function runDefinite(node, v, opt) {
         const a = parseLimit(opt.lower, 'Lower limit'), b = parseLimit(opt.upper, 'Upper limit');
         const f = compile(node, [v]);
+        if (a.value === b.value && Number.isFinite(a.value)) {
+            const z = makeResult('definite', 'Definite integral');
+            z.main = { label: 'Value =', text: '0', tex: `\\int_{${texOf(a.node)}}^{${texOf(b.node)}} ${texOf(node)}\\,d${v}=0` };
+            z.meta.push('The limits are equal, so the integral is 0.');
+            z.steps.push({ title: 'Equal limits', text: '∫ₐᵃ f(x) dx = 0 for any f.', tex: '' });
+            z.plot = { variable: v, curves: [curveOf('f(x)', node, [v])], xRange: rangeFor(a.value, b.value) };
+            return finalizeText(z);
+        }
         const r = makeResult('definite', Math.abs(a.value) === Infinity || Math.abs(b.value) === Infinity ? 'Improper integral' : 'Definite integral');
         const num = integrateRobust(f, a.value, b.value, kinkPoints(node, v, a.value, b.value));
         r.warnings.push(...num.warnings);
@@ -1446,7 +1482,7 @@
         const intTex = `\\int_{${limTex(a)}}^{${limTex(b)}} ${texOf(node)}\\,d${v}`;
         const intText = `∫[${strOf(a.node)} → ${strOf(b.node)}] ${strOf(node)} d${v}`;
         const rel = num.error / Math.max(1e-12, Math.abs(num.value));
-        const diverges = !Number.isFinite(num.value) || Math.abs(num.value) > 1e9 || (num.error > 1e-4 && rel > 1e-3);
+        const diverges = !Number.isFinite(num.value) || (num.error > 1e-4 && rel > 1e-3);
         if (diverges) {
             r.main = { label: 'Result:', text: 'Diverges or cannot be evaluated numerically', tex: `${intTex}\\;\\text{diverges}` };
             r.warnings.push('The integral appears to diverge (or oscillates without converging).');
@@ -1503,7 +1539,7 @@
             let g = null;
             if (['floor', 'ceil', 'round', 'fix'].includes(n.fn.name) && n.args.length === 1 && dependsOn(n.args[0], v)) {
                 const gg = compile(n.args[0], [v]), glo = gg(lo), ghi = gg(hi);
-                if (Number.isFinite(glo) && Number.isFinite(ghi)) {
+                if (Number.isFinite(glo) && Number.isFinite(ghi) && Math.abs(glo) < 1e9 && Math.abs(ghi) < 1e9) {
                     const m0 = Math.ceil(Math.min(glo, ghi) - 1), m1 = Math.floor(Math.max(glo, ghi) + 1);
                     if (m1 - m0 < 400) for (let m = m0; m <= m1; m++) for (const off of (n.fn.name === 'round' ? [0.5] : [0])) {
                         signChanges(x => gg(x) - (m + off), Math.min(lo, hi), Math.max(lo, hi), 400).forEach(c => pts.push(c.x));
@@ -1570,8 +1606,13 @@
             return [s0, c0];
         };
         const powConst = (u, al) => {
-            if (Number.isInteger(al) && al >= 0) { let r = cst(1); for (let i = 0; i < al; i++) r = mul(r, u); return r; }
-            if (Number.isInteger(al) && al < 0) { let r = cst(1); for (let i = 0; i < -al; i++) r = mul(r, u); return div(cst(1), r); }
+            if (Number.isInteger(al)) {
+                if (u.slice(1).every(c => c === 0)) return cst(Math.pow(u[0], al));          // plain constant
+                if (Math.abs(al) > 4096) throw new CalcError('The exponent is too large for a series expansion');
+                let e = Math.abs(al), base = u, r = cst(1);                                    // exponentiation by squaring
+                while (e > 0) { if (e & 1) r = mul(r, base); e = Math.floor(e / 2); if (e) base = mul(base, base); }
+                return al >= 0 ? r : div(cst(1), r);
+            }
             if (u[0] === 0) throw new CalcError('Non-integer power of 0 is not analytic at the expansion point');
             if (u[0] < 0) {
                 const q = 1 / al;
@@ -1668,29 +1709,23 @@
         }
         const coeffs = cs.map((c, k) => ({ k, coef: c, deriv: c * Number(math.factorial(k)) }));
 
-        // exact polynomial via Algebrite when possible
-        let polyNode = null;
-        const aStr = toAlgebrite(a.node);
-        let nodeSize = 0; node.traverse(() => { nodeSize++; });
-        const out = nodeSize <= 30 && a.value === 0 ? runAlgebrite(`taylor(${toAlgebrite(node)}, ${v}, ${n}, ${aStr})`) : null;
-        const parsed = out && fromAlgebrite(out);
+        // Polynomial built directly from the verified coefficients (rationals recognised exactly; no CAS call)
         const numericPoly = x => coeffs.reduce((s, c) => s + c.coef * Math.pow(x - a.value, c.k), 0);
-        if (parsed && a.value === 0) {
-            const pf = compile(parsed, [v]);
-            if ([0.1, 0.3, -0.2, 0.5].every(dx => Math.abs(pf(a.value + dx) - numericPoly(a.value + dx)) <= 1e-8 * Math.max(1, Math.abs(numericPoly(a.value + dx))))) polyNode = parsed;
-        }
-        let polyText, polyTex;
-        if (polyNode) {
-            polyText = strOf(polyNode); polyTex = texOf(polyNode);
-        } else {
-            const parts = coeffs.filter(c => Math.abs(c.coef) > 1e-12).map(c => {
-                const cs = nice(c.coef, 6).text;
-                const base = a.value === 0 ? v : `(${v} - ${fmt(a.value)})`;
-                return c.k === 0 ? cs : (c.k === 1 ? `${cs}*${base}` : `${cs}*${base}^${c.k}`);
-            });
-            polyText = parts.join(' + ').replace(/\+ -/g, '- ') || '0';
-            polyTex = polyText;
-        }
+        const baseNode = a.value === 0 ? S(v) : new math.ParenthesisNode(OP('-', 'subtract', [S(v), a.node.type === 'ConstantNode' || a.node.type === 'SymbolNode' ? a.node : new math.ParenthesisNode(a.node)]));
+        let polyNode = null;
+        coeffs.filter(c => Math.abs(c.coef) > 1e-12 * Math.max(1, ...coeffs.map(q => Math.abs(q.coef)))).sort((p, q) => q.k - p.k).forEach(c => {
+            const mag = Math.abs(c.coef);
+            let cText = nice(mag, 13, 1e-9).text;
+            if (!/^\d+(\/\d+)?$/.test(cText)) { const rc = recogniseConst(mag); cText = rc && !/ln/.test(rc.text) ? rc.text.replace('π²', 'pi^2').replace('π', 'pi').replace('√', 'sqrt') : String(parseFloat(mag.toPrecision(13))); }
+            const cNode = parse(cText.replace(/sqrt(\w+)/g, 'sqrt($1)'));
+            let term;
+            const pw = c.k === 0 ? null : (c.k === 1 ? baseNode : OP('^', 'pow', [baseNode, C(c.k)]));
+            if (!pw) term = cNode; else if (Math.abs(mag - 1) < 1e-12) term = pw; else term = OP('*', 'multiply', [cNode, pw]);
+            if (!polyNode) polyNode = c.coef < 0 ? OP('-', 'unaryMinus', [term]) : term;
+            else polyNode = OP(c.coef < 0 ? '-' : '+', c.coef < 0 ? 'subtract' : 'add', [polyNode, term]);
+        });
+        if (!polyNode) polyNode = C(0);
+        const polyText = strOf(polyNode), polyTex = texOf(polyNode);
         r.main = { label: `T${n}(${v}) =`, text: polyText, tex: `T_{${n}}(${v})=${polyTex}` };
         r.meta.push(`Expansion point a = ${fmt(a.value)}`);
         r.items.push({ label: 'Formula:', text: `Σ f⁽ᵏ⁾(a)/k! · (${v} − a)ᵏ`, tex: `\\sum_{k=0}^{${n}}\\frac{f^{(k)}(a)}{k!}(${v}-a)^k` });
@@ -2525,7 +2560,7 @@
         const f = compile(node, [v]);
         const num = integrateRobust(f, a, b, kinkPoints(node, v, a, b));
         const rel = num.error / Math.max(1e-12, Math.abs(num.value));
-        const diverges = !Number.isFinite(num.value) || Math.abs(num.value) > 1e9 || (num.error > 1e-4 && rel > 1e-3);
+        const diverges = !Number.isFinite(num.value) || (num.error > 1e-4 && rel > 1e-3);
         let exact = null;
         if (!diverges && Number.isFinite(a) && Number.isFinite(b)) {
             budgetMs = 3000;
@@ -2985,7 +3020,7 @@
         const lines = String(src).split(/\n|;(?![^(]*\))/).map(t => t.trim()).filter(Boolean);
         if (!lines.length) throw new CalcError('Type an expression, e.g.  2^10 + sqrt(2)');
         if (lines.length > 40) throw new CalcError('Up to 40 lines at a time');
-        const scope = { deg: Math.PI / 180, ans: 0 };
+        const scope = { deg: Math.PI / 180, ans: 0, i: math.complex(0, 1) };
         const r = makeResult('calc', 'Calculator');
         let last = null;
         const digits = opt.digits || 12;
@@ -3000,14 +3035,20 @@
             let val;
             try { val = node.compile().evaluate(Object.assign({}, scope)); } catch (e) { throw new CalcError(`Line ${idx + 1}: ${friendlyError(e)}`); }
             let text, tex = '', num = null;
+            if (val && typeof val === 'object' && typeof val.re === 'number' && typeof val.im === 'number') {   // complex: clean up rounding noise
+                const sc = Math.max(1, Math.abs(val.re), Math.abs(val.im));
+                const re = Math.abs(val.re) < 1e-14 * sc ? 0 : val.re, im = Math.abs(val.im) < 1e-14 * sc ? 0 : val.im;
+                val = im === 0 ? re : math.complex(re, im);
+            }
             if (typeof val === 'number') {
                 num = val;
                 const n = nice(val, digits, 1e-12), c = recogniseConst(val);
-                text = Number.isFinite(val) ? (Number.isInteger(val) && Math.abs(val) < 1e15 ? String(val) : fmt(val, digits)) : fmt(val);
+                text = Number.isFinite(val) ? (Number.isInteger(val) && Math.abs(val) <= 9007199254740992 ? String(val) : fmt(val, digits)) : fmt(val);
                 const exact = Number.isInteger(val) ? null : (c ? c.text : (/^-?\d+\/\d+$/.test(n.text) ? n.text : null));
                 if (exact) text = `${exact} ≈ ${fmt(val, digits)}`;
                 tex = exact ? `${(c ? c.tex : n.tex)}\\approx ${fmt(val, digits)}` : '';
-                if (Number.isInteger(val) && Math.abs(val) >= 1e15) text = val.toExponential(digits - 1);
+                if (Number.isInteger(val) && Math.abs(val) > 9007199254740992) text = val.toExponential(digits - 1);
+                if (val !== 0 && Math.abs(val) < 1e-14 && !name) text = `0   (floating-point noise: ${val.toExponential(3)})`;
             } else {
                 text = math.format(val, { precision: 12 });
             }

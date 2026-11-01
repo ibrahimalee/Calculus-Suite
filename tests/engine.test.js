@@ -490,7 +490,7 @@ test('Taylor series: many orders, removable singularities, exact rationals', () 
     assert.match(atan.main.text, /1 \/ 11 \* x \^ 11/);
     assert.match(coef('tan(x)', 9).main.text, /62 \/ 2835 \* x \^ 9/);
     assert.match(coef('asin(x)', 7).main.text, /5 \/ 112 \* x \^ 7/);
-    assert.match(coef('sin(x)/x', 6).main.text, /1\/5040\*x\^6/);
+    assert.match(coef('sin(x)/x', 6).main.text, /1 \/ 5040 \* x \^ 6/);
     close(resultFn(coef('sin(x)/x', 8), 1)(0.5), Math.sin(0.5) / 0.5, 1e-9);
     close(resultFn(coef('(1-cos(x))/x^2', 6), 1)(0.4), (1 - Math.cos(0.4)) / 0.16, 1e-8);
     close(resultFn(coef('x^x', 6, '1'), 1)(1.1), Math.pow(1.1, 1.1), 1e-6);
@@ -522,4 +522,42 @@ test('analysis finds poles that land exactly on the sample grid', () => {
 test('matrix: characteristic polynomial is printed in descending order', () => {
     assert.equal(E.run.matrix('2 1 ; 1 2', { op: 'charpoly' }).main.text, 'λ² - 4·λ + 3');
     assert.equal(E.run.matrix('0 1 ; -1 0', { op: 'charpoly' }).main.text, 'λ² + 1');
+});
+
+test('quadrature battery: singular endpoints, infinite ranges, divergence detection', () => {
+    const val = (s, a, b) => { const r = E.run.integral(s, { lower: a, upper: b, digits: 12 }); return { text: r.main.text, v: parseFloat(r.main.text.replace(/^.*?≈\s*/, '').replace(/^.*=\s*/, '')) }; };
+    const good = [['1/sqrt(x)', '0', '1', 2], ['ln(x)', '0', '1', -1], ['1/sqrt(1-x)', '0', '1', 2], ['x^(-0.8)', '0', '1', 5], ['1/sqrt(abs(x))', '-1', '1', 4],
+        ['x*ln(x)', '0', '1', -0.25], ['e^(-x^2)', '-inf', 'inf', Math.sqrt(Math.PI)], ['x^2*e^(-x)', '0', 'inf', 2], ['ln(x)/sqrt(x)', '0', '1', -4],
+        ['1/sqrt(x*(1-x))', '0', '1', Math.PI], ['abs(x)', '-2', '3', 6.5], ['x/(e^x-1)', '0', 'inf', Math.PI ** 2 / 6], ['ln(1+x)/x', '0', '1', Math.PI ** 2 / 12],
+        ['x^(-1.5)', '1', 'inf', 2], ['ln(x)^2', '0', '1', 2], ['x^(-0.5)*e^(-x)', '0', 'inf', Math.sqrt(Math.PI)], ['x^2', '0', '1e5', 1e15 / 3], ['floor(x)', '0', '1e8', 5e15]];
+    for (const [s, a, b, exp] of good) close(val(s, a, b).v, exp, 3e-8, `${s} [${a},${b}]`);
+    for (const [s, a, b] of [['1/x', '1', 'inf'], ['1/x', '0', '1'], ['1/x', '-1', '1'], ['1/x^2', '0', '1'], ['1/sqrt(x)', '1', 'inf'], ['x', '0', 'inf']]) {
+        assert.match(val(s, a, b).text, /Diverges/, `${s} [${a},${b}] should diverge`);
+    }
+    assert.equal(val('floor(x)', '3', '3').v, 0);
+});
+
+test('calculator: complex numbers, floating-point noise and large integers', () => {
+    const c = s => E.run.calc(s, {}).main.text;
+    assert.equal(c('e^(i*pi)'), '-1');
+    assert.equal(c('i^2'), '-1');
+    assert.equal(c('(1+2i)*(3-i)'), '5 + 5i');
+    assert.match(c('sin(pi)'), /^0 +\(floating-point noise/);
+    assert.equal(c('1e15+1'), '1000000000000001');
+    assert.equal(c('2^53'), '9007199254740992');
+});
+
+test('hostile inputs never hang: constant towers, huge exponents, zero-width and giant ranges', () => {
+    const t0 = Date.now();
+    const run = (m, s, o) => { try { E.run[m](s, o || {}); } catch (e) { assert.ok(e instanceof E.CalcError, `${m} ${s}: ${e.constructor.name} ${e.message}`); } };
+    run('derivative', '10^10^10', { order: '10' });
+    run('derivative', 'x^x^x', { order: '10' });
+    run('integral', '10^10^10');
+    run('integral', 'floor(1e300*x)', { lower: '1', upper: '1' });
+    run('integral', 'floor(1e300*x)', { lower: '0', upper: '2' });
+    run('series', '10^10^10', { terms: '3' });
+    run('series', '(1+x)^5000', { terms: '3' });
+    run('series', 'sin(sin(sin(sin(sin(x)))))', { terms: '20' });
+    run('sums', '1/10^10^2');
+    assert.ok(Date.now() - t0 < 20000, 'hostile inputs should be handled quickly');
 });
