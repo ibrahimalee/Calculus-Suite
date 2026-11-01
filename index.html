@@ -24,11 +24,21 @@
         </a>
         <div class="appbar-spacer"></div>
         <button class="cmd-btn" id="paletteBtn" type="button" aria-label="Open command palette">
-            <span>Search modes, examples, actions…</span><kbd>Ctrl K</kbd>
+            <span data-icon="search" data-size="16"></span><span>Search tools, examples, actions…</span><kbd>Ctrl K</kbd>
         </button>
-        <button class="icon-btn" id="installBtn" type="button" title="Install as an app" aria-label="Install app" hidden>⬇</button>
-        <button class="icon-btn" id="helpBtn" type="button" title="Syntax help (?)" aria-label="Open syntax help">?</button>
-        <button class="icon-btn" id="themeToggle" type="button" aria-label="Toggle dark mode">☀️</button>
+        <button class="icon-btn" id="installBtn" type="button" title="Install as an app" aria-label="Install app" hidden><span data-icon="download"></span></button>
+        <button class="icon-btn" id="helpBtn" type="button" title="Syntax help (?)" aria-label="Open syntax help"><span data-icon="help"></span></button>
+        <div class="pop-wrap">
+            <button class="icon-btn" id="appearBtn" type="button" title="Appearance" aria-label="Appearance settings" aria-expanded="false" aria-controls="appearPop"><span data-icon="palette"></span></button>
+            <div class="popover" id="appearPop" role="dialog" aria-label="Appearance" hidden>
+                <h4>Theme</h4>
+                <div class="seg" id="themeSeg"><button type="button" data-theme="light"><span data-icon="sun" data-size="15"></span>Light</button><button type="button" data-theme="dark"><span data-icon="moon" data-size="15"></span>Dark</button><button type="button" data-theme="auto"><span data-icon="sparkle" data-size="15"></span>Auto</button></div>
+                <h4>Accent colour</h4>
+                <div class="swatches" id="accentSwatches"></div>
+                <p class="density-note">Your choices are remembered on this device. Plots follow the theme automatically.</p>
+            </div>
+        </div>
+        <button class="icon-btn" id="themeToggle" type="button" aria-label="Toggle dark mode"><span data-icon="sun"></span></button>
     </header>
 
     <div class="container" id="app">
@@ -45,25 +55,25 @@
                     <textarea id="functionInput" rows="2" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="e.g. x^2 * sin(x)"></textarea>
                     <div class="input-hint" id="inputHint"></div>
                     <div id="preview" class="preview-box" aria-live="polite">Enter a function to begin…</div>
-                    <button class="mini-btn keypad-toggle" id="keypadToggle" type="button" aria-expanded="false">⌨ Symbols</button>
+                    <button class="mini-btn keypad-toggle" id="keypadToggle" type="button" aria-expanded="false"><span data-icon="keyboard" data-size="15"></span>Symbols</button>
                     <div class="keypad" id="keypad" aria-label="Symbol keypad" hidden></div>
                     <select id="examples" class="examples-select" aria-label="Load an example"></select>
                     <div class="templates-grid" id="templates" style="margin-top:10px" aria-label="Quick templates"></div>
                 </section>
 
                 <section class="panel" id="optionsPanel">
-                    <div class="panel-title"><span>⚙</span><span>Options</span></div>
+                    <div class="panel-title"><span data-icon="sliders" data-size="15"></span><span>Options</span></div>
                     <div id="modeOptions" class="mode-options"></div>
                 </section>
 
                 <div class="btn-grid">
-                    <button class="btn btn-primary" id="computeBtn" type="button"><span>🚀</span><span>Compute</span></button>
-                    <button class="btn btn-secondary" id="clearBtn" type="button" aria-label="Clear" title="Clear (Ctrl+Shift+K)">🗑️</button>
+                    <button class="btn btn-primary" id="computeBtn" type="button"><span data-icon="play" data-size="17"></span><span>Compute</span><kbd>Ctrl ↵</kbd></button>
+                    <button class="btn btn-secondary" id="clearBtn" type="button" aria-label="Clear" title="Clear (Ctrl+Shift+K)"><span data-icon="trash" data-size="18"></span></button>
                 </div>
                 <div class="shortcut-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> compute · <kbd>Ctrl</kbd>+<kbd>K</kbd> palette · <kbd>?</kbd> help</div>
 
                 <details class="panel">
-                    <summary>🎚 Precision &amp; plots</summary>
+                    <summary><span data-icon="sliders" data-size="15"></span>Precision &amp; plots</summary>
                     <div class="setting-row">
                         <div class="setting-label"><label for="precision">Precision (digits)</label><span class="setting-value" id="precisionValue">6</span></div>
                         <input type="range" class="slider" id="precision" min="2" max="12" value="6">
@@ -75,19 +85,21 @@
                 </details>
 
                 <details class="panel" id="historyPanel" open>
-                    <summary>🕘 History</summary>
+                    <summary><span data-icon="clock" data-size="15"></span>History</summary>
                     <div style="display:flex;justify-content:flex-end"><button class="mini-btn" id="clearHistory" type="button">Clear history</button></div>
                     <div id="historyList" class="history-list"></div>
                 </details>
             </aside>
 
             <main class="workspace">
-                <div class="tabs" role="tablist">
-                    <button class="tab active" id="tab-results" data-tab="results" role="tab" aria-selected="true" type="button">📊 Results</button>
-                    <button class="tab" id="tab-plot" data-tab="plot" role="tab" aria-selected="false" type="button">📈 2D Plot</button>
-                    <button class="tab" id="tab-plot3d" data-tab="plot3d" role="tab" aria-selected="false" type="button">🎮 3D Plot</button>
-                    <button class="tab" id="tab-steps" data-tab="steps" role="tab" aria-selected="false" type="button">📚 Steps</button>
+                <div class="tabs" role="tablist" id="tabs"><span class="tab-indicator" id="tabIndicator" aria-hidden="true"></span>
+                    <button class="tab active" id="tab-results" data-tab="results" role="tab" aria-selected="true" type="button"><span data-icon="grid" data-size="16"></span>Results</button>
+                    <button class="tab" id="tab-plot" data-tab="plot" role="tab" aria-selected="false" type="button"><span data-icon="chart" data-size="16"></span>2D Plot</button>
+                    <button class="tab" id="tab-plot3d" data-tab="plot3d" role="tab" aria-selected="false" type="button"><span data-icon="cube" data-size="16"></span>3D Plot</button>
+                    <button class="tab" id="tab-steps" data-tab="steps" role="tab" aria-selected="false" type="button"><span data-icon="list" data-size="16"></span>Steps</button>
                 </div>
+
+                <div class="progress" id="progress" aria-hidden="true"></div>
 
                 <div id="results" class="tab-content active" role="tabpanel" aria-live="polite"></div>
 
@@ -97,7 +109,7 @@
                             <label>x from <input type="text" id="xMin" placeholder="auto" inputmode="decimal"></label>
                             <label>to <input type="text" id="xMax" placeholder="auto" inputmode="decimal"></label>
                             <button class="mini-btn" id="resetRange" type="button">Reset range</button>
-                            <button class="mini-btn" id="downloadPlot" type="button">📷 Save PNG</button>
+                            <button class="mini-btn" id="downloadPlot" type="button"><span data-icon="camera" data-size="14"></span>Save PNG</button>
                             <span class="plot-tip">Drag to pan · scroll to zoom · double-click to reset</span>
                         </div>
                         <div id="plot2d" class="plot-area"></div>
@@ -118,6 +130,8 @@
                 </div>
 
                 <div id="steps" class="tab-content" role="tabpanel"></div>
+
+                <div class="statusbar" role="status"><span><i class="dot" id="engineDot"></i><span id="engineStatus">Starting engine…</span></span><span id="offlineStatus">Checking offline support…</span><span>math.js · Algebrite · Plotly · KaTeX</span></div>
             </main>
         </div>
     </div>

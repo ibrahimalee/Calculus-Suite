@@ -1,6 +1,8 @@
 /* Runs the CalcEngine off the UI thread so heavy symbolic work can never freeze the page. */
 'use strict';
 try {
+    // The vendored browser bundles expect a `window`; a worker only has `self`.
+    if (typeof window === 'undefined') self.window = self;
     importScripts('../vendor/math.min.js', '../vendor/algebrite.min.js', 'engine.js');
     const g = self;
     const Alg = g.Algebrite || (g.window && g.window.Algebrite);

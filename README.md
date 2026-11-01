@@ -25,6 +25,12 @@ A calculus workstation that runs entirely in the browser – no backend, no buil
 
 Plus: command palette (`Ctrl+K`), installable offline PWA, Markdown report export, PNG plot export, LaTeX rendering, 2D/3D/contour plots, history, shareable links (`#s=…`), copy as text/LaTeX, dark mode, keyboard shortcuts, example gallery, background worker with timeout.
 
+## Design & trust
+
+- A single stroke-icon set, light / dark / auto themes and six accent colours (Appearance menu), a sliding tab indicator, loading progress bar and live engine status.
+- Every result carries trust badges (e.g. *Verified: the antiderivative was checked by differentiating it*) and shows how long it took and where it ran.
+- WCAG 2.x AA contrast verified with axe-core in every theme/accent combination; keyboard-first (`Ctrl+K` palette, `Alt+1…9`, `Alt+R/P/D/S`).
+
 ## Run
 
 Open `index.html` (or `npm run serve` and visit http://localhost:8080). All libraries are vendored in `vendor/` (math.js, Algebrite, Plotly, KaTeX); a CDN fallback is used only if a local file is missing. Deploys as-is to GitHub Pages.
@@ -34,6 +40,7 @@ Open `index.html` (or `npm run serve` and visit http://localhost:8080). All libr
 ```
 npm install
 npm test        # unit tests for js/engine.js (Node)
+npm run serve   # then, in another shell:  BASE=http://localhost:8080 npm run e2e   (Playwright UI checks)
 ```
 
 ```

@@ -74,5 +74,5 @@
         });
     }
 
-    window.Runner = { run, getEngine, warmUp: startWorker, cancel: restartWorker, isBusy: () => pending.size > 0 };
+    window.Runner = { run, getEngine, warmUp: startWorker, cancel: restartWorker, isBusy: () => pending.size > 0, mode: () => (workerState === 'ready' ? 'background worker' : 'main thread') };
 })();

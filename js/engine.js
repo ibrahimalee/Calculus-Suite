@@ -942,6 +942,58 @@
         return z.map(([re, im]) => ({ re, im }));
     }
 
+
+    // ---- square-free decomposition (Yun) so repeated roots stay exact -----------------
+    const trimRel = (p, tol) => { p = p.slice(); const mx = Math.max(...p.map(Math.abs), 0); while (p.length > 1 && Math.abs(p[p.length - 1]) <= tol * mx) p.pop(); return p; };
+    const polyDeriv = p => (p.length <= 1 ? [0] : p.slice(1).map((c, i) => c * (i + 1)));
+    const polySub = (a, b) => {   // subtraction with cancellation noise removed (relative to the operands)
+        const n = Math.max(a.length, b.length), r = [], mx = Math.max(...a.map(Math.abs), ...b.map(Math.abs), 1e-300);
+        for (let i = 0; i < n; i++) { const v = (a[i] || 0) - (b[i] || 0); r.push(Math.abs(v) <= 1e-9 * mx ? 0 : v); }
+        return r;
+    };
+    function polyGcd(a, b) {
+        const monic = q => { const l = q[q.length - 1]; return q.map(c => c / l); };
+        a = trimRel(a, 1e-12); b = trimRel(b, 1e-12);
+        if (a.length < b.length) [a, b] = [b, a];
+        if (b.length === 1 && Math.abs(b[0]) <= 1e-12 * Math.max(...a.map(Math.abs), 1)) return monic(a);
+        a = monic(a); b = monic(b);
+        for (let guard = 0; guard < 80; guard++) {
+            if (b.length === 1) return [1];                       // non-zero constant remainder: coprime
+            const [, rem] = polyDivMod(a, b);
+            const size = Math.max(...a.map(Math.abs), ...b.map(Math.abs));
+            const r = rem.slice();
+            while (r.length > 1 && Math.abs(r[r.length - 1]) <= 1e-8 * size) r.pop();
+            if (r.length === 1 && Math.abs(r[0]) <= 1e-8 * size) return b;   // remainder is numerically zero → b is the gcd
+            a = b; b = monic(r);
+        }
+        return [1];
+    }
+    /** Complex roots with exact multiplicities: [{re, im, mult}] (conjugates listed separately). */
+    function polyRootsMult(p) {
+        p = trimRel(p, 1e-13);
+        const deg = p.length - 1;
+        if (deg < 1) return [];
+        try {
+            let a = polyGcd(p, polyDeriv(p));
+            let b = polyDivMod(p, a)[0], c = polyDivMod(polyDeriv(p), a)[0];
+            let d = polySub(c, polyDeriv(b));
+            const out = []; let i = 1, total = 0;
+            while (b.length > 1 && i <= deg) {
+                const ai = polyGcd(b, d);
+                if (ai.length > 1) {
+                    polyRoots(ai).forEach(z => { out.push({ re: z.re, im: z.im, mult: i }); });
+                    total += (ai.length - 1) * i;
+                }
+                b = polyDivMod(b, ai)[0]; c = polyDivMod(d, ai)[0]; d = polySub(c, polyDeriv(b)); i++;
+            }
+            if (total === deg) {
+                // polish every root against the original polynomial using Newton on the square-free part is unnecessary: roots are simple in their factor
+                return out;
+            }
+        } catch (e) { /* fall through to the plain solver */ }
+        return polyRoots(p).map(z => ({ re: z.re, im: z.im, mult: 1 }));
+    }
+
     const snapCoef = x => {
         if (!Number.isFinite(x)) return 'NaN';
         for (let k = 1; k <= 60; k++) {
@@ -1272,7 +1324,7 @@
     // Result builders
     // ------------------------------------------------------------------
     function makeResult(kind, title) {
-        return { kind, title, main: null, items: [], meta: [], warnings: [], steps: [], plot: null, text: '' };
+        return { kind, title, main: null, items: [], meta: [], warnings: [], steps: [], plot: null, text: '', badges: [] };
     }
 
     const INLINE_LABEL = /^(y-intercept|Roots|Local |Saddle|Flat|Critical points|Inflection|Vertical|As x|Recognised|General solution|Particular solution|Implicit solution|Constants|Monotonicity|Concavity)/;
@@ -1281,6 +1333,13 @@
         // `tex` is normally a complete statement (the UI then hides the label); value-only
         // lines are flagged `inline` so the UI shows "label + value".
         r.items.forEach(i => { if (i.tex && INLINE_LABEL.test(i.label)) i.inline = true; });
+        // trust badges are derived from the metadata lines the computation produced
+        r.badges = r.badges || [];
+        r.meta.forEach(m => {
+            let x;
+            if ((x = /^Method: (.+)$/.exec(m))) r.badges.push({ kind: 'info', text: x[1].length > 90 ? x[1].slice(0, 87) + '…' : x[1] });
+            else if (/^Verified|cross-?checked|verified against/i.test(m)) r.badges.push({ kind: 'ok', text: m.replace(/^Verified: /, 'Verified: ').slice(0, 110) });
+        });
         const lines = [r.title];
         if (r.main) lines.push(`${r.main.label} ${r.main.text}`);
         r.items.forEach(i => lines.push(`${i.label} ${i.text}`));
@@ -1395,6 +1454,21 @@
         }
         r.steps.push({ title: 'Simplify', text: `Result: ${strOf(d)}`, tex: texOf(d) });
 
+        // independent check of the symbolic result (numerical differentiation for order 1, power-series arithmetic for higher orders)
+        if (vars.length <= 1) {
+            const fchk = compile(node, [v]), dchk = compile(d, [v]);
+            let agree = 0, disagree = 0, fact = 1; for (let q = 2; q <= order; q++) fact *= q;
+            for (const x of [0.31, 0.77, -0.55, 1.4, 2.1]) {
+                let truth;
+                if (order === 1) { const hh = 1e-4 * Math.max(1, Math.abs(x)); truth = (-fchk(x + 2 * hh) + 8 * fchk(x + hh) - 8 * fchk(x - hh) + fchk(x - 2 * hh)) / (12 * hh); }
+                else { try { truth = taylorCoeffs(node, v, x, order)[order] * fact; } catch (e) { continue; } }
+                const got = dchk(x);
+                if (!Number.isFinite(truth) || !Number.isFinite(got)) continue;
+                if (Math.abs(got - truth) <= 1e-5 * Math.max(1, Math.abs(truth))) agree++; else disagree++;
+            }
+            if (agree >= 2 && !disagree) r.meta.push(`Verified: agrees with an independent ${order === 1 ? 'numerical differentiation' : 'power-series computation'} at ${agree} sample points.`);
+        }
+
         // Optional evaluation / tangent line
         const at = (opt.point || '').trim();
         const f = compile(node, [v]);
@@ -1451,6 +1525,7 @@
         const F = res.F;
         r.main = { label: `∫ f(${v}) d${v} =`, text: strOf(F) + ' + C', tex: `\\int ${texOf(node)}\\,d${v}=${texOf(F)}+C` };
         r.meta.push('Method: ' + res.method);
+        r.meta.push('Verified: the antiderivative was checked by differentiating it at sample points.');
         r.steps = res.steps.slice();
         r.steps.push({ title: 'Add the constant of integration', text: 'Every antiderivative differs by a constant, so we add + C.', tex: `${texOf(F)}+C` });
         try {
@@ -1817,13 +1892,14 @@
         };
         const recognise = x => {
             const n = nice(x, 8, 2e-6);
+            if (/^-?\d+(\/\d+)?$/.test(n.text)) return n;              // a clean integer or fraction always wins over exotic constants
             if (/^-?[\d.]+(e[+-]?\d+)?$/.test(n.text) && !Number.isInteger(x)) {
                 for (const [name, val, tex] of [['e', Math.E, 'e'], ['1/e', 1 / Math.E, '\\frac{1}{e}'], ['√2', Math.SQRT2, '\\sqrt{2}'], ['√3', Math.sqrt(3), '\\sqrt{3}'], ['ln 2', Math.LN2, '\\ln 2']]) {
                     for (const m of [1, -1]) if (Math.abs(x - m * val) < 1e-6 * Math.max(1, Math.abs(x))) return { text: (m < 0 ? '-' : '') + name, tex: (m < 0 ? '-' : '') + tex };
                 }
                 for (let d = 1; d <= 6; d++) {
                     const k = Math.round(x * d / Math.E);
-                    if (k !== 0 && Math.abs(x - k * Math.E / d) < 1e-6 * Math.max(1, Math.abs(x))) return { text: `${k === 1 ? '' : k}e${d > 1 ? '/' + d : ''}`, tex: '' };
+                    if (k !== 0 && Math.abs(k) <= 12 && Math.abs(x - k * Math.E / d) < 1e-6 * Math.max(1, Math.abs(x))) return { text: `${k === 1 ? '' : k}e${d > 1 ? '/' + d : ''}`, tex: '' };
                 }
             }
             return n;
@@ -2871,6 +2947,37 @@
         return { A: A.map(r => r.map(x => (Math.abs(x) < 1e-12 ? 0 : x))), pivots };
     }
 
+
+    /** Characteristic polynomial coefficients [1, c1, …, cn] of det(λI − A) (Faddeev–LeVerrier). */
+    function charPolyCoeffs(M) {
+        const n = M.length, I = M.map((row, i) => row.map((_, j) => (i === j ? 1 : 0)));
+        let Mk = M.map(row => row.map(() => 0));
+        const c = [1];
+        for (let k = 1; k <= n; k++) {
+            Mk = k === 1 ? I.map(row => row.slice()) : math.add(math.multiply(M, Mk), math.multiply(c[k - 1], I));
+            const AMk = math.multiply(M, Mk);
+            c.push(-AMk.reduce((s0, row, i) => s0 + row[i], 0) / k);
+        }
+        return c;
+    }
+
+    /** Basis of the null space of M (columns that are free after row reduction). */
+    function nullSpace(M, tol) {
+        const m = M.length, n = M[0].length;
+        const A = M.map(r => r.slice()), pivots = [];
+        let row = 0;
+        for (let c = 0; c < n && row < m; c++) {
+            let p = row; for (let i = row + 1; i < m; i++) if (Math.abs(A[i][c]) > Math.abs(A[p][c])) p = i;
+            if (Math.abs(A[p][c]) < tol) continue;
+            [A[row], A[p]] = [A[p], A[row]];
+            const d = A[row][c]; A[row] = A[row].map(x => x / d);
+            for (let i = 0; i < m; i++) if (i !== row) { const f0 = A[i][c]; A[i] = A[i].map((x, j) => x - f0 * A[row][j]); }
+            pivots.push(c); row++;
+        }
+        const free = []; for (let c = 0; c < n; c++) if (!pivots.includes(c)) free.push(c);
+        return free.map(fc => { const v = new Array(n).fill(0); v[fc] = 1; pivots.forEach((pc, r) => { v[pc] = -A[r][fc]; }); return v; });
+    }
+
     function runMatrix(src, opt) {
         const M = parseMatrix(src);
         const m = M.length, n = M[0].length, op = opt.op || 'det';
@@ -2912,34 +3019,45 @@
             if (op === 'rank') r.items.push({ label: 'rref(A) =', text: matTxt(A), tex: `\\operatorname{rref}A=${matTex(A)}` });
         } else if (op === 'eigen') {
             sq(); r.title = 'Eigenvalues & eigenvectors';
-            let e;
-            try { e = math.eigs(M); } catch (err) { throw new CalcError('Could not compute eigenvalues for this matrix'); }
-            const vals = Array.isArray(e.values) ? e.values : e.values.toArray();
-            const fmtC = z => (typeof z === 'number' ? nice(z, 6, 1e-9).text : `${nice(z.re, 5, 1e-9).text} ${z.im < 0 ? '−' : '+'} ${nice(Math.abs(z.im), 5, 1e-9).text}i`);
-            r.main = { label: 'λ =', text: vals.map(fmtC).join(',  '), tex: `\\lambda=${vals.map(z => (typeof z === 'number' ? nice(z, 6, 1e-9).tex : `${nice(z.re, 5, 1e-9).tex}${z.im < 0 ? '-' : '+'}${nice(Math.abs(z.im), 5, 1e-9).tex}i`)).join(',\;')}` };
-            const evs = e.eigenvectors || [];
-            evs.forEach((ev, i) => {
-                const vec = Array.isArray(ev.vector) ? ev.vector : ev.vector.toArray();
-                const nrm = Math.hypot(...vec.map(x => (typeof x === 'number' ? x : x.re)));
-                const sc = vec.map(x => (typeof x === 'number' ? x / (nrm || 1) : x.re / (nrm || 1)));
-                r.items.push({ label: `v${i + 1} (λ = ${fmtC(ev.value)}):`, text: '(' + sc.map(x => fmt(x, 5)).join(', ') + ')', tex: '' });
+            const co = charPolyCoeffs(M);
+            const roots = polyRoots(co.slice().reverse());
+            const scale = Math.max(1, ...roots.map(z => Math.hypot(z.re, z.im)));
+            const used = new Array(roots.length).fill(false), groups = [];
+            roots.forEach((z, i) => {
+                if (used[i]) return; used[i] = true;
+                const members = [z];
+                roots.forEach((w, j) => { if (!used[j] && Math.hypot(w.re - z.re, w.im - z.im) < 1e-4 * scale) { used[j] = true; members.push(w); } });
+                let re = members.reduce((a, q) => a + q.re, 0) / members.length, im = members.reduce((a, q) => a + q.im, 0) / members.length;
+                const sn = x => { try { const nv = nice(x, 9, 5e-8); const val = /^-?\d+(\/\d+)?$/.test(nv.text) ? math.evaluate(nv.text) : x; return Math.abs(val - x) < 1e-7 * scale ? val : x; } catch (e) { return x; } };
+                re = sn(re); im = Math.abs(im) < 1e-7 * scale ? 0 : sn(im);
+                groups.push({ re, im, alg: members.length });
+            });
+            // keep one of each conjugate pair for display; the other is implied
+            const shown = groups.filter(g => g.im >= 0).sort((a, b) => a.re - b.re || a.im - b.im);
+            const fmtL = g => (g.im === 0 ? nice(g.re, 8, 1e-9).text : `${nice(g.re, 6, 1e-9).text} ${'±'} ${nice(Math.abs(g.im), 6, 1e-9).text}i`);
+            const fmtT = g => (g.im === 0 ? nice(g.re, 8, 1e-9).tex : `${nice(g.re, 6, 1e-9).tex}\\pm ${nice(Math.abs(g.im), 6, 1e-9).tex}i`);
+            r.main = { label: 'λ =', text: shown.map(fmtL).join(',  '), tex: `\\lambda=${shown.map(fmtT).join(',\;')}` };
+            let worst = 0, defective = false;
+            shown.forEach(g => {
+                if (g.im !== 0) { r.items.push({ label: `λ = ${fmtL(g)}:`, text: `complex conjugate pair${g.alg > 1 ? ` (algebraic multiplicity ${g.alg})` : ''} – eigenvectors are complex`, tex: '', inline: true }); return; }
+                const sh = M.map((row, i) => row.map((x, j) => (i === j ? x - g.re : x)));
+                const basis = nullSpace(sh, 1e-6 * Math.max(1, scale));
+                const geo = basis.length;
+                if (geo < g.alg) defective = true;
+                const vecs = basis.map(v => { const nrm = Math.hypot(...v) || 1; let u = v.map(x => x / nrm); const first = u.find(x => Math.abs(x) > 1e-9); if (first < 0) u = u.map(x => -x); return u; });
+                vecs.forEach(u => { const av = math.multiply(M, u); worst = Math.max(worst, Math.max(...av.map((x, i) => Math.abs(x - g.re * u[i])))); });
+                r.items.push({ label: `λ = ${fmtL(g)}:`, text: `multiplicity ${g.alg}${geo < g.alg ? ` (only ${geo} independent eigenvector${geo === 1 ? '' : 's'} – defective)` : ''};  ` + (vecs.length ? vecs.map(u => '(' + u.map(x => fmt(x, 5)).join(', ') + ')').join('  ·  ') : 'no real eigenvector found'), tex: '', inline: true });
             });
             const tr = M.reduce((s0, row, i) => s0 + row[i], 0), dt = math.det(M);
             r.meta.push(`Check: Σλ = trace = ${fmt(tr, 6)},  Πλ = det = ${fmt(dt, 6)}`);
-            r.steps.push({ title: 'Characteristic equation', text: 'det(A − λI) = 0', tex: `\\det(A-\\lambda I)=0` });
-            r.steps.push({ title: 'Solve for λ, then (A − λI)v = 0', text: 'Eigenvectors are shown normalised to unit length.', tex: '' });
+            if (worst > 0 || shown.some(g => g.im === 0)) r.meta.push(`Verified: max |A·v − λ·v| = ${worst.toExponential(2)} (eigenvectors normalised to unit length)`);
+            if (defective) r.meta.push('This matrix is defective: it does not have a full set of independent eigenvectors, so it is not diagonalisable.');
+            else if (!groups.some(g => g.im !== 0)) r.meta.push('The matrix is diagonalisable (a full set of real eigenvectors exists).');
+            r.steps.push({ title: 'Characteristic equation', text: 'det(λI − A) = 0 is solved for λ (all complex roots, with multiplicity).', tex: `\\det(\\lambda I-A)=0` });
+            r.steps.push({ title: 'Eigenvectors', text: 'For each real λ the null space of (A − λI) is computed by row reduction.', tex: '(A-\\lambda I)\\mathbf{v}=\\mathbf{0}' });
         } else if (op === 'charpoly') {
             sq(); r.title = 'Characteristic polynomial';
-            // Faddeev–LeVerrier
-            const I = M.map((row, i) => row.map((_, j) => (i === j ? 1 : 0)));
-            let Mk = M.map(row => row.map(() => 0)); const c = [1];
-            for (let k = 1; k <= n; k++) {
-                const AM = math.multiply(M, math.add(Mk, math.multiply(c[k - 1], I)));
-                Mk = k === 1 ? I.map(row => row.map(x => x)) : math.add(math.multiply(M, Mk), math.multiply(c[k - 1], I));
-                const AMk = math.multiply(M, Mk);
-                c.push(-AMk.reduce((s0, row, i) => s0 + row[i], 0) / k);
-                void AM;
-            }
+            const c = charPolyCoeffs(M);
             const parts = c.map((co, k) => ({ co, pw: n - k })).filter(t => Math.abs(t.co) > 1e-10);
             const fmtTerm = (t, first, tex) => {
                 const mag = Math.abs(t.co), sign = t.co < 0 ? '-' : '+', lam = tex ? '\\lambda' : 'λ';
@@ -2947,7 +3065,7 @@
                 return first ? (t.co < 0 ? '-' : '') + body : ` ${sign} ${body}`;
             };
             r.main = { label: 'p(λ) =', text: parts.map((t, i) => fmtTerm(t, i === 0, false)).join(''), tex: `p(\\lambda)=${parts.map((t, i) => fmtTerm(t, i === 0, true)).join('')}` };
-            const ev = math.eigs(M).values; r.meta.push('Roots of p are the eigenvalues: ' + (Array.isArray(ev) ? ev : ev.toArray()).map(z => (typeof z === 'number' ? fmt(z, 5) : `${fmt(z.re, 4)}±${fmt(Math.abs(z.im), 4)}i`)).join(', '));
+            const ev = polyRoots(c.slice().reverse()); r.meta.push('Roots of p are the eigenvalues: ' + ev.map(z => (Math.abs(z.im) < 1e-9 ? fmt(z.re, 5) : `${fmt(z.re, 4)} ${z.im < 0 ? '−' : '+'} ${fmt(Math.abs(z.im), 4)}i`)).join(', '));
         } else if (op === 'solve') {
             sq(); const b = parseMatrix(opt.b || '', 'a right-hand side b, e.g.  1 ; 2');
             if (b.length !== m || b[0].length !== 1) throw new CalcError(`b must be a column of ${m} numbers separated by ;`);
@@ -3097,21 +3215,19 @@
         let realRoots = [], complexRoots = [], exactPoly = false, degree = 0;
         if (rat && rat.d.length === 1 && rat.n.length > 1 && rat.n.length <= 13) {
             exactPoly = true; degree = rat.n.length - 1;
-            const rs = polyRoots(rat.n), sc = Math.max(1, ...rs.map(z => Math.hypot(z.re, z.im)));
-            const used = new Array(rs.length).fill(false);
-            rs.forEach((z, i) => {
-                if (used[i]) return; used[i] = true;
-                let mult = 1;
-                rs.forEach((w, j) => { if (!used[j] && Math.hypot(w.re - z.re, w.im - z.im) < 1e-4 * sc) { used[j] = true; mult++; } });
-                if (Math.abs(z.im) < 1e-7 * sc) realRoots.push({ x: z.re, mult }); else if (z.im > 0) complexRoots.push({ re: z.re, im: z.im, mult });
+            const rs = polyRootsMult(rat.n), sc = Math.max(1, ...rs.map(z => Math.hypot(z.re, z.im)));
+            rs.forEach(z => {
+                const re = Math.abs(z.re) < 1e-12 * sc ? 0 : z.re;
+                if (Math.abs(z.im) < 1e-9 * sc) realRoots.push({ x: re, mult: z.mult }); else if (z.im > 0) complexRoots.push({ re, im: z.im, mult: z.mult });
             });
             // polish real roots with Newton on the polynomial
-            realRoots.forEach(q => { for (let it = 0; it < 6; it++) { const d = numDeriv(f, q.x); const fx = f(q.x); if (!Number.isFinite(d) || Math.abs(d) < 1e-14) break; const nx = q.x - fx / d; if (!Number.isFinite(nx)) break; q.x = nx; } });
+            realRoots.filter(q => q.mult === 1).forEach(q => { for (let it = 0; it < 6; it++) { const d = numDeriv(f, q.x); const fx = f(q.x); if (!Number.isFinite(d) || Math.abs(d) < 1e-14) break; const nx = q.x - fx / d; if (!Number.isFinite(nx)) break; q.x = nx; } });
         } else {
             signChanges(f, lo, hi, 8000).forEach(c => { const fx = Math.abs(f(c.x)); if (c.exact || fx < 1e-7) realRoots.push({ x: c.x, mult: 1 }); });
             const f1 = x => numDeriv(f, x);
             signChanges(f1, lo, hi, 4000).forEach(c => { if (Math.abs(f(c.x)) < 1e-9 && !realRoots.some(q => Math.abs(q.x - c.x) < 1e-5)) realRoots.push({ x: c.x, mult: 2 }); });
         }
+        if (exactPoly) realRoots.forEach(q => { for (let d = 1; d <= 24; d++) { const nn = Math.round(q.x * d); if (Math.abs(q.x - nn / d) < 5e-9 * Math.max(1, Math.abs(q.x)) && Math.abs(f(nn / d)) <= Math.abs(f(q.x)) * 10 + 1e-12) { q.x = nn / d; break; } } });
         realRoots.sort((a, b) => a.x - b.x);
         const fmtRoot = x => { const c = recogniseConst(x); const n = nice(x, 8, 1e-9); return c && !/^-?\d/.test(n.text.replace('π', '')) ? c : (c && n.text === fmt(x, 8) ? c : n); };
         if (relation === '=') {

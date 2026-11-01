@@ -359,6 +359,45 @@
     });
 
     const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    // ------------------------------------------------------------------
+    // Icons: one consistent stroke-icon set instead of emoji
+    // ------------------------------------------------------------------
+    const ICON = {
+        search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+        sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+        moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+        help: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4.5M12 17.5h.01"/>',
+        download: '<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
+        play: '<path d="M7 4.5v15l12-7.5z" fill="currentColor"/>',
+        trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 10v6M14 10v6"/>',
+        copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>',
+        tex: '<path d="M4 6h8M8 6v12M14 10l6 8M20 10l-6 8"/>',
+        link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1"/>',
+        file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+        camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+        keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
+        chart: '<path d="M3 3v18h18"/><path d="m7 15 4-5 3 3 5-7"/>',
+        cube: '<path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="m3 7 9 5 9-5M12 12v10"/>',
+        list: '<path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+        grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+        sliders: '<path d="M4 6h8M18 6h2M4 12h2M12 12h8M4 18h10M20 18h0"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
+        clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        check: '<path d="m5 12 5 5 9-10"/>',
+        shield: '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>',
+        alert: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
+        info: '<circle cx="12" cy="12" r="10"/><path d="M12 11v6M12 7.5h.01"/>',
+        bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+        palette: '<path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 1.5-2.2-.5-1.2.3-2.3 1.6-2.3H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7" r="1"/>',
+        sparkle: '<path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
+        wifi: '<path d="M2 9a15 15 0 0 1 20 0M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0M12 20h.01"/>',
+        cpu: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>',
+        x: '<path d="M6 6l12 12M18 6 6 18"/>',
+        compass: '<circle cx="12" cy="12" r="10"/><path d="m16 8-2 6-6 2 2-6z"/>',
+        command: '<path d="M9 9V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3z"/>'
+    };
+    const icon = (name, size) => `<svg class="ico" width="${size || 18}" height="${size || 18}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[name] || ''}</svg>`;
+    function hydrateIcons(root) { (root || document).querySelectorAll('[data-icon]:not([data-done])').forEach(el => { el.innerHTML = icon(el.dataset.icon, +el.dataset.size || 18); el.dataset.done = '1'; }); }
+
     const digits = () => parseInt($('precision').value, 10) || 6;
     const resolution = () => parseInt($('resolution').value, 10) || 400;
     const isDark = () => document.body.classList.contains('dark');
@@ -366,7 +405,8 @@
     function toast(msg, kind) {
         const t = document.createElement('div');
         t.className = 'toast ' + (kind || '');
-        t.textContent = msg;
+        t.innerHTML = icon(kind === 'err' ? 'alert' : 'check', 16) + '<span></span>';
+        t.lastChild.textContent = msg;
         t.setAttribute('role', 'status');
         document.body.appendChild(t);
         requestAnimationFrame(() => t.classList.add('show'));
@@ -376,18 +416,51 @@
     // ------------------------------------------------------------------
     // Theme
     // ------------------------------------------------------------------
-    function applyTheme(dark) {
+    const ACCENTS = [['indigo', '#6366f1'], ['violet', '#8b5cf6'], ['cyan', '#06b6d4'], ['emerald', '#10b981'], ['amber', '#f59e0b'], ['rose', '#f43f5e']];
+    const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } } };
+    let themeMode = 'auto';
+
+    function applyTheme(dark, persistMode) {
         document.body.classList.toggle('dark', dark);
-        $('themeToggle').textContent = dark ? '🌙' : '☀️';
+        $('themeToggle').innerHTML = icon(dark ? 'moon' : 'sun');
         $('themeToggle').setAttribute('aria-pressed', String(dark));
-        try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) { /* storage unavailable */ }
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#0b0d16' : '#6366f1');
+        if (persistMode) { themeMode = persistMode; store.set('themeMode', persistMode); store.set('theme', dark ? 'dark' : 'light'); }
+        document.querySelectorAll('#themeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.theme === themeMode)));
+    }
+    function systemDark() { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); }
+    function setThemeMode(mode) { applyTheme(mode === 'auto' ? systemDark() : mode === 'dark', mode); refreshActivePlot(); }
+    function setAccent(name) {
+        if (name === 'indigo') document.body.removeAttribute('data-accent'); else document.body.setAttribute('data-accent', name);
+        store.set('accent', name);
+        document.querySelectorAll('.swatch').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.accent === name)));
+        requestAnimationFrame(moveIndicator);
+        refreshActivePlot();
     }
     function initTheme() {
-        let saved = null;
-        try { saved = localStorage.getItem('theme'); } catch (e) { /* ignore */ }
-        const dark = saved ? saved === 'dark' : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        applyTheme(dark);
-        $('themeToggle').addEventListener('click', () => { applyTheme(!isDark()); refreshActivePlot(); });
+        const legacy = store.get('theme');
+        themeMode = store.get('themeMode') || (legacy ? legacy : 'auto');
+        applyTheme(themeMode === 'auto' ? systemDark() : themeMode === 'dark', null);
+        if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (themeMode === 'auto') { applyTheme(systemDark()); refreshActivePlot(); } });
+        $('themeToggle').addEventListener('click', () => setThemeMode(isDark() ? 'light' : 'dark'));
+        $('accentSwatches').innerHTML = ACCENTS.map(([n, c]) => `<button class="swatch" type="button" data-accent="${n}" style="background:${c}" aria-label="${n} accent" title="${n}" aria-pressed="false"></button>`).join('');
+        $('accentSwatches').querySelectorAll('.swatch').forEach(b => b.addEventListener('click', () => setAccent(b.dataset.accent)));
+        document.querySelectorAll('#themeSeg button').forEach(b => b.addEventListener('click', () => setThemeMode(b.dataset.theme)));
+        setAccent(store.get('accent') || 'indigo');
+        const pop = $('appearPop'), btn = $('appearBtn');
+        const close = () => { pop.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+        btn.addEventListener('click', e => { e.stopPropagation(); pop.hidden = !pop.hidden; btn.setAttribute('aria-expanded', String(!pop.hidden)); });
+        document.addEventListener('click', e => { if (!pop.hidden && !pop.contains(e.target) && e.target !== btn) close(); });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pop.hidden) { close(); btn.focus(); } });
+        applyTheme(isDark());
+    }
+
+    // sliding tab indicator
+    function moveIndicator() {
+        const act = document.querySelector('.tab.active'), ind = $('tabIndicator');
+        if (!act || !ind) return;
+        ind.style.width = act.offsetWidth + 'px';
+        ind.style.transform = `translateX(${act.offsetLeft - 5}px)`;
     }
 
     // ------------------------------------------------------------------
@@ -581,12 +654,16 @@
         state.busy = true;
         btn.classList.add('loading');
         btn.innerHTML = '<div class="spinner"></div><span>Cancel</span>';
+        document.body.classList.add('busy');
+        const t0 = performance.now();
         $('results').setAttribute('aria-busy', 'true');
         if (activeTab() === 'results') $('results').innerHTML = '<div class="skeleton"><i></i><i></i><i></i><i></i></div>';
         try {
             const src = $('functionInput').value;
             const mode = state.mode;
             const result = mode === 'graph' ? engine.run.graph(src.replace(/(^|[;\n])\s*(y|f\(x\))\s*=/g, '$1'), gatherOptions()) : await Runner.run(mode, src, gatherOptions());
+            result.ms = Math.round(performance.now() - t0);
+            result.engine = mode === 'graph' ? 'main thread' : (Runner.mode ? Runner.mode() : 'worker');
             state.result = result;
             resetParams(result);
             displayResult(result);
@@ -600,13 +677,14 @@
         } finally {
             state.busy = false;
             btn.classList.remove('loading');
-            btn.innerHTML = '<span>🚀</span><span>Compute</span>';
+            btn.innerHTML = `${icon('play', 17)}<span>Compute</span><kbd>Ctrl ↵</kbd>`;
+            document.body.classList.remove('busy');
             $('results').removeAttribute('aria-busy');
         }
     }
 
     function showError(message, unexpected) {
-        $('results').innerHTML = `<div class="alert alert-error" role="alert"><span class="alert-icon">⚠</span><div><strong>${unexpected ? 'Unexpected error' : 'Could not compute'}</strong><br>${esc(message)}</div></div>`;
+        $('results').innerHTML = `<div class="alert alert-error" role="alert"><span class="alert-icon">${icon('alert', 20)}</span><div><strong>${unexpected ? 'Unexpected error' : 'Could not compute'}</strong><br>${esc(message)}</div></div>`;
         switchTab('results');
     }
 
@@ -615,25 +693,31 @@
     // ------------------------------------------------------------------
     const KIND_ICON = { derivative: '∂', integral: '∫', definite: '∫', series: 'Σ', limit: 'lim', analysis: 'f', ode: 'y′', multivariable: '∇', vector: '∇', graph: '∿', riemann: 'Δx', applications: 'V', root: 'x*', fourier: '∼', matrix: '[ ]', calc: '=', solve: 'x=', sum: 'Σk' };
 
+    /** Metadata lines that are not already shown as trust badges. */
+    function metaRest(r) { return r.meta.filter(m => !/^Method: /.test(m) && !/^Verified|cross-?checked|verified against/i.test(m)); }
+
     function displayResult(r) {
         const rows = r.items.map(i => `
             <div class="result-row">${i.tex && !i.inline ? '' : `<span class="row-label">${esc(i.label)}</span> `}${texSpan(i.tex, i.text, false)}</div>`).join('');
         const html = `
             <div class="result-card">
+                <div class="result-kicker">${esc((MODES[state.mode] || {}).label || 'Result')}</div>
                 <div class="result-title">
                     <div class="result-icon">${esc(KIND_ICON[r.kind] || '=')}</div>
                     <span>${esc(r.title)}</span>
                     <div class="result-actions">
-                        <button class="mini-btn" data-act="copy" title="Copy result as text">📋 Copy</button>
-                        <button class="mini-btn" data-act="copytex" title="Copy LaTeX">TeX</button>
-                        <button class="mini-btn" data-act="share" title="Copy a link to this calculation">🔗 Share</button>
-                        <button class="mini-btn" data-act="export" title="Download a Markdown report">📄 Export</button>
+                        <button class="mini-btn" data-act="copy" title="Copy result as text">${icon('copy', 14)}Copy</button>
+                        <button class="mini-btn" data-act="copytex" title="Copy LaTeX">${icon('tex', 14)}LaTeX</button>
+                        <button class="mini-btn" data-act="share" title="Copy a link to this calculation">${icon('link', 14)}Share</button>
+                        <button class="mini-btn" data-act="export" title="Download a Markdown report">${icon('file', 14)}Export</button>
                     </div>
                 </div>
                 ${r.main ? `<div class="result-content">${r.main.tex ? '' : `<span class="row-label">${esc(r.main.label)}</span> `}${texSpan(r.main.tex, r.main.text, true)}</div>` : ''}
                 ${rows ? `<div class="result-rows">${rows}</div>` : ''}
-                ${r.meta.length ? `<div class="result-meta">${r.meta.map(m => esc(m)).join('<br>')}</div>` : ''}
-                ${r.warnings.map(w => `<div class="alert alert-warning"><span class="alert-icon">ℹ️</span><span>${esc(w)}</span></div>`).join('')}
+                ${(r.badges && r.badges.length) ? `<div class="badges">${r.badges.map(b => `<span class="badge ${esc(b.kind)}">${icon(b.kind === 'ok' ? 'shield' : b.kind === 'warn' ? 'alert' : 'info', 14)}${esc(b.text)}</span>`).join('')}</div>` : ''}
+                ${metaRest(r).length ? `<div class="result-meta">${metaRest(r).map(m => esc(m)).join('<br>')}</div>` : ''}
+                ${r.warnings.map(w => `<div class="alert alert-warning"><span class="alert-icon">${icon('info', 18)}</span><span>${esc(w)}</span></div>`).join('')}
+                <div class="result-foot"><span>${icon('bolt', 14)}${r.ms != null ? `${r.ms} ms` : 'instant'}</span><span>${icon('cpu', 14)}${esc(r.engine || 'worker')}</span><span>${icon('clock', 14)}${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span></div>
             </div>`;
         const container = $('results');
         container.innerHTML = html;
@@ -649,7 +733,7 @@
         const el = $('steps');
         if (!steps || !steps.length) {
             el.classList.remove('show-timeline');
-            el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📖</div><h3>No steps for this computation</h3><p>Try a different operation</p></div>';
+            el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${icon('list', 34)}</div><h3>No steps for this computation</h3><p>Try a different operation</p></div>`;
             return;
         }
         el.classList.add('show-timeline');
@@ -742,6 +826,7 @@
             t.setAttribute('aria-selected', String(on));
         });
         document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === name));
+        moveIndicator();
         if (name === 'plot') plot2D();
         if (name === 'plot3d') plot3D();
     }
@@ -821,7 +906,7 @@
         if (!spec && !field) spec = liveSpec2D();
         if (!spec && !field) {
             Plotly.purge(div);
-            div.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📈</div><h3>Nothing to plot yet</h3><p>${state.liveSpec && state.liveSpec.vars.length > 1 ? 'This expression has several variables – see the 3D tab.' : 'Enter a function of one variable or run a computation.'}</p></div>`;
+            div.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${icon('chart', 34)}</div><h3>Nothing to plot yet</h3><p>${state.liveSpec && state.liveSpec.vars.length > 1 ? 'This expression has several variables – see the 3D tab.' : 'Enter a function of one variable or run a computation.'}</p></div>`;
             return;
         }
         if (div.querySelector('.empty-state')) div.innerHTML = '';
@@ -1055,23 +1140,23 @@
         const cmds = [];
         MODE_ORDER.forEach((id, i) => cmds.push({ group: 'Tools', ico: MODES[id].icon, label: `Open ${MODES[id].label}`, hint: `Alt+${i + 1}`, keys: MODE_DESC[id], run: () => { setMode(id); $('functionInput').focus(); } }));
         const acts = [
-            ['Actions', '🚀', 'Compute', 'Ctrl+Enter', 'run calculate solve', compute],
-            ['Actions', '🗑', 'Clear everything', 'Ctrl+Shift+K', 'reset', clearAll],
-            ['Actions', '🌗', 'Toggle dark / light theme', '', 'theme night day', () => { applyTheme(!isDark()); refreshActivePlot(); }],
-            ['Actions', '🔗', 'Copy share link', '', 'url link', shareLink],
-            ['Actions', '📄', 'Export result as Markdown report', '', 'download save report', exportReport],
-            ['Actions', '📷', 'Save current plot as PNG', '', 'image picture download', downloadPlot],
-            ['Actions', '📋', 'Copy result as text', '', 'clipboard', () => state.result && copyText(state.result.text, 'Result copied')],
-            ['Actions', '⌨', 'Show / hide symbol keypad', '', 'symbols keyboard', toggleKeypad],
-            ['Actions', '🕘', 'Clear history', '', 'delete', () => { try { localStorage.removeItem('cs_history'); } catch (e) { /* ignore */ } renderHistory(); }],
-            ['Actions', '?', 'Syntax help & shortcuts', '?', 'documentation', () => $('helpBtn').click()],
-            ['Go to', '📊', 'Results tab', 'Alt+R', '', () => switchTab('results')],
-            ['Go to', '📈', '2D plot tab', 'Alt+P', '', () => switchTab('plot')],
-            ['Go to', '🎮', '3D plot tab', 'Alt+D', '', () => switchTab('plot3d')],
-            ['Go to', '📚', 'Steps tab', 'Alt+S', '', () => switchTab('steps')]
+            ['Actions', 'play', 'Compute', 'Ctrl+Enter', 'run calculate solve', compute],
+            ['Actions', 'trash', 'Clear everything', 'Ctrl+Shift+K', 'reset', clearAll],
+            ['Actions', 'palette', 'Toggle dark / light theme', '', 'theme night day', () => { applyTheme(!isDark()); refreshActivePlot(); }],
+            ['Actions', 'link', 'Copy share link', '', 'url link', shareLink],
+            ['Actions', 'file', 'Export result as Markdown report', '', 'download save report', exportReport],
+            ['Actions', 'camera', 'Save current plot as PNG', '', 'image picture download', downloadPlot],
+            ['Actions', 'copy', 'Copy result as text', '', 'clipboard', () => state.result && copyText(state.result.text, 'Result copied')],
+            ['Actions', 'keyboard', 'Show / hide symbol keypad', '', 'symbols keyboard', toggleKeypad],
+            ['Actions', 'clock', 'Clear history', '', 'delete', () => { try { localStorage.removeItem('cs_history'); } catch (e) { /* ignore */ } renderHistory(); }],
+            ['Actions', 'help', 'Syntax help & shortcuts', '?', 'documentation', () => $('helpBtn').click()],
+            ['Go to', 'grid', 'Results tab', 'Alt+R', '', () => switchTab('results')],
+            ['Go to', 'chart', '2D plot tab', 'Alt+P', '', () => switchTab('plot')],
+            ['Go to', 'cube', '3D plot tab', 'Alt+D', '', () => switchTab('plot3d')],
+            ['Go to', 'list', 'Steps tab', 'Alt+S', '', () => switchTab('steps')]
         ];
         acts.forEach(a => cmds.push({ group: a[0], ico: a[1], label: a[2], hint: a[3], keys: a[4], run: a[5] }));
-        if (deferredInstall) cmds.push({ group: 'Actions', ico: '⬇', label: 'Install as an app', hint: '', keys: 'pwa', run: installApp });
+        if (deferredInstall) cmds.push({ group: 'Actions', ico: 'download', label: 'Install as an app', hint: '', keys: 'pwa', run: installApp });
         MODE_ORDER.forEach(id => MODES[id].examples.forEach((ex, i) => cmds.push({ group: 'Examples', ico: MODES[id].icon, label: `${MODES[id].label}: ${ex.label}`, hint: '', keys: ex.fn, run: () => { setMode(id, true); loadExample(i); } })));
         return cmds;
     }
@@ -1089,7 +1174,7 @@
         let last = '', html = '';
         palItems.forEach((c, i) => {
             if (c.group !== last) { html += `<div class="palette-group">${esc(c.group)}</div>`; last = c.group; }
-            html += `<button class="palette-item ${i === palSel ? 'sel' : ''}" role="option" data-i="${i}"><span class="p-ico">${esc(c.ico)}</span><span>${esc(c.label)}</span><small>${esc(c.hint || '')}</small></button>`;
+            html += `<button class="palette-item ${i === palSel ? 'sel' : ''}" role="option" data-i="${i}"><span class="p-ico">${ICON[c.ico] ? icon(c.ico, 16) : esc(c.ico)}</span><span>${esc(c.label)}</span><small>${esc(c.hint || '')}</small></button>`;
         });
         $('paletteList').innerHTML = html || '<div class="empty-state" style="padding:30px">No matches</div>';
         $('paletteList').querySelectorAll('.palette-item').forEach(b => { b.addEventListener('click', () => runPalette(+b.dataset.i)); b.addEventListener('mousemove', () => { palSel = +b.dataset.i; markPalette(); }); });
@@ -1113,8 +1198,8 @@
                 spec = { vars: info.vars.slice(0, 3), fn: engine.compile(info.node, info.vars), live: true };
             }
         }
-        const msg = (icon, title, text) => { Plotly.purge(div); div.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${icon}</div><h3>${title}</h3><p>${text}</p></div>`; };
-        if (!spec) return msg('🎮', 'No surface to show', 'Enter a function of two variables, e.g. <code>sin(x)*cos(y)</code>, or use the Multivariable mode.');
+        const msg = (ic, title, text) => { Plotly.purge(div); div.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${icon(ic, 34)}</div><h3>${title}</h3><p>${text}</p></div>`; };
+        if (!spec) return msg('cube', 'No surface to show', 'Enter a function of two variables, e.g. <code>sin(x)*cos(y)</code>, or use the Multivariable mode.');
         if (div.querySelector('.empty-state')) div.innerHTML = '';
         const th = plotTheme();
         const sceneBase = {
@@ -1158,7 +1243,7 @@
             }
             zv.push(row);
         }
-        if (valid < 25) return msg('⚠', 'Cannot draw this surface', 'The function is undefined on almost the whole domain.');
+        if (valid < 25) return msg('alert', 'Cannot draw this surface', 'The function is undefined on almost the whole domain.');
         const flat = [].concat(...zv).filter(z => z !== null).sort((a, b) => a - b);
         const zlo = flat[0], zhi = flat[flat.length - 1];
         const scale = isDark() ? [[0, '#1d4ed8'], [0.5, '#a855f7'], [1, '#f472b6']] : [[0, '#0f172a'], [0.5, '#2563eb'], [1, '#60a5fa']];
@@ -1213,7 +1298,12 @@
             <h2>Calculus, <span>beautifully</span><br>solved &amp; explained.</h2>
             <p>Sixteen tools, one workspace. Every result comes with the reasoning behind it, live 2D/3D plots, and exact answers wherever they exist. Pick a tile to start – or press <kbd>Ctrl</kbd> <kbd>K</kbd>.</p>
             <div class="tiles">${FEATURED.map((f, i) => `<button class="tile" type="button" data-i="${i}"><span class="t-ico">${esc(f[2])}</span><b>${esc(f[3])}</b><code>${esc(f[4])}</code></button>`).join('')}</div>
-            <div class="chips"><span class="chip">✓ Verified antiderivatives</span><span class="chip">⚡ Background worker</span><span class="chip">📴 Works offline</span><span class="chip">🔗 Shareable links</span><span class="chip">🧮 LaTeX output</span><span class="chip">🌗 Dark mode</span></div>
+            <div class="tips">
+                <div class="tip">${icon('command', 20)}<div><b>Command palette</b>Press <kbd>Ctrl</kbd> <kbd>K</kbd> to jump to any tool, example or action.</div></div>
+                <div class="tip">${icon('sliders', 20)}<div><b>Live sliders</b>In <em>Graph &amp; sliders</em> every extra letter becomes a draggable, animatable parameter.</div></div>
+                <div class="tip">${icon('shield', 20)}<div><b>Verified results</b>Antiderivatives and derivatives are cross-checked independently before you see them.</div></div>
+                <div class="tip">${icon('link', 20)}<div><b>Share anything</b>One click copies a link that reproduces the whole calculation.</div></div>
+            </div>
         </div>`;
     }
     function showWelcome() {
@@ -1222,7 +1312,7 @@
         el.querySelectorAll('.tile').forEach(t => t.addEventListener('click', () => { const f = FEATURED[+t.dataset.i]; setMode(f[0], true); loadExample(f[1]); }));
         const st = $('steps');
         st.classList.remove('show-timeline');
-        st.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📖</div><h3>Step-by-step reasoning</h3><p>Run a computation and every step of the solution appears here.</p></div>';
+        st.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${icon('list', 34)}</div><h3>Step-by-step reasoning</h3><p>Run a computation and every step of the solution appears here.</p></div>`;
     }
 
     function clearAll() {
@@ -1340,7 +1430,17 @@
             $('functionInput').value = 'x^2 * sin(x)';
             validateInput();
         }
-        Runner.warmUp();
+        hydrateIcons();
+        moveIndicator();
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(moveIndicator);
+        window.addEventListener('resize', moveIndicator);
+        Runner.warmUp().then(ok => {
+            $('engineDot').classList.add('on');
+            $('engineStatus').textContent = ok ? 'Engine ready · background worker' : 'Engine ready · main thread';
+        });
+        if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+            navigator.serviceWorker.ready.then(() => { $('offlineStatus').innerHTML = icon('wifi', 14) + ' Ready to work offline'; hydrateIcons(); }).catch(() => {});
+        } else $('offlineStatus').textContent = 'Offline install needs http(s)';
         if (restored) compute(); else showWelcome();
         $('app').classList.add('ready');
     }
