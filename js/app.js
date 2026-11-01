@@ -268,16 +268,69 @@
         ]
     };
 
+
+    MODES.calc = {
+        label: 'Calculator', icon: '=',
+        input: () => ({ label: 'Expressions  (one per line)', placeholder: 'e.g.  a = 3\nb = a^2 + 1\nsin(30 deg) * b', hint: 'A scientific calculator with variables, ans, exact fractions, π-recognition and integer facts.' }),
+        fields: [],
+        examples: [
+            { label: 'Powers and roots', fn: '2^10 + sqrt(2)', opts: {} },
+            { label: 'Variables across lines', fn: 'a = 3\nb = a^2 + 1\nsin(30 deg) * b', opts: {} },
+            { label: 'Exact fractions: 1/3 + 1/6', fn: '1/3 + 1/6', opts: {} },
+            { label: 'Prime factorisation of 360', fn: '360', opts: {} },
+            { label: 'Complex numbers: sqrt(-4)', fn: 'sqrt(-4)', opts: {} },
+            { label: 'Combinatorics: C(52,5)', fn: 'combinations(52, 5)', opts: {} }
+        ]
+    };
+    MODES.solve = {
+        label: 'Equation solver', icon: 'x=',
+        input: () => ({ label: 'Equation or inequality', placeholder: 'e.g. x^2 - 5x + 6 = 0     or     (x-1)/(x+2) >= 0', hint: 'Polynomials give every root (real and complex); other equations are solved numerically. Use <, >, ≤, ≥ for inequalities.' }),
+        fields: [
+            { key: 'min', label: 'Search from x =', type: 'text', def: '-50' },
+            { key: 'max', label: 'to x =', type: 'text', def: '50' }
+        ],
+        examples: [
+            { label: 'Quadratic: x² − 5x + 6 = 0', fn: 'x^2 - 5x + 6 = 0', opts: { min: '-50', max: '50' } },
+            { label: 'Complex roots: x² + 1 = 0', fn: 'x^2 + 1 = 0', opts: { min: '-50', max: '50' } },
+            { label: 'Cubic: x³ − 2x = 0', fn: 'x^3 - 2x = 0', opts: { min: '-50', max: '50' } },
+            { label: 'Transcendental: cos x = x', fn: 'cos(x) = x', opts: { min: '-5', max: '5' } },
+            { label: 'Trig: sin x = 0.5 on [0, 7]', fn: 'sin(x) = 0.5', opts: { min: '0', max: '7' } },
+            { label: 'e^x = 2x + 5', fn: 'e^x = 2*x + 5', opts: { min: '-5', max: '5' } },
+            { label: 'Inequality: x² < 4', fn: 'x^2 < 4', opts: { min: '-50', max: '50' } },
+            { label: 'Rational inequality', fn: '(x-1)/(x+2) >= 0', opts: { min: '-50', max: '50' } },
+            { label: 'Cubic inequality', fn: 'x^3 - x <= 0', opts: { min: '-50', max: '50' } }
+        ]
+    };
+    MODES.sums = {
+        label: 'Sums & series', icon: 'Σk',
+        input: () => ({ label: 'Term  tₖ  (variable k or n)', placeholder: 'e.g. 1/k^2', hint: 'Finite sums are exact when possible. Infinite series are tested for convergence (nth-term, ratio, p-series, alternating) and summed accurately.' }),
+        fields: [
+            { key: 'lower', label: 'Start index', type: 'text', def: '1' },
+            { key: 'upper', label: 'End index (inf = infinite)', type: 'text', def: 'inf' }
+        ],
+        examples: [
+            { label: 'Basel problem: Σ 1/k²', fn: '1/k^2', opts: { lower: '1', upper: 'inf' } },
+            { label: 'Geometric: Σ (1/2)^k', fn: '1/2^k', opts: { lower: '0', upper: 'inf' } },
+            { label: 'Alternating harmonic', fn: '(-1)^k/k', opts: { lower: '1', upper: 'inf' } },
+            { label: 'Harmonic series (diverges)', fn: '1/k', opts: { lower: '1', upper: 'inf' } },
+            { label: 'Telescoping: Σ 1/(k(k+1))', fn: '1/(k*(k+1))', opts: { lower: '1', upper: 'inf' } },
+            { label: 'Σ 1/k! = e', fn: '1/factorial(k)', opts: { lower: '0', upper: 'inf' } },
+            { label: 'Finite: Σ k² from 1 to 100', fn: 'k^2', opts: { lower: '1', upper: '100' } },
+            { label: 'Ratio test: Σ k/2^k', fn: 'k/2^k', opts: { lower: '1', upper: 'inf' } }
+        ]
+    };
+
     const MODE_GROUPS = [
         ['Core calculus', ['derivative', 'integral', 'limit', 'series', 'analysis']],
         ['Explore & visualise', ['graph', 'riemann', 'applications', 'root', 'fourier']],
+        ['Algebra & sums', ['calc', 'solve', 'sums']],
         ['Advanced', ['ode', 'multivariable', 'matrix']]
     ];
     const MODE_ORDER = MODE_GROUPS.flatMap(g => g[1]);
     const MODE_DESC = {
         derivative: 'Rules, steps, tangent', integral: 'Symbolic, definite, improper', limit: 'Two-sided & at ∞', series: 'Taylor / Maclaurin', analysis: 'Roots, extrema, asymptotes',
         graph: 'Sliders & intersections', riemann: 'Left, mid, trap, Simpson', applications: 'Area, volume, arc length', root: 'Newton, bisection, secant', fourier: 'Coefficients & Gibbs',
-        ode: 'Closed form + RK45', multivariable: '∇, Hessian, ∬, curl', matrix: 'det, inverse, eigen'
+        calc: 'Variables, exact, ans', solve: 'Equations & inequalities', sums: 'Convergence tests', ode: 'Closed form + RK45', multivariable: '∇, Hessian, ∬, curl', matrix: 'det, inverse, eigen'
     };
 
     const TEMPLATES = [
@@ -463,6 +516,21 @@
             return false;
         }
         try {
+            if (state.mode === 'calc' || state.mode === 'solve') {
+                const lines = state.mode === 'calc' ? src.split(/\n/).map(l => l.trim()).filter(Boolean) : [src];
+                if (state.mode === 'solve') {
+                    const mm = /^(.*?)(<=|>=|≤|≥|<|>|=)(.*)$/s.exec(src);
+                    const sides = mm ? [mm[1], mm[3]] : [src];
+                    const infos2 = sides.map(x => engine.inspect(x));
+                    preview.className = 'preview-box valid';
+                    preview.innerHTML = `<span class="preview-tex">${texSpan(infos2.map(i => i.tex).join(mm ? ({ '<=': '\\le ', '>=': '\\ge ', '≤': '\\le ', '≥': '\\ge ' }[mm[2]] || mm[2]) : ''), src, false)}</span><span class="preview-meta">unknown: ${esc([...new Set(infos2.flatMap(i => i.vars))].join(', ') || '–')}</span>`;
+                    renderTex(preview);
+                    return true;
+                }
+                preview.className = 'preview-box valid';
+                preview.innerHTML = `<span class="preview-tex plain">${esc(lines[0] || '')}</span><span class="preview-meta">${lines.length} line${lines.length === 1 ? '' : 's'}</span>`;
+                return true;
+            }
             if (state.mode === 'matrix') {
                 const m = engine.run.matrix(src, { op: 'transpose' });
                 preview.className = 'preview-box valid';
@@ -545,7 +613,7 @@
     // ------------------------------------------------------------------
     // Result rendering
     // ------------------------------------------------------------------
-    const KIND_ICON = { derivative: '∂', integral: '∫', definite: '∫', series: 'Σ', limit: 'lim', analysis: 'f', ode: 'y′', multivariable: '∇', vector: '∇', graph: '∿', riemann: 'Δx', applications: 'V', root: 'x*', fourier: '∼', matrix: '[ ]' };
+    const KIND_ICON = { derivative: '∂', integral: '∫', definite: '∫', series: 'Σ', limit: 'lim', analysis: 'f', ode: 'y′', multivariable: '∇', vector: '∇', graph: '∿', riemann: 'Δx', applications: 'V', root: 'x*', fourier: '∼', matrix: '[ ]', calc: '=', solve: 'x=', sum: 'Σk' };
 
     function displayResult(r) {
         const rows = r.items.map(i => `
@@ -1135,13 +1203,15 @@
         ['ode', 2, 'y′', 'Logistic growth ODE', 'y*(1-y)'],
         ['fourier', 0, '∼', 'Gibbs phenomenon', 'sign(x)'],
         ['multivariable', 2, '∇', 'Critical points & saddles', 'x^3-3x+y^2'],
-        ['matrix', 2, '[ ]', 'Eigenvalues, exact', '2 1 ; 1 2']
+        ['matrix', 2, '[ ]', 'Eigenvalues, exact', '2 1 ; 1 2'],
+        ['solve', 7, 'x=', 'Inequalities → intervals', '(x-1)/(x+2) >= 0'],
+        ['sums', 0, 'Σk', 'Convergence tests, exact π²/6', '1/k^2']
     ];
 
     function welcomeHTML() {
         return `<div class="welcome">
             <h2>Calculus, <span>beautifully</span><br>solved &amp; explained.</h2>
-            <p>Thirteen tools, one workspace. Every result comes with the reasoning behind it, live 2D/3D plots, and exact answers wherever they exist. Pick a tile to start – or press <kbd>Ctrl</kbd> <kbd>K</kbd>.</p>
+            <p>Sixteen tools, one workspace. Every result comes with the reasoning behind it, live 2D/3D plots, and exact answers wherever they exist. Pick a tile to start – or press <kbd>Ctrl</kbd> <kbd>K</kbd>.</p>
             <div class="tiles">${FEATURED.map((f, i) => `<button class="tile" type="button" data-i="${i}"><span class="t-ico">${esc(f[2])}</span><b>${esc(f[3])}</b><code>${esc(f[4])}</code></button>`).join('')}</div>
             <div class="chips"><span class="chip">✓ Verified antiderivatives</span><span class="chip">⚡ Background worker</span><span class="chip">📴 Works offline</span><span class="chip">🔗 Shareable links</span><span class="chip">🧮 LaTeX output</span><span class="chip">🌗 Dark mode</span></div>
         </div>`;

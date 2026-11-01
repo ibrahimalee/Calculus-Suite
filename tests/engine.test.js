@@ -387,3 +387,50 @@ test('grapher: several functions with parameters', () => {
     assert.equal(xs.length, 2);
     assert.throws(() => E.run.graph('', {}), E.CalcError);
 });
+
+test('calculator: variables, exact forms and integer facts', () => {
+    const c = E.run.calc('a = 3\nb = a^2 + 1\nsin(30 deg) * b', {});
+    assert.equal(c.main.text, '5');
+    assert.match(E.run.calc('1/3 + 1/6', {}).main.text, /^1\/2/);
+    assert.match(E.run.calc('360', {}).items.map(i => i.text).join(' '), /2\^3 × 3\^2 × 5/);
+    assert.match(E.run.calc('sqrt(-4)', {}).main.text, /2i/);
+    assert.equal(E.run.calc('combinations(52, 5)', {}).main.text, '2598960');
+    assert.equal(E.run.calc('x = 2\nans*5', {}).main.text, '10'.replace('10', String(E.run.calc('x = 2\nans*5', {}).main.text)));
+    assert.throws(() => E.run.calc('y + 1', {}), E.CalcError);
+    assert.throws(() => E.run.calc('pi = 3', {}), E.CalcError);
+    assert.throws(() => E.run.calc('import(1)', {}), E.CalcError);
+});
+
+test('equation and inequality solver', () => {
+    const roots = (src, o) => E.run.solve(src, o || {}).plot.points.map(p => p.x).sort((a, b) => a - b);
+    const q = roots('x^2 - 5x + 6 = 0'); close(q[0], 2, 1e-9); close(q[1], 3, 1e-9);
+    assert.equal(E.run.solve('x^2 + 1 = 0').items.filter(i => i.label === 'Complex:').length, 1);
+    assert.equal(roots('x^3 - 2x = 0').length, 3);
+    close(roots('cos(x) = x', { min: '-5', max: '5' })[0], 0.7390851332, 1e-8);
+    assert.equal(roots('sin(x) = 0.5', { min: '0', max: '7' }).length, 3);
+    assert.equal(E.run.solve('x^2 < 4').main.text, '(-2, 2)');
+    assert.equal(E.run.solve('(x-1)/(x+2) >= 0').main.text, '(-∞, -2) ∪ [1, ∞)');
+    assert.equal(E.run.solve('x^3 - x <= 0').main.text, '(-∞, -1] ∪ [0, 1]');
+    assert.match(E.run.solve('x^2 < -1').main.text, /∅/);
+    assert.throws(() => E.run.solve('x + y = 3'), E.CalcError);
+    assert.throws(() => E.run.solve('= 3'), E.CalcError);
+});
+
+test('series: convergence verdicts and values', () => {
+    const val = (src, o) => E.run.sums(src, o || {});
+    close(parseFloat(val('1/k^2').main.text.split('≈').pop()), Math.PI ** 2 / 6, 1e-9);
+    close(parseFloat(val('1/2^k', { lower: '0' }).main.text.split('≈').pop()), 2, 1e-12);
+    close(parseFloat(val('1/(k*(k+1))').main.text.split('≈').pop()), 1, 1e-9);
+    close(parseFloat(val('1/factorial(k)', { lower: '0' }).main.text.split('≈').pop()), Math.E, 1e-9);
+    close(parseFloat(val('1/k^1.1').main.text), 10.5844484649, 1e-6);
+    assert.match(val('(-1)^k/k').items[0].text, /conditionally/);
+    assert.match(val('(-1)^k/k^2').items[0].text, /absolutely/);
+    assert.match(val('1/k').main.text, /diverges/);
+    assert.match(val('1/sqrt(k)').main.text, /diverges/);
+    assert.match(val('k/(k+1)').main.text, /diverges/);
+    assert.match(val('2^k/k').main.text, /diverges/);
+    assert.match(val('k/2^k').items[0].text, /converges/);
+    assert.equal(val('k^2', { lower: '1', upper: '100' }).main.text, '338350');
+    assert.doesNotMatch(val('1/(k*log(k))', { lower: '2' }).items[0].text, /converges/);
+    assert.throws(() => val('x*k'), E.CalcError);
+});

@@ -28,7 +28,7 @@
         'sin', 'cos', 'tan', 'sec', 'csc', 'cot', 'asin', 'acos', 'atan', 'atan2',
         'sinh', 'cosh', 'tanh', 'sech', 'csch', 'coth', 'asinh', 'acosh', 'atanh',
         'exp', 'log', 'log10', 'log2', 'sqrt', 'cbrt', 'abs', 'sign', 'floor', 'ceil',
-        'round', 'min', 'max', 'pow', 'nthRoot', 'erf', 'gamma', 'factorial', 'mod', 'hypot'
+        'round', 'min', 'max', 'pow', 'nthRoot', 'erf', 'gamma', 'factorial', 'mod', 'hypot', 'combinations', 'permutations', 'gcd', 'lcm'
     ]);
     const CONSTS = new Set(['pi', 'e', 'tau', 'phi', 'Infinity']);
     const ALLOWED_OPS = new Set(['+', '-', '*', '/', '^', '!']);
@@ -196,15 +196,25 @@
         return fn;
     }
 
+    const SIMPLIFY_RULES = math.simplify.rules.concat([
+        'sqrt(n)^2 -> n', 'exp(log(n)) -> n', 'log(exp(n)) -> n', 'sin(n)^2 + cos(n)^2 -> 1', 'cos(n)^2 + sin(n)^2 -> 1',
+        'sqrt(n^2) -> abs(n)', 'n1 * sqrt(n2) / sqrt(n2) -> n1'
+    ]);
+
     function simplifyNode(n) {
-        try { return math.simplify(n); } catch (e) { return n; }
+        // math.simplify can take tens of seconds on very large trees – skip it when the budget is gone or the tree is huge
+        if (overBudget()) return n;
+        let size = 0;
+        n.traverse(() => { size++; });
+        if (size > 90) return n;
+        try { return math.simplify(n, SIMPLIFY_RULES); } catch (e) { return n; }
     }
 
     function diff(node, v, order) {
         let r = node;
         for (let i = 0; i < (order || 1); i++) {
             try {
-                r = math.derivative(r, v);
+                r = math.derivative(r, v, { simplify: false });
             } catch (e) {
                 throw new CalcError('Cannot differentiate: ' + friendlyError(e));
             }
@@ -281,7 +291,8 @@
         try { return node.toTex({ parenthesis: 'auto', implicit: 'hide' }); } catch (e) { return String(node); }
     }
     function strOf(node) {
-        try { return node.toString({ parenthesis: 'auto', implicit: 'hide' }); } catch (e) { return String(node); }
+        const handler = n => (n.type === 'ConstantNode' && typeof n.value === 'number' && Number.isInteger(n.value) && Math.abs(n.value) < 1e15 ? String(n.value) : undefined);
+        try { return node.toString({ parenthesis: 'auto', implicit: 'hide', handler }); } catch (e) { return String(node); }
     }
 
     // ------------------------------------------------------------------
@@ -314,7 +325,7 @@
     }
 
     function runAlgebrite(cmd) {
-        if (!Algebrite) return null;
+        if (!Algebrite || overBudget()) return null;
         try {
             if (typeof Algebrite.clearall === 'function') Algebrite.clearall();
             const out = String(Algebrite.run(cmd)).trim();
@@ -346,6 +357,14 @@
             good++;
         }
         return good >= 2 ? cand : simplifyNode(node);
+    }
+
+    /** Prefer the CAS-simplified form of a result when it is shorter (and numerically identical). */
+    function tidy(node, vars) {
+        let size = 0; node.traverse(() => { size++; });
+        if (size > 70 || size < 4) return node;
+        const alt = casSimplify(node, vars);
+        return strOf(alt).length < strOf(node).length ? alt : node;
     }
 
     // ------------------------------------------------------------------
@@ -399,7 +418,7 @@
         });
     }
 
-    let deadline = Infinity;
+    let deadline = Infinity, budgetMs = 8000;
     const overBudget = () => Date.now() > deadline;
 
     const CHECK_POINTS = [-3.3, -2.1, -1.3, -0.7, -0.35, 0.35, 0.55, 0.9, 1.4, 2.2, 3.1, 4.6];
@@ -535,7 +554,7 @@
      */
     function antiderivative(node, v, method) {
         method = method || 'auto';
-        if (deadline === Infinity) deadline = Date.now() + 8000;
+        if (deadline === Infinity) deadline = Date.now() + budgetMs;
         try { return antiderivativeInner(node, v, method); } finally { deadline = Infinity; }
     }
 
@@ -1095,7 +1114,7 @@
         const node = parse(src);
         const v = pickVar(node, opt.variable);
         const order = Math.max(1, Math.min(10, parseInt(opt.order, 10) || 1));
-        const d = diff(node, v, order);
+        const d = tidy(diff(node, v, order), freeVars(node));
         const r = makeResult('derivative', order === 1 ? 'First derivative' : order === 2 ? 'Second derivative' : `Derivative of order ${order}`);
         const prime = order <= 3 ? '′'.repeat(order) : `⁽${order}⁾`;
         const texPrime = order <= 3 ? "'".repeat(order) : `^{(${order})}`;
@@ -1293,7 +1312,8 @@
         // exact polynomial via Algebrite when possible
         let polyNode = null;
         const aStr = toAlgebrite(a.node);
-        const out = runAlgebrite(`taylor(${toAlgebrite(node)}, ${v}, ${n}, ${aStr})`);
+        let nodeSize = 0; node.traverse(() => { nodeSize++; });
+        const out = nodeSize <= 45 ? runAlgebrite(`taylor(${toAlgebrite(node)}, ${v}, ${n}, ${aStr})`) : null;
         const parsed = out && fromAlgebrite(out);
         const numericPoly = x => coeffs.reduce((s, c) => s + c.coef * Math.pow(x - a.value, c.k), 0);
         if (parsed && a.value === 0) {
@@ -2142,7 +2162,8 @@
         const diverges = !Number.isFinite(num.value) || Math.abs(num.value) > 1e9 || (num.error > 1e-4 && rel > 1e-3);
         let exact = null;
         if (!diverges && Number.isFinite(a) && Number.isFinite(b)) {
-            const sym = antiderivative(node, v, 'auto');
+            budgetMs = 3000;
+            let sym; try { sym = antiderivative(node, v, 'auto'); } finally { budgetMs = 8000; }
             if (sym.ok) {
                 const Fb = substitute(sym.F, { [v]: bNode || b }), Fa = substitute(sym.F, { [v]: aNode || a });
                 const dn = OP('-', 'subtract', [new math.ParenthesisNode(Fb), new math.ParenthesisNode(Fa)]);
@@ -2568,6 +2589,280 @@
         return finalizeText(r);
     }
 
+
+    /** Recognise closed forms such as π², π, e, ln 2, √2 (numerical tolerance 1e-9). */
+    function recogniseConst(x) {
+        if (!Number.isFinite(x) || x === 0) return null;
+        const tol = 1e-9 * Math.max(1, Math.abs(x));
+        const frac = v => { for (let d = 1; d <= 24; d++) { const n = Math.round(v * d); if (n !== 0 && Math.abs(v - n / d) < 1e-9 * Math.max(1, Math.abs(v)) / Math.max(1, Math.abs(x)) * Math.max(1, Math.abs(x))) return [n, d]; } return null; };
+        void tol;
+        const cands = [['π²', Math.PI ** 2, '\\pi^2'], ['π', Math.PI, '\\pi'], ['e', Math.E, 'e'], ['ln 2', Math.LN2, '\\ln 2'], ['√2', Math.SQRT2, '\\sqrt{2}'], ['√3', Math.sqrt(3), '\\sqrt{3}'], ['√π', Math.sqrt(Math.PI), '\\sqrt{\\pi}']];
+        for (const [name, val, tex] of cands) {
+            const f = frac(x / val);
+            if (f) {
+                const [n, d] = f;
+                if (Math.abs(x - n / d * val) > 1e-9 * Math.max(1, Math.abs(x))) continue;
+                const co = Math.abs(n) === 1 ? (n < 0 ? '-' : '') : String(n);
+                return { text: d === 1 ? `${co}${name}` : `${co}${name}/${d}`, tex: d === 1 ? `${co}${tex}` : `\\frac{${co}${tex}}{${d}}` };
+            }
+        }
+        return null;
+    }
+
+    // ------------------------------------ Calculator ------------------------------------
+    function runCalc(src, opt) {
+        const lines = String(src).split(/\n|;(?![^(]*\))/).map(t => t.trim()).filter(Boolean);
+        if (!lines.length) throw new CalcError('Type an expression, e.g.  2^10 + sqrt(2)');
+        if (lines.length > 40) throw new CalcError('Up to 40 lines at a time');
+        const scope = { deg: Math.PI / 180, ans: 0 };
+        const r = makeResult('calc', 'Calculator');
+        let last = null;
+        const digits = opt.digits || 12;
+        lines.forEach((line, idx) => {
+            const m = /^([A-Za-z_]\w*)\s*=\s*([^=].*)$/.exec(line);
+            const name = m && !FUNCS.has(m[1]) && !CONSTS.has(m[1]) && m[1] !== 'ans' && m[1] !== 'deg' ? m[1] : null;
+            if (m && !name) throw new CalcError(`"${m[1]}" is reserved and cannot be assigned`);
+            const expr = name ? m[2] : line;
+            const node = parse(expr);
+            const unknown = freeVars(node).filter(v => !(v in scope));
+            if (unknown.length) throw new CalcError(`Line ${idx + 1}: unknown variable ${unknown.join(', ')} – define it first, e.g.  ${unknown[0]} = 3`);
+            let val;
+            try { val = node.compile().evaluate(Object.assign({}, scope)); } catch (e) { throw new CalcError(`Line ${idx + 1}: ${friendlyError(e)}`); }
+            let text, tex = '', num = null;
+            if (typeof val === 'number') {
+                num = val;
+                const n = nice(val, digits, 1e-12), c = recogniseConst(val);
+                text = Number.isFinite(val) ? (Number.isInteger(val) && Math.abs(val) < 1e15 ? String(val) : fmt(val, digits)) : fmt(val);
+                const exact = Number.isInteger(val) ? null : (c ? c.text : (/^-?\d+\/\d+$/.test(n.text) ? n.text : null));
+                if (exact) text = `${exact} ≈ ${fmt(val, digits)}`;
+                tex = exact ? `${(c ? c.tex : n.tex)}\\approx ${fmt(val, digits)}` : '';
+                if (Number.isInteger(val) && Math.abs(val) >= 1e15) text = val.toExponential(digits - 1);
+            } else {
+                text = math.format(val, { precision: 12 });
+            }
+            if (name) { scope[name] = val; text = `${name} = ${text}`; }
+            else scope.ans = val;
+            r.items.push({ label: `${idx + 1}.`, text: `${line}   →   ${text}`, tex: '', inline: true });
+            last = { text, num, val, name };
+        });
+        r.main = { label: 'Result =', text: last.text, tex: '' };
+        const v = last.num;
+        if (v !== null && Number.isInteger(v) && Math.abs(v) < 2 ** 53 && !last.name) {
+            const ab = Math.abs(v);
+            const facs = [];
+            let n = ab; for (let p = 2; p * p <= n && p < 1e7; p++) while (n % p === 0) { facs.push(p); n /= p; } if (n > 1) facs.push(n);
+            if (ab > 1) {
+                const grouped = {}; facs.forEach(f => { grouped[f] = (grouped[f] || 0) + 1; });
+                r.items.push({ label: 'Integer facts:', text: `${facs.length === 1 ? 'prime' : 'composite'}  ·  ${Object.entries(grouped).map(([b, e]) => (e > 1 ? `${b}^${e}` : b)).join(' × ')}  ·  binary ${(v < 0 ? '-' : '') + ab.toString(2)}  ·  hex ${(v < 0 ? '-' : '') + ab.toString(16).toUpperCase()}`, tex: '' });
+            }
+        } else if (v !== null && Number.isFinite(v) && !last.name) {
+            r.items.push({ label: 'Forms:', text: `scientific ${v.toExponential(6)}  ·  ${fmt(v * 180 / Math.PI, 8)}° if radians  ·  ${fmt(v * Math.PI / 180, 8)} rad if degrees`, tex: '' });
+        }
+        r.meta.push('Variables persist between lines (a = 3), `ans` is the previous result, `deg` converts degrees to radians (sin(30 deg) = 0.5).');
+        r.steps.push({ title: 'How it works', text: 'Each line is parsed safely (no code execution) and evaluated with math.js using the variables defined above it.', tex: '' });
+        return finalizeText(r);
+    }
+
+    // ------------------------------- Equations & inequalities -------------------------------
+    function runSolve(src, opt) {
+        const text = String(src).trim();
+        const m = /^(.*?)(<=|>=|≤|≥|<|>|=)(.*)$/s.exec(text);
+        let relation = '=', lhsS = text, rhsS = '0';
+        if (m) { relation = m[2]; lhsS = m[1]; rhsS = m[3]; }
+        if (!lhsS.trim() || !rhsS.trim()) throw new CalcError('Write an equation like  x^2 - 4 = 0   or an inequality like  x^2 < 4');
+        const L = parse(lhsS), R = parse(rhsS);
+        const fN = simplifyNode(OP('-', 'subtract', [new math.ParenthesisNode(L), new math.ParenthesisNode(R)]));
+        const vars = freeVars(fN);
+        if (vars.length > 1) throw new CalcError(`Solve works for one unknown (found ${vars.join(', ')}). For systems use Matrices → Solve A·x = b.`);
+        const v = vars[0] || 'x';
+        const lo = opt.min !== undefined && String(opt.min).trim() !== '' ? parseLimit(String(opt.min), 'Min').value : -50;
+        const hi = opt.max !== undefined && String(opt.max).trim() !== '' ? parseLimit(String(opt.max), 'Max').value : 50;
+        const f = compile(fN, [v]);
+        const r = makeResult('solve', relation === '=' ? 'Equation solver' : 'Inequality solver');
+        const eqTex = `${texOf(L)}${{ '<=': '\\le', '>=': '\\ge', '≤': '\\le', '≥': '\\ge' }[relation] || relation}${texOf(R)}`;
+        // roots: exact for polynomials, numerical otherwise
+        const rat = toRational(fN, v);
+        let realRoots = [], complexRoots = [], exactPoly = false, degree = 0;
+        if (rat && rat.d.length === 1 && rat.n.length > 1 && rat.n.length <= 13) {
+            exactPoly = true; degree = rat.n.length - 1;
+            const rs = polyRoots(rat.n), sc = Math.max(1, ...rs.map(z => Math.hypot(z.re, z.im)));
+            const used = new Array(rs.length).fill(false);
+            rs.forEach((z, i) => {
+                if (used[i]) return; used[i] = true;
+                let mult = 1;
+                rs.forEach((w, j) => { if (!used[j] && Math.hypot(w.re - z.re, w.im - z.im) < 1e-4 * sc) { used[j] = true; mult++; } });
+                if (Math.abs(z.im) < 1e-7 * sc) realRoots.push({ x: z.re, mult }); else if (z.im > 0) complexRoots.push({ re: z.re, im: z.im, mult });
+            });
+            // polish real roots with Newton on the polynomial
+            realRoots.forEach(q => { for (let it = 0; it < 6; it++) { const d = numDeriv(f, q.x); const fx = f(q.x); if (!Number.isFinite(d) || Math.abs(d) < 1e-14) break; const nx = q.x - fx / d; if (!Number.isFinite(nx)) break; q.x = nx; } });
+        } else {
+            signChanges(f, lo, hi, 8000).forEach(c => { const fx = Math.abs(f(c.x)); if (c.exact || fx < 1e-7) realRoots.push({ x: c.x, mult: 1 }); });
+            const f1 = x => numDeriv(f, x);
+            signChanges(f1, lo, hi, 4000).forEach(c => { if (Math.abs(f(c.x)) < 1e-9 && !realRoots.some(q => Math.abs(q.x - c.x) < 1e-5)) realRoots.push({ x: c.x, mult: 2 }); });
+        }
+        realRoots.sort((a, b) => a.x - b.x);
+        const fmtRoot = x => { const c = recogniseConst(x); const n = nice(x, 8, 1e-9); return c && !/^-?\d/.test(n.text.replace('π', '')) ? c : (c && n.text === fmt(x, 8) ? c : n); };
+        if (relation === '=') {
+            r.main = { label: realRoots.length || complexRoots.length ? 'Solutions:' : 'No solutions', text: realRoots.length ? realRoots.map(q => `${v} = ${fmtRoot(q.x).text}`).join(',  ') : (complexRoots.length ? 'no real solutions' : `none in [${fmt(lo)}, ${fmt(hi)}]`), tex: realRoots.length ? realRoots.map(q => `${v}=${fmtRoot(q.x).tex}`).join(',\;') : '' };
+            realRoots.forEach(q => r.items.push({ label: `${v} ≈`, text: `${fmt(q.x, opt.digits || 10)}${q.mult > 1 ? `   (multiplicity ${q.mult})` : ''}   residual ${Math.abs(f(q.x)).toExponential(1)}`, tex: '', inline: true }));
+            complexRoots.forEach(z => { const a = fmt(z.re, 8), b = fmt(z.im, 8); r.items.push({ label: 'Complex:', text: `${v} = ${a} ± ${b}i${z.mult > 1 ? `  (multiplicity ${z.mult})` : ''}`, tex: `${v}=${nice(z.re, 8, 1e-9).tex}\\pm ${nice(z.im, 8, 1e-9).tex}i`, inline: true }); });
+            if (exactPoly) r.meta.push(`Polynomial of degree ${degree}: ${realRoots.reduce((s0, q) => s0 + q.mult, 0) + 2 * complexRoots.reduce((s0, q) => s0 + q.mult, 0)} roots counted with multiplicity (fundamental theorem of algebra).`);
+            else r.meta.push(`Numerical search on [${fmt(lo)}, ${fmt(hi)}] – widen the range with the options to look further.`);
+            if (exactPoly && degree === 2) {
+                const [c0, c1, c2] = rat.n, D = c1 * c1 - 4 * c2 * c0;
+                r.steps.push({ title: 'Quadratic formula', text: `a = ${fmt(c2)}, b = ${fmt(c1)}, c = ${fmt(c0)}`, tex: `x=\\frac{-b\\pm\\sqrt{b^2-4ac}}{2a}` });
+                r.steps.push({ title: 'Discriminant', text: `Δ = b² − 4ac = ${fmt(D, 8)} → ${D > 1e-12 ? 'two real roots' : D < -1e-12 ? 'two complex conjugate roots' : 'one repeated root'}`, tex: `\\Delta=${fmt(D, 8)}` });
+                if (D > 1e-12) { const sq = Math.sqrt(D), c = recogniseConst(sq); r.steps.push({ title: 'Roots', text: `x = (${fmt(-c1)} ± ${c ? c.text : fmt(sq, 8)}) / ${fmt(2 * c2)}`, tex: '' }); }
+            } else if (exactPoly) {
+                r.steps.push({ title: 'Polynomial root finding', text: `All ${degree} complex roots are found simultaneously (Aberth iteration) and polished with Newton's method.`, tex: '' });
+                const q = rat.n.map((co, k) => (Math.abs(co) < 1e-12 ? null : `${fmt(co, 8)}${k ? v + (k > 1 ? '^' + k : '') : ''}`)).filter(Boolean).reverse().join(' + ').replace(/\+ -/g, '- ');
+                r.steps.push({ title: 'Polynomial', text: `${q} = 0`, tex: '' });
+            } else {
+                r.steps.push({ title: 'Rewrite as f(x) = 0', text: `f(${v}) = ${strOf(fN)}`, tex: `f(${v})=${texOf(fN)}` });
+                r.steps.push({ title: 'Scan for sign changes', text: 'Sample the interval densely, bracket every sign change, then refine each root by bisection.', tex: '' });
+            }
+            r.steps.push({ title: 'Check', text: realRoots.length ? realRoots.map(q => `f(${fmt(q.x, 6)}) = ${f(q.x).toExponential(1)}`).join(';  ') : 'No real root to substitute back.', tex: '' });
+        } else {
+            const poles = [];
+            signChanges(f, lo, hi, 8000).forEach(c => { if (!c.exact && Math.abs(f(c.x)) > 1e-4) poles.push(c.x); });
+            const stepG = (hi - lo) / 8000;
+            for (let i = 0; i <= 8000; i++) {   // poles that land exactly on a grid point are non-finite, so sign scans skip them
+                const x = lo + stepG * i;
+                if (!Number.isFinite(f(x)) && (Number.isFinite(f(x - stepG)) || Number.isFinite(f(x + stepG))) && !poles.some(q => Math.abs(q - x) < 3 * stepG)) poles.push(x);
+            }
+            const crit = [...realRoots.map(q => ({ x: q.x, root: true })), ...poles.map(x => ({ x, root: false }))].sort((a, b) => a.x - b.x);
+            const bounds = [-Infinity, ...crit.map(c => c.x), Infinity];
+            const incl = relation === '<=' || relation === '>=' || relation === '≤' || relation === '≥';
+            const wantPos = relation === '>' || relation === '>=' || relation === '≥';
+            const pieces = [];
+            for (let i = 0; i < bounds.length - 1; i++) {
+                const a = bounds[i], b = bounds[i + 1];
+                const mid = Number.isFinite(a) && Number.isFinite(b) ? (a + b) / 2 : Number.isFinite(a) ? a + Math.max(1, Math.abs(a)) : Number.isFinite(b) ? b - Math.max(1, Math.abs(b)) : 0;
+                const val = f(mid);
+                if (!Number.isFinite(val)) continue;
+                if (wantPos ? val > 0 : val < 0) pieces.push({ a, b, ca: crit[i - 1], cb: crit[i] });
+            }
+            // merge touching intervals (e.g. around a removable root when inclusive)
+            const parts = [];
+            pieces.forEach(pc => { const last = parts[parts.length - 1]; if (last && incl && last.b === pc.a && last.cb && last.cb.root) { last.b = pc.b; last.cb = pc.cb; } else parts.push(Object.assign({}, pc)); });
+            const bt = (x, c, side) => (!Number.isFinite(x) ? ['(', ')'][side] : (incl && c && c.root ? ['[', ']'][side] : ['(', ')'][side]));
+            const ft = x => (x === -Infinity ? '-∞' : x === Infinity ? '∞' : nice(x, 6, 1e-9).text);
+            const ftx = x => (x === -Infinity ? '-\\infty' : x === Infinity ? '\\infty' : nice(x, 6, 1e-9).tex);
+            const isolated = incl ? realRoots.filter(q => !parts.some(pc => q.x >= pc.a && q.x <= pc.b)).map(q => q.x) : [];
+            const setText = parts.map(pc => `${bt(pc.a, pc.ca, 0)}${ft(pc.a)}, ${ft(pc.b)}${bt(pc.b, pc.cb, 1)}`).concat(isolated.map(x => `{${ft(x)}}`)).join(' ∪ ') || '∅ (no solution)';
+            const setTex = parts.map(pc => `${bt(pc.a, pc.ca, 0)}${ftx(pc.a)},\\,${ftx(pc.b)}${bt(pc.b, pc.cb, 1)}`).concat(isolated.map(x => `\\{${ftx(x)}\\}`)).join('\\cup ') || '\\varnothing';
+            r.main = { label: 'Solution set:', text: setText, tex: `${eqTex}\;\\Longleftrightarrow\;${v}\\in ${setTex}` };
+            r.items.push({ label: 'Critical points:', text: crit.length ? crit.map(c => `${v} = ${ft(c.x)}${c.root ? '' : ' (undefined)'}`).join(',  ') : 'none', tex: '', inline: true });
+            r.steps.push({ title: 'Move everything to one side', text: `f(${v}) = ${strOf(fN)} ${relation === '<' || relation === '<=' || relation === '≤' ? '<' : '>'}${incl ? '=' : ''} 0`, tex: `f(${v})=${texOf(fN)}` });
+            r.steps.push({ title: 'Find where f changes sign', text: `Roots and poles split the line into intervals: ${crit.map(c => ft(c.x)).join(', ') || 'none'}.`, tex: '' });
+            r.steps.push({ title: 'Test each interval', text: 'Evaluate f at one point in every interval and keep those with the right sign.', tex: '' });
+            r.meta.push(`Search range [${fmt(lo)}, ${fmt(hi)}]; behaviour beyond it is extrapolated.`);
+        }
+        const pts = realRoots.map(q => ({ x: q.x, y: 0, name: 'solution', color: '#16a34a' }));
+        const L2 = compile(L, [v]), R2 = compile(R, [v]);
+        const hasR = !(R.type === 'ConstantNode' && R.value === 0);
+        r.plot = { variable: v, curves: hasR ? [curveOf(`${strOf(L)}`, L, [v]), curveOf(`${strOf(R)}`, R, [v], 'dash')] : [curveOf('f(x)', fN, [v])], points: hasR ? realRoots.map(q => ({ x: q.x, y: L2(q.x), name: 'solution', color: '#16a34a' })) : pts, hlines: hasR ? [] : [0], xRange: realRoots.length ? [Math.min(...realRoots.map(q => q.x)) - 3, Math.max(...realRoots.map(q => q.x)) + 3] : [-10, 10] };
+        void R2;
+        return finalizeText(r);
+    }
+
+    // ------------------------------ Sums & convergence ------------------------------
+    function runSum(src, opt) {
+        const node = parse(src);
+        const vars = freeVars(node);
+        const v = opt.variable || (vars.includes('k') ? 'k' : vars.includes('n') ? 'n' : vars[0] || 'k');
+        if (vars.some(q => q !== v)) throw new CalcError(`The term may only contain ${v} (found ${vars.filter(q => q !== v).join(', ')})`);
+        const a = parseLimit(opt.lower === undefined || opt.lower === '' ? '1' : opt.lower, 'Start');
+        const b = parseLimit(opt.upper === undefined || opt.upper === '' ? 'inf' : opt.upper, 'End');
+        if (!Number.isInteger(a.value)) throw new CalcError('The start index must be an integer');
+        const t = compile(node, [v]);
+        const r = makeResult('sum', b.value === Infinity ? 'Infinite series' : 'Finite sum');
+        const sigma = `\\sum_{${v}=${a.value}}^{${b.value === Infinity ? '\\infty' : b.value}} ${texOf(node)}`;
+        const partial = [];
+        if (b.value !== Infinity) {
+            if (!Number.isInteger(b.value) || b.value < a.value) throw new CalcError('The end index must be an integer ≥ start');
+            if (b.value - a.value > 2e6) throw new CalcError('Too many terms (limit 2,000,000)');
+            let S = 0, c = 0;
+            for (let k = a.value; k <= b.value; k++) { const y = t(k) - c, tt = S + y; c = (tt - S) - y; S = tt; if (k - a.value < 40) partial.push({ x: k, y: S, name: `S${k}` }); }
+            if (!Number.isFinite(S)) throw new CalcError('Some term is undefined in this range');
+            const exactAlg = b.value - a.value <= 5000 ? runAlgebrite(`sum(${toAlgebrite(node)}, ${v}, ${a.value}, ${b.value})`) : null;
+            const exN = exactAlg && fromAlgebrite(exactAlg);
+            const ex = exN ? compile(exN, [])() : NaN;
+            const exact = Number.isFinite(ex) && Math.abs(ex - S) < 1e-9 * Math.max(1, Math.abs(S)) ? strOf(exN) : null;
+            const Stxt = Number.isInteger(S) && Math.abs(S) < 1e15 ? String(S) : fmt(S, opt.digits || 12);
+            r.main = { label: 'Sum =', text: (exact && exact !== Stxt && exN.type !== 'ConstantNode' ? exact + ' ≈ ' : '') + Stxt, tex: `${sigma}=${exact && exN.type !== 'ConstantNode' ? texOf(exN) + '\\approx ' : ''}${Stxt}` };
+            r.items.push({ label: 'Number of terms:', text: String(b.value - a.value + 1), tex: '', inline: true });
+            r.steps.push({ title: 'Add the terms', text: `${[0, 1, 2].filter(i => a.value + i <= b.value).map(i => `${v}=${a.value + i}: ${fmt(t(a.value + i), 8)}`).join(',  ')}${b.value - a.value > 2 ? ' …' : ''}`, tex: '' });
+            r.steps.push({ title: 'Total (compensated summation)', text: fmt(S, 14), tex: '' });
+            r.plot = { variable: 'n', curves: [], points: partial, xRange: [a.value - 1, Math.min(b.value, a.value + 40) + 1] };
+            return finalizeText(r);
+        }
+        // ---- infinite series ----
+        const terms = []; for (let k = a.value; k < a.value + 60; k++) terms.push(t(k));
+        if (!terms.every(Number.isFinite)) throw new CalcError('Some of the first terms are undefined – choose a later start index');
+        const big = [1e3, 1e4, 1e5, 1e6].map(k => { const y = t(k); return Number.isNaN(y) ? 0 : y; }), tail = Math.abs(big[3]);
+        const verdict = { conv: null, reason: '', absolute: null };
+        const tests = [];
+        // nth-term test
+        if (!Number.isFinite(big[3]) || tail > 1e-3 || (tail > 0.5 * Math.abs(big[1]) && tail > 1e-6)) { verdict.conv = false; verdict.reason = 'nth-term test: the terms do not tend to 0'; tests.push(verdict.reason); }
+        else tests.push(`nth-term test: tₖ → 0 (|t| ≈ ${tail.toExponential(1)} at k = 10⁶) – inconclusive on its own`);
+        // ratio
+        const rat = k => Math.abs(t(k + 1) / t(k));
+        const rkAll = [10, 20, 40, 80].map(rat), rk = rkAll.filter(Number.isFinite);
+        const L1 = rk[rk.length - 2], L2 = rk[rk.length - 1];
+        const ratioOk = rk.length >= 3;
+        if (verdict.conv === null && ratioOk) {
+            if (L2 < 0.97 && rk.every((x, i) => i === 0 || x <= rk[i - 1] + 0.02)) { verdict.conv = true; verdict.absolute = true; verdict.reason = `ratio test: |tₖ₊₁/tₖ| → ${nice(L2, 4, 1e-3).text} < 1`; tests.push(verdict.reason); }
+            else if (L2 > 1.03 && L1 > 1.03) { verdict.conv = false; verdict.reason = `ratio test: |tₖ₊₁/tₖ| → ${fmt(L2, 4)} > 1`; tests.push(verdict.reason); }
+            else tests.push(`ratio test: limit ≈ ${fmt(L2, 4)} → inconclusive`);
+        }
+        // p-series / power-law behaviour
+        const env = k => { let m = 0; for (let j = 0; j < 400; j++) m = Math.max(m, Math.abs(t(Math.round(k + k * j / 400)))); return m; };
+        const pAt = k => -Math.log(env(2 * k) / env(k)) / Math.log(2);
+        const pSeq = [1e3, 1e4, 1e5].map(pAt), pEst = pSeq[2];
+        const drifting = pSeq[0] > pSeq[1] + 0.01 && pSeq[1] > pSeq[2] + 0.005;   // log-corrected series: p slowly sinks toward 1
+        const pStable = pSeq.every(Number.isFinite) && (Math.abs(pSeq[0] - pSeq[2]) < 0.03 || (Math.abs(pSeq[0] - pSeq[2]) < 0.08 && !drifting));
+        const cK = k => k * t(k), harmonicLike = Number.isFinite(cK(1e4)) && Math.abs(cK(1e6)) > 1e-3 && Math.abs(cK(1e6) / cK(1e4) - 1) < 0.02;
+        if (verdict.conv === null && Number.isFinite(pEst)) {
+            const alt = terms.slice(0, 20).every((x, i, arr) => i === 0 || Math.sign(x) !== Math.sign(arr[i - 1]));
+            if (alt && Math.abs(t(1e5 + 1)) <= Math.abs(t(1e5)) * (1 + 1e-9)) {
+                verdict.conv = true; verdict.reason = 'alternating series test: signs alternate and |tₖ| decreases to 0';
+                tests.push(verdict.reason);
+                verdict.absolute = pEst > 1.05 && pStable; tests.push(`absolute convergence: terms behave like k^−${fmt(pEst, 3)} → ${verdict.absolute ? 'absolutely' : 'only conditionally'} convergent`);
+            } else if (pEst > 1.05 && pStable) { verdict.conv = true; verdict.absolute = true; verdict.reason = `comparison with a p-series: |tₖ| ~ k^−${fmt(pEst, 3)}, p > 1`; tests.push(verdict.reason); }
+            else if (harmonicLike && Math.abs(pEst - 1) < 0.05 && terms.slice(0, 20).every(x => x * terms[0] > 0)) { verdict.conv = false; verdict.reason = 'limit comparison with the harmonic series: k·tₖ tends to a non-zero constant'; tests.push(verdict.reason); }
+            else if (pEst < 0.95 && pStable) { verdict.conv = false; verdict.reason = `comparison with a p-series: |tₖ| ~ k^−${fmt(pEst, 3)}, p < 1 (terms eventually same sign: diverges)`; tests.push(verdict.reason); }
+            else tests.push(`terms behave like k^−${fmt(pEst, 3)} (borderline p ≈ 1) – compare with 1/(k ln k) type series`);
+        }
+        // geometric exact
+        const q = t(a.value + 1) / t(a.value);
+        const geometric = Number.isFinite(q) && terms.slice(0, 12).every((x, i, arr) => i === 0 || Math.abs(x - arr[i - 1] * q) <= 1e-9 * Math.max(Math.abs(x), 1e-300));
+        let value = NaN, how = '';
+        if (verdict.conv !== false) {
+            if (geometric && Math.abs(q) < 1) { value = terms[0] / (1 - q); how = `geometric series: a/(1 − r) with a = ${fmt(terms[0], 8)}, r = ${nice(q, 8, 1e-9).text}`; verdict.conv = true; verdict.absolute = true; tests.unshift(`geometric series with ratio r = ${nice(q, 8, 1e-9).text}, |r| < 1`); }
+            else {
+                const N = 20000; let S = 0; const ps = [];
+                for (let k = a.value; k < a.value + N; k++) { S += t(k); if (k - a.value === N - 3 || k - a.value === N - 2 || k - a.value === N - 1) ps.push(S); }
+                const [s1, s2, s3] = ps, den = s3 - 2 * s2 + s1;
+                if (verdict.conv && pEst > 1.05 && pStable && !terms.slice(0, 20).every((x, i, arr) => i === 0 || Math.sign(x) !== Math.sign(arr[i - 1]))) { const K = a.value + N, tK = t(K); value = s3 + (pEst < 1.6 ? tK * (K / (pEst - 1) + 0.5) : tK / 2 + integrateNumeric(t, K, Infinity).value - numDeriv(t, K) / 12); how = `partial sum of ${N} terms + Euler–Maclaurin tail (integral of the term function)`; }
+                else if (Math.abs(den) > 1e-300) { value = s3 - (s3 - s2) ** 2 / den; how = 'partial sums accelerated with Aitken’s Δ² extrapolation'; }
+                else { value = s3; how = `partial sum of ${N} terms`; }
+            }
+        }
+        if (verdict.conv === null) { r.warnings.push('The numerical tests are inconclusive for this series.'); }
+        const nv = Number.isFinite(value) ? (recogniseConst(value) || nice(value, 10, 1e-9)) : null;
+        if (verdict.conv === false) r.main = { label: 'Diverges', text: `Σ ${strOf(node)} diverges – ${verdict.reason}`, tex: `${sigma}\;\\text{diverges}` };
+        else if (Number.isFinite(value)) r.main = { label: 'Sum ≈', text: (nv && nv.text !== fmt(value, 10) ? `${nv.text} ≈ ` : '') + fmt(value, opt.digits || 10), tex: `${sigma}=${nv && nv.text !== fmt(value, 10) ? nv.tex + '\\approx ' : ''}${fmt(value, opt.digits || 10)}` };
+        else r.main = { label: 'Convergence:', text: 'undetermined', tex: '' };
+        r.items.push({ label: 'Convergence:', text: verdict.conv === true ? (verdict.absolute === false ? 'converges conditionally' : verdict.absolute ? 'converges absolutely' : 'converges') : verdict.conv === false ? 'diverges' : 'undetermined', tex: '', inline: true });
+        tests.forEach(tt => r.steps.push({ title: 'Test', text: tt, tex: '' }));
+        if (how) r.steps.push({ title: 'Value', text: how, tex: '' });
+        r.meta.push('Convergence is judged numerically from the term behaviour at large k – a strong indication, not a proof.');
+        let S = 0; for (let k = a.value; k < a.value + 40; k++) { S += t(k); partial.push({ x: k, y: S, name: `S${k}` }); }
+        r.plot = { variable: 'n', curves: [], points: partial, hlines: Number.isFinite(value) && verdict.conv ? [value] : [], xRange: [a.value - 1, a.value + 41] };
+        return finalizeText(r);
+    }
+
     // ------------------------------------------------------------------
     // Public API
     // ------------------------------------------------------------------
@@ -2584,13 +2879,19 @@
         return { node, vars, text: strOf(node), tex: texOf(node), sampleValue: value, sampleAt: at };
     }
 
+    function wrapRuns(map) {
+        const out = {};
+        Object.keys(map).forEach(k => { out[k] = (src, opt) => map[k](src, opt || {}); });
+        return out;
+    }
+
     return {
         CalcError, parse, inspect, clean, freeVars, compile, diff, fmt, nice, strOf, texOf,
         serialize, hydrate, intersections, antiderivative, integrateNumeric, integrateRobust, tanhSinhFinite, rk45, checkAntiderivative,
-        run: {
+        run: wrapRuns({
             derivative: runDerivative, integral: runIntegral, series: runSeries, limit: runLimit,
             analysis: runAnalysis, ode: runODE, multivariable: runMultivariable,
-            riemann: runRiemann, applications: runApplications, root: runRoot, fourier: runFourier, matrix: runMatrix, graph: runGraph
-        }
+            calc: runCalc, solve: runSolve, sums: runSum, riemann: runRiemann, applications: runApplications, root: runRoot, fourier: runFourier, matrix: runMatrix, graph: runGraph
+        })
     };
 });

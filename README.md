@@ -18,6 +18,9 @@ A calculus workstation that runs entirely in the browser – no backend, no buil
 | **Root finding** | Newton, bisection, secant with every iteration shown |
 | **Fourier series** | Coefficients, even/odd detection, Gibbs phenomenon, Parseval check |
 | **Matrices** | det, exact inverse, eigen-decomposition, rank/RREF, charpoly, solve Ax=b, powers |
+| **Calculator** | Variables across lines, `ans`, exact fractions / π / e recognition, complex numbers, prime factorisation, binary & hex |
+| **Equation solver** | All real and complex roots of polynomials, numerical roots for anything else, inequalities → interval notation |
+| **Sums & series** | Finite sums (exact when possible); infinite series with nth-term / ratio / p-series / alternating tests and accurate values |
 | **Multivariable** | Gradient (+ tangent plane, directional derivative), partials, Hessian, Laplacian, critical-point classification, double integrals with variable limits, divergence, curl |
 
 Plus: command palette (`Ctrl+K`), installable offline PWA, Markdown report export, PNG plot export, LaTeX rendering, 2D/3D/contour plots, history, shareable links (`#s=…`), copy as text/LaTeX, dark mode, keyboard shortcuts, example gallery, background worker with timeout.
