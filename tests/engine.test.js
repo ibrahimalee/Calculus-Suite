@@ -434,3 +434,92 @@ test('series: convergence verdicts and values', () => {
     assert.doesNotMatch(val('1/(k*log(k))', { lower: '2' }).items[0].text, /converges/);
     assert.throws(() => val('x*k'), E.CalcError);
 });
+
+// ---------------------------------------------------------------------------
+// Regression tests for bugs found by the math audit
+// ---------------------------------------------------------------------------
+test('parser: π glued to a variable and the mod operator', () => {
+    close(fnOf('πx')(2), 2 * Math.PI);
+    close(fnOf('2πr', ['r'])(1), 2 * Math.PI);
+    close(fnOf('x mod 3')(7), 1);
+    close(fnOf('x % 3')(7), 1);
+});
+
+test('derivatives of functions math.js cannot differentiate', () => {
+    const d = (src, x) => resultFn(E.run.derivative(src, {}), 1)(x);
+    close(d('cbrt(x)', -8), 1 / 12);                       // stays real for negative x
+    close(d('nthRoot(x,3)', -1), 1 / 3);
+    close(d('erf(x)', 0.7), 2 / Math.sqrt(Math.PI) * Math.exp(-0.49));
+    close(d('sign(x)*x', -2), -1);                          // sign is locally constant
+    close(d('floor(x)*x', 2.5), 2);
+    close(d('max(x,1)', 3), 1); close(d('max(x,1)', 0.2), 0);
+    close(d('min(x,1)', 0.2), 1);
+    close(d('atan2(x,1)', 0.5), 1 / 1.25);
+    close(d('hypot(x,1)', 2), 2 / Math.sqrt(5));
+    close(d('x % 3', 7), 1);
+});
+
+test('integrals that need substitution on a whole factor, partial fractions in u, trig identities', () => {
+    const cases = ['ln(x)/x', '1/(x*ln(x))', 'e^x/(1+e^x)', '1/(1+e^x)', 'x^2*sqrt(1+x^3)', 'tan(x)^2', 'cot(x)^2', 'e^x*sin(x)', 'e^(2x)*cos(x)',
+        '3*e^(-x)*sin(2x)', 'sin(x)*cos(2x)', 'sin(3x)*sin(x)', 'cos(x)*cos(5x)', 'cos(x)*sin(x)^3'];
+    for (const src of cases) {
+        const r = E.run.integral(src, {});
+        assert.ok(r.main.text.endsWith('+ C'), `${src}: ${r.main.text}`);
+        const F = fnOf(r.main.text.replace(/ \+ C$/, '')), f = fnOf(src);
+        let checked = 0;
+        for (const x of [0.4, 0.9, 1.3, 1.9, 2.6, 3.4, 5.1]) {
+            const h = 1e-5, a = (F(x + h) - F(x - h)) / (2 * h), b = f(x);
+            if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(b) > 1e4) continue;
+            close(a, b, 1e-4, `${src} @ ${x}`); checked++;
+        }
+        assert.ok(checked >= 4, `${src}: only ${checked} points checked`);
+    }
+});
+
+test('definite integrals split at floor/ceil/round discontinuities', () => {
+    const v = (s, a, b) => parseFloat(E.run.integral(s, { lower: a, upper: b, digits: 10 }).main.text.replace(/^.*?≈\s*/, '').replace(/^.*=\s*/, ''));
+    close(v('floor(x)', '0', '4.5'), 8, 1e-8);
+    close(v('ceil(x)', '0', '3'), 6, 1e-8);
+    close(v('round(x)', '0', '3'), 4.5, 1e-8);
+});
+
+test('Taylor series: many orders, removable singularities, exact rationals', () => {
+    const coef = (src, n, a) => E.run.series(src, { terms: String(n), point: a || '0' });
+    const atan = coef('atan(x)', 11);
+    close(resultFn(atan, 1)(0.3), Math.atan(0.3), 1e-6);
+    assert.match(atan.main.text, /1 \/ 11 \* x \^ 11/);
+    assert.match(coef('tan(x)', 9).main.text, /62 \/ 2835 \* x \^ 9/);
+    assert.match(coef('asin(x)', 7).main.text, /5 \/ 112 \* x \^ 7/);
+    assert.match(coef('sin(x)/x', 6).main.text, /1\/5040\*x\^6/);
+    close(resultFn(coef('sin(x)/x', 8), 1)(0.5), Math.sin(0.5) / 0.5, 1e-9);
+    close(resultFn(coef('(1-cos(x))/x^2', 6), 1)(0.4), (1 - Math.cos(0.4)) / 0.16, 1e-8);
+    close(resultFn(coef('x^x', 6, '1'), 1)(1.1), Math.pow(1.1, 1.1), 1e-6);
+    assert.throws(() => coef('ln(x)', 3), E.CalcError);
+    assert.throws(() => coef('sqrt(x)', 3), E.CalcError);
+    assert.throws(() => coef('abs(x)', 3), E.CalcError);
+    assert.throws(() => coef('1/x', 3), E.CalcError);
+});
+
+test('high-order derivatives are fast and correct', () => {
+    const t0 = Date.now();
+    const r = E.run.derivative('atan(x)', { order: '8' });
+    assert.ok(Date.now() - t0 < 5000, 'order-8 derivative of atan should be quick');
+    const f8 = resultFn(r, 1)(0.5);
+    // reference: central difference of the independently computed 7th derivative
+    const r7 = E.run.derivative('atan(x)', { order: '7' });
+    const g7 = resultFn(r7, 1), h = 1e-4;
+    close(f8, (g7(0.5 + h) - g7(0.5 - h)) / (2 * h), 1e-5);
+    close(resultFn(E.run.derivative('ln(x)', { order: '10' }), 1)(2), -362880 / 1024, 1e-9);
+});
+
+test('analysis finds poles that land exactly on the sample grid', () => {
+    assert.deepEqual(E.run.analysis('1/x', {}).plot.vlines, [0]);
+    assert.deepEqual(E.run.analysis('1/x^2', {}).plot.vlines, [0]);
+    assert.deepEqual(E.run.analysis('sin(x)/x', { min: '-10', max: '10' }).plot.vlines, []);   // removable hole, not an asymptote
+    assert.deepEqual(E.run.analysis('x/(x^2-4)', {}).plot.vlines, [-2, 2]);
+});
+
+test('matrix: characteristic polynomial is printed in descending order', () => {
+    assert.equal(E.run.matrix('2 1 ; 1 2', { op: 'charpoly' }).main.text, 'λ² - 4·λ + 3');
+    assert.equal(E.run.matrix('0 1 ; -1 0', { op: 'charpoly' }).main.text, 'λ² + 1');
+});

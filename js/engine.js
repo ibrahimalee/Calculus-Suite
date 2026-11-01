@@ -31,7 +31,7 @@
         'round', 'min', 'max', 'pow', 'nthRoot', 'erf', 'gamma', 'factorial', 'mod', 'hypot', 'combinations', 'permutations', 'gcd', 'lcm'
     ]);
     const CONSTS = new Set(['pi', 'e', 'tau', 'phi', 'Infinity']);
-    const ALLOWED_OPS = new Set(['+', '-', '*', '/', '^', '!']);
+    const ALLOWED_OPS = new Set(['+', '-', '*', '/', '^', '!', 'mod', '%']);
     const VAR_ORDER = 'xyztuvwrsabcdfghkmnpq';
 
     const ALIASES = {
@@ -46,7 +46,7 @@
         let s = String(src == null ? '' : src).trim();
         if (!s) return '';
         s = s.replace(/[²³⁴⁵⁶]/g, c => SUPERSCRIPTS[c])
-            .replace(/π/g, 'pi').replace(/∞/g, 'Infinity')
+            .replace(/π/g, ' pi ').replace(/∞/g, ' Infinity ')
             .replace(/[×·⋅]/g, '*').replace(/[−–—]/g, '-').replace(/÷/g, '/')
             .replace(/√\s*\(/g, 'sqrt(').replace(/√\s*([A-Za-z0-9_.]+)/g, 'sqrt($1)')
             .replace(/\*\*/g, '^')
@@ -201,8 +201,48 @@
         'sqrt(n^2) -> abs(n)', 'n1 * sqrt(n2) / sqrt(n2) -> n1'
     ]);
 
+    /** Exact bottom-up folding: integer arithmetic on constants and 0/1 identities (keeps fractions symbolic). */
+    function foldConstants(node) {
+        const isC = (n, val) => { n = unwrap(n); return n.type === 'ConstantNode' && (val === undefined || n.value === val); };
+        const fold = n => {
+            if (n.type === 'ParenthesisNode') { const inner = fold(n.content); return inner.type === 'ConstantNode' || inner.type === 'SymbolNode' ? inner : new math.ParenthesisNode(inner); }
+            if (n.type !== 'OperatorNode' && n.type !== 'FunctionNode') return n;
+            let m = n.map(fold);
+            if (m.type !== 'OperatorNode') return m;
+            const a = m.args;
+            if (a.every(x => unwrap(x).type === 'ConstantNode')) {
+                const v0 = a.map(x => { x = unwrap(x); return x.value; });
+                let val;
+                switch (m.fn) {
+                    case 'add': val = v0[0] + v0[1]; break;
+                    case 'subtract': val = v0[0] - v0[1]; break;
+                    case 'multiply': val = v0[0] * v0[1]; break;
+                    case 'divide': val = v0[0] / v0[1]; break;
+                    case 'pow': val = Math.abs(v0[1]) <= 64 ? Math.pow(v0[0], v0[1]) : NaN; break;
+                    case 'unaryMinus': val = -v0[0]; break;
+                    default: val = NaN;
+                }
+                if (Number.isInteger(val) && Math.abs(val) < 1e15) return val < 0 ? OP('-', 'unaryMinus', [C(-val)]) : C(val);
+            }
+            switch (m.fn) {
+                case 'multiply': if (a.some(x => isC(x, 0))) return C(0); if (isC(a[0], 1)) return a[1]; if (isC(a[1], 1)) return a[0]; break;
+                case 'add': if (isC(a[0], 0)) return a[1]; if (isC(a[1], 0)) return a[0]; break;
+                case 'subtract': if (isC(a[1], 0)) return a[0]; if (isC(a[0], 0)) return OP('-', 'unaryMinus', [a[1]]); break;
+                case 'divide': if (isC(a[0], 0) && !isC(a[1], 0)) return C(0); if (isC(a[1], 1)) return a[0]; break;
+                case 'pow': if (isC(a[1], 1)) return a[0]; if (isC(a[1], 0)) return C(1); break;
+                default: break;
+            }
+            return m;
+        };
+        let cur = node;
+        for (let i = 0; i < 3; i++) cur = fold(cur);
+        return cur;
+    }
+
     function simplifyNode(n) {
+        try { n = foldConstants(n); } catch (e) { /* keep n */ }
         // math.simplify can take tens of seconds on very large trees – skip it when the budget is gone or the tree is huge
+        try { n = math.simplifyCore(n); } catch (e) { /* keep n */ }   // fast constant folding: removes 0·x^(−1) style junk
         if (overBudget()) return n;
         let size = 0;
         n.traverse(() => { size++; });
@@ -210,15 +250,109 @@
         try { return math.simplify(n, SIMPLIFY_RULES); } catch (e) { return n; }
     }
 
-    function diff(node, v, order) {
-        let r = node;
-        for (let i = 0; i < (order || 1); i++) {
-            try {
-                r = math.derivative(r, v, { simplify: false });
-            } catch (e) {
-                throw new CalcError('Cannot differentiate: ' + friendlyError(e));
+    /**
+     * One differentiation step with extra rules math.js lacks:
+     *  - min/max/hypot/atan2/mod are rewritten into differentiable forms,
+     *  - sign/floor/ceil/round/fix are piecewise constant (derivative 0 almost everywhere),
+     *  - erf'(u) = 2/√π · e^(−u²) · u'.
+     * Odd roots (cbrt, nthRoot) are kept real for negative arguments.
+     */
+    let phCounter = 0;
+    function diffOnce(node, v) {
+        const holes = []; // {sym, original, deriv|null}
+        const FLAT = new Set(['sign', 'floor', 'ceil', 'round', 'fix']);
+        const pass1 = node.transform(n => {
+            if (n.type === 'OperatorNode' && (n.fn === 'mod' || n.op === '%') && n.args.length === 2) {
+                const [a, b] = n.args;
+                return OP('-', 'subtract', [a, OP('*', 'multiply', [b, new math.FunctionNode('floor', [OP('/', 'divide', [a, b])])])]);
             }
-            r = simplifyNode(r);
+            if (n.type !== 'FunctionNode' || !n.fn) return n;
+            const name = n.fn.name, a = n.args;
+            const call = (nm, ...args) => new math.FunctionNode(nm, args);
+            const sq = x => OP('^', 'pow', [new math.ParenthesisNode(x), C(2)]);
+            if (name === 'hypot' && a.length === 2) return call('sqrt', OP('+', 'add', [sq(a[0]), sq(a[1])]));
+            if (name === 'min' && a.length === 2) return OP('/', 'divide', [new math.ParenthesisNode(OP('-', 'subtract', [OP('+', 'add', [a[0], a[1]]), call('abs', OP('-', 'subtract', [a[0], a[1]]))])), C(2)]);
+            if (name === 'max' && a.length === 2) return OP('/', 'divide', [new math.ParenthesisNode(OP('+', 'add', [OP('+', 'add', [a[0], a[1]]), call('abs', OP('-', 'subtract', [a[0], a[1]]))])), C(2)]);
+            if (name === 'mod' && a.length === 2) return OP('-', 'subtract', [a[0], OP('*', 'multiply', [a[1], call('floor', OP('/', 'divide', [a[0], a[1]]))])]);
+            if (name === 'atan2' && a.length === 2) {
+                const [y, x] = a;
+                return OP('*', 'multiply', [C(2), call('atan', OP('/', 'divide', [y, new math.ParenthesisNode(OP('+', 'add', [call('sqrt', OP('+', 'add', [sq(x), sq(y)])), x]))]))]);
+            }
+            return n;
+        });
+        const prep = pass1.transform(n => {
+            if (n.type !== 'FunctionNode' || !n.fn) return n;
+            const name = n.fn.name, a = n.args;
+            const call = (nm, ...args) => new math.FunctionNode(nm, args);
+            const sq = x => OP('^', 'pow', [new math.ParenthesisNode(x), C(2)]);
+            if ((FLAT.has(name) || name === 'erf') && a.length === 1 && dependsOn(n, v)) {
+                const sym = '__h' + (phCounter++);
+                holes.push({ sym, original: n, deriv: name === 'erf' ? OP('*', 'multiply', [OP('/', 'divide', [C(2), call('sqrt', S('pi'))]), OP('*', 'multiply', [call('exp', OP('-', 'unaryMinus', [sq(a[0])])), new math.ParenthesisNode(diffOnce(a[0], v))])]) : null });
+                return S(sym);
+            }
+            return n;
+        });
+        let d;
+        try { d = math.derivative(prep, v, { simplify: false }); }
+        catch (e) { throw new CalcError('Cannot differentiate: ' + friendlyError(e)); }
+        holes.forEach(h => {
+            if (!h.deriv) return;
+            let dh; try { dh = math.derivative(prep, S(h.sym), { simplify: false }); } catch (e) { return; }
+            d = OP('+', 'add', [new math.ParenthesisNode(d), OP('*', 'multiply', [new math.ParenthesisNode(dh), new math.ParenthesisNode(h.deriv)])]);
+        });
+        const map = {}; holes.forEach(h => { map[h.sym] = h.original; });
+        return holes.length ? substitute(d, map) : d;
+    }
+
+    /** x^(p/q) with odd q becomes nthRoot(x, q)^p so negative arguments stay real. */
+    function realRoots(node) {
+        return node.transform(n => {
+            if (n.type === 'OperatorNode' && n.fn === 'pow' && dependsOn(n.args[0], '__none__') === false) {
+                const e = unwrap(n.args[1]);
+                let num = null, den = null;
+                if (e.type === 'OperatorNode' && e.fn === 'divide' && unwrap(e.args[0]).type === 'ConstantNode' && unwrap(e.args[1]).type === 'ConstantNode') { num = unwrap(e.args[0]).value; den = unwrap(e.args[1]).value; }
+                else if (e.type === 'OperatorNode' && e.fn === 'divide' && unwrap(e.args[0]).type === 'OperatorNode' && unwrap(e.args[0]).fn === 'unaryMinus' && unwrap(unwrap(e.args[0]).args[0]).type === 'ConstantNode' && unwrap(e.args[1]).type === 'ConstantNode') { num = -unwrap(unwrap(e.args[0]).args[0]).value; den = unwrap(e.args[1]).value; }
+                else if (e.type === 'OperatorNode' && e.fn === 'unaryMinus' && unwrap(e.args[0]).type === 'OperatorNode' && unwrap(e.args[0]).fn === 'divide') { const q = unwrap(e.args[0]); if (unwrap(q.args[0]).type === 'ConstantNode' && unwrap(q.args[1]).type === 'ConstantNode') { num = -unwrap(q.args[0]).value; den = unwrap(q.args[1]).value; } }
+                if (num !== null && Number.isInteger(num) && Number.isInteger(den) && den > 1 && den % 2 === 1) {
+                    const root = new math.FunctionNode('nthRoot', [n.args[0], C(den)]);
+                    return OP('^', 'pow', [root, C(num)]);
+                }
+            }
+            return n;
+        });
+    }
+
+    /** n-th derivative via Algebrite's native d(f,x,n); accepted only if it agrees with independent power-series values. */
+    function diffViaCAS(node, v, order) {
+        if (!Algebrite || order < 2 || overBudget()) return null;
+        let size = 0; node.traverse(() => { size++; });
+        if (size > 60) return null;
+        const others = freeVars(node).filter(q => q !== v);
+        if (others.length || /\^\s*\(?\d{3,}/.test(node.toString())) return null;   // huge exponents make big-integer CAS work crawl
+        const out = runAlgebrite(`d(${toAlgebrite(node)}, ${v}, ${order})`);
+        const cand = out && fromAlgebrite(out);
+        if (!cand) return null;
+        const fc = compile(cand, [v]);
+        let good = 0;
+        let fact = 1; for (let i = 2; i <= order; i++) fact *= i;
+        for (const pt of [0.31, 0.77, 1.43, -0.55, 2.2]) {
+            let truth;
+            try { truth = taylorCoeffs(node, v, pt, order)[order] * fact; } catch (e) { continue; }
+            const val = fc(pt);
+            if (!Number.isFinite(truth) || !Number.isFinite(val)) continue;
+            if (Math.abs(val - truth) > 1e-7 * Math.max(1, Math.abs(truth))) return null;
+            good++;
+        }
+        return good >= 2 ? cand : null;
+    }
+
+    function diff(node, v, order) {
+        if ((order || 1) > 1) { const fast = diffViaCAS(node, v, order); if (fast) return fast; }
+        let r = node;
+        const hasOddRoot = /cbrt|nthRoot|\^\s*\(?-?\d+\s*\/\s*\d+/.test(node.toString());
+        for (let i = 0; i < (order || 1); i++) {
+            r = simplifyNode(diffOnce(r, v));
+            if (hasOddRoot) r = realRoots(r);
         }
         return r;
     }
@@ -249,10 +383,11 @@
         if (!Number.isFinite(x)) return { text: fmt(x), tex: x > 0 ? '\\infty' : x < 0 ? '-\\infty' : '\\text{undefined}' };
         const rtol = looseTol || 1e-9;
         const tol = rtol * Math.max(1, Math.abs(x));
+        const maxDen = rtol <= 1e-8 ? 100000 : 24;   // looser tolerances would produce false fractions
         const tryFrac = (val) => {
-            for (let d = 1; d <= 24; d++) {
+            for (let d = 1; d <= maxDen; d++) {
                 const n = Math.round(val * d);
-                if (Math.abs(val - n / d) < rtol * Math.max(1, Math.abs(val))) return [n, d];
+                if (Math.abs(val - n / d) < (d > 1200 ? 1e-13 : d > 24 ? 1e-11 : rtol) * Math.max(1, Math.abs(val))) return [n, d];
             }
             return null;
         };
@@ -359,6 +494,25 @@
         return good >= 2 ? cand : simplifyNode(node);
     }
 
+    /** Compact an intermediate derivative with the CAS so repeated differentiation does not blow up. */
+    function casCompact(node, v) {
+        const vars = freeVars(node);
+        const out = Algebrite && !overBudget() ? (() => { try { if (typeof Algebrite.clearall === 'function') Algebrite.clearall(); return String(Algebrite.run(toAlgebrite(node))).trim(); } catch (e) { return null; } })() : null;
+        if (!out || /Stop|Unsupported|rror|\?/.test(out)) return node;
+        const cand = fromAlgebrite(out);
+        if (!cand) return node;
+        const a = compile(node, vars), b = compile(cand, vars);
+        let good = 0;
+        for (const x of [0.31, 0.77, 1.21, 1.88, -0.45, -1.3]) {
+            const args = vars.map((_, i) => x + 0.11 * i), va = a(...args), vb = b(...args);
+            if (!Number.isFinite(va) || !Number.isFinite(vb)) continue;
+            if (Math.abs(va - vb) > 1e-8 * Math.max(1, Math.abs(va))) return node;
+            good++;
+        }
+        void v;
+        return good >= 2 ? cand : node;
+    }
+
     /** Prefer the CAS-simplified form of a result when it is shorter (and numerically identical). */
     function tidy(node, vars) {
         let size = 0; node.traverse(() => { size++; });
@@ -441,9 +595,10 @@
         const t = tableLookup(expr, u);
         if (t) return t;
         const out = runAlgebrite(`integral(${toAlgebrite(expr)}, ${u})`);
-        if (!out) return null;
-        const F = fromAlgebrite(out);
-        return F && checkAntiderivative(F, expr, u) ? F : null;
+        const F = out && fromAlgebrite(out);
+        if (F && checkAntiderivative(F, expr, u)) return F;
+        const pf = integrateRational(expr, u);
+        return pf ? pf.F : null;
     }
 
     function collectCandidates(node, v) {
@@ -456,8 +611,8 @@
             if (!seen.has(k)) seen.set(k, g);
         };
         node.traverse(n => {
-            if (n.type === 'FunctionNode') n.args.forEach(add);
-            if (n.type === 'OperatorNode' && n.op === '^') { add(n.args[0]); add(n.args[1]); }
+            if (n.type === 'FunctionNode') { n.args.forEach(add); add(n); }
+            if (n.type === 'OperatorNode' && n.op === '^') { add(n.args[0]); add(n.args[1]); if (!dependsOn(n.args[0], v) && dependsOn(n.args[1], v)) add(n); }
             if (n.type === 'OperatorNode' && n.fn === 'divide') add(n.args[1]);
         });
         // try larger (more complex) inner functions first
@@ -471,8 +626,9 @@
             try { dg = diff(g, v); } catch (e) { continue; }
             if (dg.type === 'ConstantNode' && dg.value === 0) continue;
             const ratio = simplifyNode(OP('/', 'divide', [node, new math.ParenthesisNode(dg)]));
-            const gs = g.toString();
-            const replaced = ratio.transform(n => (n.toString() === gs ? S('u') : n));
+            const gf = compile(g, [v]), probe = [0.37, 0.91, 1.43, 2.17], gvals = probe.map(gf);
+            const same = n => { if (n.type === 'SymbolNode' || n.type === 'ConstantNode' || !dependsOn(n, v)) return false; const nf = compile(n, [v]); return probe.every((x, i) => { const y = nf(x); return Number.isFinite(y) && Number.isFinite(gvals[i]) && Math.abs(y - gvals[i]) <= 1e-9 * Math.max(1, Math.abs(y)); }); };
+            const replaced = ratio.transform(n => (same(n) ? S('u') : n));
             if (dependsOn(replaced, v)) continue;
             const G = integrateBasic(replaced, 'u');
             if (!G) continue;
@@ -548,6 +704,69 @@
         return { F };
     }
 
+
+    /** Equivalent forms of an integrand that standard methods handle better. */
+    function trigRewrites(node, v) {
+        const out = [];
+        const lin = g => { try { const d = diff(g, v); return d.type === 'ConstantNode' || (!dependsOn(d, v) && Number.isFinite(compile(d, [])())); } catch (e) { return false; } };
+        const call = (nm, ...a) => new math.FunctionNode(nm, a);
+        const half = x => OP('/', 'divide', [new math.ParenthesisNode(x), C(2)]);
+        // tan^2 / cot^2
+        const sq = node.transform(n => {
+            if (n.type === 'OperatorNode' && n.fn === 'pow' && unwrap(n.args[1]).type === 'ConstantNode' && unwrap(n.args[1]).value === 2) {
+                const b = unwrap(n.args[0]);
+                if (b.type === 'FunctionNode' && b.fn.name === 'tan') return new math.ParenthesisNode(OP('-', 'subtract', [OP('^', 'pow', [call('sec', b.args[0]), C(2)]), C(1)]));
+                if (b.type === 'FunctionNode' && b.fn.name === 'cot') return new math.ParenthesisNode(OP('-', 'subtract', [OP('^', 'pow', [call('csc', b.args[0]), C(2)]), C(1)]));
+            }
+            return n;
+        });
+        if (sq.toString() !== node.toString()) out.push({ node: sq, note: 'Rewrite tan² = sec² − 1 (and cot² = csc² − 1)' });
+        // product of two sin/cos with linear arguments -> sum
+        const f = flattenProduct(node), dep = f.filter(x => dependsOn(x, v)), k = f.filter(x => !dependsOn(x, v));
+        const isTrig = x => x.type === 'FunctionNode' && (x.fn.name === 'sin' || x.fn.name === 'cos') && lin(x.args[0]);
+        if (dep.length === 2 && dep.every(isTrig)) {
+            const [p, q] = dep, A1 = p.args[0], B1 = q.args[0], np = p.fn.name, nq = q.fn.name;
+            const plus = call(np === nq ? 'cos' : 'sin', OP('+', 'add', [A1, B1]).cloneDeep()), minus = n => n;
+            void plus; void minus;
+            let r;
+            const sumAB = OP('+', 'add', [A1, B1]), difAB = OP('-', 'subtract', [A1, B1]), difBA = OP('-', 'subtract', [B1, A1]);
+            if (np === 'sin' && nq === 'cos') r = half(OP('+', 'add', [call('sin', sumAB), call('sin', difAB)]));
+            else if (np === 'cos' && nq === 'sin') r = half(OP('+', 'add', [call('sin', sumAB), call('sin', difBA)]));
+            else if (np === 'sin' && nq === 'sin') r = half(OP('-', 'subtract', [call('cos', difAB), call('cos', sumAB)]));
+            else r = half(OP('+', 'add', [call('cos', difAB), call('cos', sumAB)]));
+            const scaled = k.length ? OP('*', 'multiply', [k.reduce((a, b) => OP('*', 'multiply', [a, b])), r]) : r;
+            out.push({ node: scaled, note: 'Product-to-sum identity turns the product into a sum of sines/cosines' });
+        }
+        return out;
+    }
+
+    /** ∫ k·e^(ax+c)·sin/cos(bx+d) dx in closed form (integration by parts twice, solved for the integral). */
+    function integrateExpTrig(node, v) {
+        const f = flattenProduct(node), dep = f.filter(x => dependsOn(x, v)), k = f.filter(x => !dependsOn(x, v));
+        if (dep.length !== 2) return null;
+        const expArg = x => {   // exp(L) or c^L  ->  exponent expressed as a linear-in-v node
+            x = unwrap(x);
+            if (x.type === 'FunctionNode' && x.fn.name === 'exp') return x.args[0];
+            if (x.type === 'OperatorNode' && x.fn === 'pow' && !dependsOn(x.args[0], v) && dependsOn(x.args[1], v)) return OP('*', 'multiply', [new math.ParenthesisNode(x.args[1]), new math.FunctionNode('log', [x.args[0]])]);
+            return null;
+        };
+        const ex = dep.find(x => expArg(x)), tr = dep.find(x => x.type === 'FunctionNode' && (x.fn.name === 'sin' || x.fn.name === 'cos'));
+        if (!ex || !tr) return null;
+        let a, b;
+        try { const da = diff(expArg(ex), v), db = diff(tr.args[0], v); if (dependsOn(da, v) || dependsOn(db, v)) return null; a = compile(da, [])(); b = compile(db, [])(); } catch (e) { return null; }
+        if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(a) < 1e-12 || Math.abs(b) < 1e-12) return null;
+        const den = a * a + b * b, call = (nm, ...x) => new math.FunctionNode(nm, x);
+        const th = tr.args[0];
+        const inner = tr.fn.name === 'sin'
+            ? OP('-', 'subtract', [OP('*', 'multiply', [C(a), call('sin', th)]), OP('*', 'multiply', [C(b), call('cos', th)])])
+            : OP('+', 'add', [OP('*', 'multiply', [C(a), call('cos', th)]), OP('*', 'multiply', [C(b), call('sin', th)])]);
+        let F = OP('/', 'divide', [OP('*', 'multiply', [ex, new math.ParenthesisNode(inner)]), C(den)]);
+        if (k.length) F = OP('*', 'multiply', [k.reduce((x, y) => OP('*', 'multiply', [x, y])), new math.ParenthesisNode(F)]);
+        F = simplifyNode(F);
+        if (!checkAntiderivative(F, node, v)) return null;
+        return { F, a, b };
+    }
+
     /**
      * Symbolic antiderivative. method: 'auto' | 'substitution' | 'parts' | 'cas'
      * Returns { ok, F (node), method, steps[] } – F has no +C.
@@ -574,6 +793,12 @@
             const t = tableLookup(node, v);
             if (t) return finish(t, 'Standard integral table', [{ title: 'Standard form', text: 'The integrand matches a known integral.', tex: `\\int ${texOf(node)}\\,d${v}=${texOf(absLogs(t))}` }]);
         }
+        if (method === 'auto' || method === 'parts') {
+            const et = integrateExpTrig(node, v);
+            if (et) return finish(et.F, 'Integration by parts (twice, solved for the integral)', [
+                { title: 'Cyclic integration by parts', text: `Integrating e^(ax)·trig twice returns the original integral, so solve for it: with a = ${fmt(et.a)}, b = ${fmt(et.b)} the result carries the factor 1/(a² + b²) = 1/${fmt(et.a * et.a + et.b * et.b)}.`, tex: `\\int e^{ax}\\sin(bx)\\,dx=\\frac{e^{ax}(a\\sin bx-b\\cos bx)}{a^2+b^2}` }
+            ]);
+        }
         if (method === 'auto' || method === 'partial') {
             const pf = integrateRational(node, v);
             if (pf) return finish(pf.F, 'Partial fractions', pf.steps);
@@ -596,6 +821,12 @@
                     { title: 'Substitute back', text: `Replace u with ${strOf(r.u)}.`, tex: `${texOf(absLogs(r.F))}` }
                 ];
                 return finish(r.F, 'U-substitution', pre);
+            }
+        }
+        if (method === 'auto') {
+            for (const rw of trigRewrites(node, v)) {
+                const sub = antiderivativeInner(rw.node, v, 'auto');
+                if (sub.ok && checkAntiderivative(sub.F, node, v)) return finish(sub.F, sub.method, [{ title: 'Rewrite the integrand', text: rw.note + ': ' + strOf(rw.node), tex: texOf(rw.node) }].concat(sub.steps));
             }
         }
         if (method === 'auto' || method === 'parts') {
@@ -1129,7 +1360,7 @@
         } else {
             let cur = node;
             for (let i = 1; i <= order; i++) {
-                const nxt = diff(cur, v);
+                const nxt = i === order ? d : diff(node, v, i);   // each order is computed from the original (fast CAS path) – no expression swell
                 r.steps.push({ title: `Differentiate (order ${i})`, text: `d/d${v} [ ${strOf(cur)} ] = ${strOf(nxt)}`, tex: `\\frac{d}{d${v}}\\left[${texOf(cur)}\\right]=${texOf(nxt)}` });
                 cur = nxt;
             }
@@ -1270,6 +1501,16 @@
         node.traverse(n => {
             if (n.type !== 'FunctionNode') return;
             let g = null;
+            if (['floor', 'ceil', 'round', 'fix'].includes(n.fn.name) && n.args.length === 1 && dependsOn(n.args[0], v)) {
+                const gg = compile(n.args[0], [v]), glo = gg(lo), ghi = gg(hi);
+                if (Number.isFinite(glo) && Number.isFinite(ghi)) {
+                    const m0 = Math.ceil(Math.min(glo, ghi) - 1), m1 = Math.floor(Math.max(glo, ghi) + 1);
+                    if (m1 - m0 < 400) for (let m = m0; m <= m1; m++) for (const off of (n.fn.name === 'round' ? [0.5] : [0])) {
+                        signChanges(x => gg(x) - (m + off), Math.min(lo, hi), Math.max(lo, hi), 400).forEach(c => pts.push(c.x));
+                    }
+                }
+                return;
+            }
             if ((n.fn.name === 'abs' || n.fn.name === 'sign') && n.args.length === 1) g = n.args[0];
             else if ((n.fn.name === 'min' || n.fn.name === 'max') && n.args.length === 2) g = OP('-', 'subtract', [n.args[0], n.args[1]]);
             if (!g || !dependsOn(g, v)) return;
@@ -1287,6 +1528,127 @@
         return [lo - pad, hi + pad];
     }
 
+
+    // ------------------------------------------------------------------
+    // Truncated power series ("jets"): Taylor coefficients without symbolic differentiation
+    // ------------------------------------------------------------------
+    function taylorCoeffs(node, v, a, N) {
+        const keep = N + 1, len = N + 1 + 12;   // spare terms absorb removable singularities such as sin(x)/x
+        const zero = () => new Array(len).fill(0);
+        const cst = c => { const r = zero(); r[0] = c; return r; };
+        const add = (x, y) => x.map((c, i) => c + y[i]);
+        const sub = (x, y) => x.map((c, i) => c - y[i]);
+        const scale = (x, k) => x.map(c => c * k);
+        const mul = (x, y) => { const r = zero(); for (let i = 0; i < len; i++) { if (x[i] === 0) continue; for (let j = 0; i + j < len; j++) r[i + j] += x[i] * y[j]; } return r; };
+        const div = (x, y) => {
+            if (y[0] === 0) { // allow exact cancellation of a common leading zero (e.g. sin(x)/x)
+                let k = 0; while (k < len && y[k] === 0 && x[k] === 0) k++;
+                if (k === len || y[k] === 0) throw new CalcError('Division by zero at the expansion point');
+                return div(x.slice(k).concat(new Array(k).fill(NaN)), y.slice(k).concat(new Array(k).fill(NaN)));
+            }
+            const q = zero();
+            for (let n = 0; n < len; n++) { let sum = x[n]; for (let k = 1; k <= n; k++) sum -= y[k] * q[n - k]; q[n] = sum / y[0]; }
+            return q;
+        };
+        const deriv = x => x.slice(1).map((c, i) => c * (i + 1)).concat([NaN]);
+        const integ = (w, c0) => { const r = zero(); r[0] = c0; for (let n = 1; n < len; n++) r[n] = w[n - 1] / n; return r; };
+        const exp = u => { const e = zero(); e[0] = Math.exp(u[0]); for (let n = 1; n < len; n++) { let sum = 0; for (let k = 1; k <= n; k++) sum += k * u[k] * e[n - k]; e[n] = sum / n; } return e; };
+        const log = u => {
+            if (!(u[0] > 0)) { if (u[0] < 0) throw new CalcError('log of a negative number at the expansion point'); throw new CalcError('log(0) is not analytic at the expansion point'); }
+            const l = zero(); l[0] = Math.log(u[0]);
+            for (let n = 1; n < len; n++) { let sum = 0; for (let k = 1; k < n; k++) sum += k * l[k] * u[n - k]; l[n] = (u[n] - sum / n) / u[0]; }
+            return l;
+        };
+        const sincos = (u, hyper) => {
+            const s0 = zero(), c0 = zero();
+            s0[0] = hyper ? Math.sinh(u[0]) : Math.sin(u[0]); c0[0] = hyper ? Math.cosh(u[0]) : Math.cos(u[0]);
+            for (let n = 1; n < len; n++) {
+                let ss = 0, cc = 0;
+                for (let k = 1; k <= n; k++) { ss += k * u[k] * c0[n - k]; cc += k * u[k] * s0[n - k]; }
+                s0[n] = ss / n; c0[n] = (hyper ? cc : -cc) / n;
+            }
+            return [s0, c0];
+        };
+        const powConst = (u, al) => {
+            if (Number.isInteger(al) && al >= 0) { let r = cst(1); for (let i = 0; i < al; i++) r = mul(r, u); return r; }
+            if (Number.isInteger(al) && al < 0) { let r = cst(1); for (let i = 0; i < -al; i++) r = mul(r, u); return div(cst(1), r); }
+            if (u[0] === 0) throw new CalcError('Non-integer power of 0 is not analytic at the expansion point');
+            if (u[0] < 0) {
+                const q = 1 / al;
+                if (Number.isInteger(q) && Math.abs(q) % 2 === 1) { const r = powConst(scale(u, -1), al); const sign = Math.pow(-1, Math.round(al * Math.abs(q)) ); void sign; return scale(r, -1); }
+                throw new CalcError('A fractional power of a negative number is not real at the expansion point');
+            }
+            const p = zero(); p[0] = Math.pow(u[0], al);
+            for (let n = 1; n < len; n++) { let sum = 0; for (let k = 1; k <= n; k++) sum += (al * k - (n - k)) * u[k] * p[n - k]; p[n] = sum / (n * u[0]); }
+            return p;
+        };
+        const sqrtS = u => powConst(u, 0.5);
+        const rec = nd => {
+            nd = unwrap(nd);
+            if (nd.type === 'ConstantNode') return cst(nd.value);
+            if (nd.type === 'SymbolNode') {
+                if (nd.name === v) { const r = zero(); r[0] = a; if (len > 1) r[1] = 1; return r; }
+                if (CONSTS.has(nd.name)) return cst(compile(nd, [])());
+                throw new CalcError(`Unknown symbol ${nd.name}`);
+            }
+            if (nd.type === 'OperatorNode') {
+                const x = nd.args.map(rec);
+                switch (nd.fn) {
+                    case 'add': return add(x[0], x[1]);
+                    case 'subtract': return sub(x[0], x[1]);
+                    case 'multiply': return mul(x[0], x[1]);
+                    case 'divide': return div(x[0], x[1]);
+                    case 'unaryMinus': return scale(x[0], -1);
+                    case 'unaryPlus': return x[0];
+                    case 'pow': {
+                        const e = unwrap(nd.args[1]);
+                        if (!dependsOn(e, v)) { const al = compile(e, [])(); if (Number.isFinite(al)) return powConst(x[0], al); }
+                        if (!(x[0][0] > 0)) throw new CalcError('Base must be positive for a variable exponent at the expansion point');
+                        return exp(mul(x[1], log(x[0])));
+                    }
+                    default: throw new CalcError(`Operator ${nd.op} is not supported for series`);
+                }
+            }
+            if (nd.type === 'FunctionNode') {
+                const name = nd.fn.name, x = nd.args.map(rec), u = x[0];
+                switch (name) {
+                    case 'exp': return exp(u);
+                    case 'log': return log(u);
+                    case 'log10': return scale(log(u), 1 / Math.LN10);
+                    case 'log2': return scale(log(u), 1 / Math.LN2);
+                    case 'sqrt': return sqrtS(u);
+                    case 'cbrt': return powConst(u, 1 / 3);
+                    case 'nthRoot': return powConst(u, 1 / compile(unwrap(nd.args[1]), [])());
+                    case 'sin': return sincos(u, false)[0];
+                    case 'cos': return sincos(u, false)[1];
+                    case 'sinh': return sincos(u, true)[0];
+                    case 'cosh': return sincos(u, true)[1];
+                    case 'tan': { const [si, co] = sincos(u, false); return div(si, co); }
+                    case 'tanh': { const [si, co] = sincos(u, true); return div(si, co); }
+                    case 'sec': return div(cst(1), sincos(u, false)[1]);
+                    case 'csc': return div(cst(1), sincos(u, false)[0]);
+                    case 'cot': { const [si, co] = sincos(u, false); return div(co, si); }
+                    case 'sech': return div(cst(1), sincos(u, true)[1]);
+                    case 'csch': return div(cst(1), sincos(u, true)[0]);
+                    case 'coth': { const [si, co] = sincos(u, true); return div(co, si); }
+                    case 'atan': return integ(div(deriv(u), add(cst(1), mul(u, u))), Math.atan(u[0]));
+                    case 'asin': return integ(div(deriv(u), sqrtS(sub(cst(1), mul(u, u)))), Math.asin(u[0]));
+                    case 'acos': { const r = integ(div(deriv(u), sqrtS(sub(cst(1), mul(u, u)))), Math.asin(u[0])); const o = scale(r, -1); o[0] = Math.acos(u[0]); return o; }
+                    case 'asinh': return integ(div(deriv(u), sqrtS(add(mul(u, u), cst(1)))), Math.asinh(u[0]));
+                    case 'acosh': return integ(div(deriv(u), sqrtS(sub(mul(u, u), cst(1)))), Math.acosh(u[0]));
+                    case 'atanh': return integ(div(deriv(u), sub(cst(1), mul(u, u))), Math.atanh(u[0]));
+                    case 'erf': return integ(scale(mul(exp(scale(mul(u, u), -1)), deriv(u)), 2 / Math.sqrt(Math.PI)), compile(new math.FunctionNode('erf', [C(u[0])]), [])());
+                    case 'abs': if (u[0] === 0) throw new CalcError('|x| is not analytic at 0'); return u[0] > 0 ? u : scale(u, -1);
+                    default: throw new CalcError(`${name} is not supported for Taylor series`);
+                }
+            }
+            throw new CalcError('Unsupported expression for series');
+        };
+        const out = rec(node).slice(0, keep);
+        if (out.some(c => !Number.isFinite(c))) throw new CalcError('The function is not analytic at the expansion point (a coefficient is undefined)');
+        return out;
+    }
+
     // ---------------------------- Series ------------------------------
     function runSeries(src, opt) {
         const node = parse(src);
@@ -1297,17 +1659,14 @@
         const f = compile(node, [v]);
         const r = makeResult('series', a.value === 0 ? `Maclaurin series (degree ${n})` : `Taylor series about ${v} = ${strOf(a.node)} (degree ${n})`);
 
-        // Derivative table (numeric values, exact where Algebrite helps)
-        const coeffs = [];
-        let cur = node;
-        for (let k = 0; k <= n; k++) {
-            if (k > 0) cur = diff(cur, v);
-            const val = compile(cur, [v])(a.value);
-            if (!Number.isFinite(val)) {
-                throw new CalcError(`f is not differentiable ${k === 0 ? '' : k + ' times '}at ${v} = ${fmt(a.value)}, so no Taylor series exists there.`);
-            }
-            coeffs.push({ k, deriv: val, coef: val / Number(math.factorial(k)) });
+        // Coefficients via truncated power-series arithmetic (no symbolic differentiation → no expression swell)
+        let cs;
+        try { cs = taylorCoeffs(node, v, a.value, n); }
+        catch (err) {
+            if (!(err instanceof CalcError)) throw err;
+            throw new CalcError(err.message.includes('expansion point') || err.message.includes('analytic') ? `No Taylor series at ${v} = ${fmt(a.value)}: ${err.message}` : err.message);
         }
+        const coeffs = cs.map((c, k) => ({ k, coef: c, deriv: c * Number(math.factorial(k)) }));
 
         // exact polynomial via Algebrite when possible
         let polyNode = null;
@@ -1542,14 +1901,21 @@
         // non-finite isolated points = holes/asymptotes
         for (let i = 0; i <= N; i += 1) {
             const x = lo + span * i / N;
-            if (!Number.isFinite(f(x)) && Number.isFinite(f(x - span / N)) !== false) {
-                const left = f(x - span / N), right = f(x + span / N);
-                if (Math.abs(left) > 1e3 || Math.abs(right) > 1e3) asymptotes.push(x);
+            if (!Number.isFinite(f(x))) {
+                // a pole that falls exactly on a sample point: |f| must be growing as we approach it (removable holes stay flat)
+                const h = span / N, grows = (dir) => { const n1 = Math.abs(f(x + dir * h)), n2 = Math.abs(f(x + dir * 2 * h)); return Number.isFinite(n1) && Number.isFinite(n2) && n1 > 1.08 * n2 && n1 > 1; };
+                if (grows(-1) || grows(1) || Math.abs(f(x - h)) > 1e3 || Math.abs(f(x + h)) > 1e3) {
+                    let best = x;   // snap to a "nice" abscissa (k/4 or kπ/4) within a couple of grid steps
+                    for (const unit of [0.25, Math.PI / 4]) { const k = Math.round(x / unit) * unit; if (Math.abs(k - x) <= 1.6 * h && Math.abs(k - x) < Math.abs(best - x) + 1e-12 && best === x) best = k; }
+                    asymptotes.push(best);
+                }
             }
         }
         // double roots: local minima of |f| near zero
         signChanges(f1, lo, hi, N).forEach(c => { if (Math.abs(f(c.x)) < 1e-8 && Number.isFinite(f(c.x))) roots.push(c.x); });
-        const rootList = dedupe(roots, tol), asymList = dedupe(asymptotes, tol * 50);
+        const stepH = span / N;
+        const snapAsym = x => { for (const unit of [0.25, Math.PI / 4]) { const k = Math.round(x / unit) * unit; if (Math.abs(k - x) <= 1.6 * stepH) return k || 0; } return x; };
+        const rootList = dedupe(roots, tol), asymList = dedupe(asymptotes.map(snapAsym), tol * 50);
 
         // critical points
         const crit = [];
@@ -2539,8 +2905,13 @@
                 c.push(-AMk.reduce((s0, row, i) => s0 + row[i], 0) / k);
                 void AM;
             }
-            const poly = simplifyNode(parse(c.map((co, k) => (Math.abs(co) < 1e-10 ? null : `${snapCoef(co)}*t^${n - k}`)).filter(Boolean).join(' + ')));
-            r.main = { label: 'p(λ) =', text: strOf(poly).replace(/\bt\b/g, 'λ'), tex: `p(\\lambda)=${texOf(poly).replace(/\bt\b/g, '\\lambda')}` };
+            const parts = c.map((co, k) => ({ co, pw: n - k })).filter(t => Math.abs(t.co) > 1e-10);
+            const fmtTerm = (t, first, tex) => {
+                const mag = Math.abs(t.co), sign = t.co < 0 ? '-' : '+', lam = tex ? '\\lambda' : 'λ';
+                const body = t.pw === 0 ? nice(mag, 8, 1e-9)[tex ? 'tex' : 'text'] : (Math.abs(mag - 1) < 1e-12 ? '' : nice(mag, 8, 1e-9)[tex ? 'tex' : 'text'] + (tex ? '' : '·')) + lam + (t.pw > 1 ? (tex ? `^{${t.pw}}` : (t.pw === 2 ? '²' : '^' + t.pw)) : '');
+                return first ? (t.co < 0 ? '-' : '') + body : ` ${sign} ${body}`;
+            };
+            r.main = { label: 'p(λ) =', text: parts.map((t, i) => fmtTerm(t, i === 0, false)).join(''), tex: `p(\\lambda)=${parts.map((t, i) => fmtTerm(t, i === 0, true)).join('')}` };
             const ev = math.eigs(M).values; r.meta.push('Roots of p are the eigenvalues: ' + (Array.isArray(ev) ? ev : ev.toArray()).map(z => (typeof z === 'number' ? fmt(z, 5) : `${fmt(z.re, 4)}±${fmt(Math.abs(z.im), 4)}i`)).join(', '));
         } else if (op === 'solve') {
             sq(); const b = parseMatrix(opt.b || '', 'a right-hand side b, e.g.  1 ; 2');
