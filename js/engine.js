@@ -325,7 +325,7 @@
     }
 
     function runAlgebrite(cmd) {
-        if (!Algebrite || overBudget()) return null;
+        if (!Algebrite || overBudget() || cmd.length > 420) return null;   // huge inputs can make Algebrite spin for minutes
         try {
             if (typeof Algebrite.clearall === 'function') Algebrite.clearall();
             const out = String(Algebrite.run(cmd)).trim();
@@ -1313,7 +1313,7 @@
         let polyNode = null;
         const aStr = toAlgebrite(a.node);
         let nodeSize = 0; node.traverse(() => { nodeSize++; });
-        const out = nodeSize <= 45 ? runAlgebrite(`taylor(${toAlgebrite(node)}, ${v}, ${n}, ${aStr})`) : null;
+        const out = nodeSize <= 30 && a.value === 0 ? runAlgebrite(`taylor(${toAlgebrite(node)}, ${v}, ${n}, ${aStr})`) : null;
         const parsed = out && fromAlgebrite(out);
         const numericPoly = x => coeffs.reduce((s, c) => s + c.coef * Math.pow(x - a.value, c.k), 0);
         if (parsed && a.value === 0) {

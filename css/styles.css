@@ -15,9 +15,9 @@
     --border-strong: rgba(15, 23, 42, .16);
     --text: #0b1220;
     --text-2: #4b5567;
-    --text-3: #8b94a7;
+    --text-3: #5b657a;
 
-    --accent: #6366f1;
+    --accent: #4f46e5;
     --accent-2: #8b5cf6;
     --accent-3: #22d3ee;
     --accent-soft: rgba(99, 102, 241, .12);
@@ -47,7 +47,7 @@ body.dark {
     --border-strong: rgba(255, 255, 255, .16);
     --text: #eef0f7;
     --text-2: #a7afc2;
-    --text-3: #6c7589;
+    --text-3: #9ba4b9;
     --accent: #818cf8;
     --accent-2: #a78bfa;
     --accent-soft: rgba(129, 140, 248, .16);
