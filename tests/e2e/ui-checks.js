@@ -92,6 +92,28 @@ const check = (name, ok, extra) => { if (!ok) failed++; console.log((ok ? 'ok   
         const o = await m.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); if (o > 1) overflowing.push(md + ':' + o); }
     check('no horizontal page overflow on a 375px phone in any tool', overflowing.length === 0, overflowing);
 
+    // 9. resilience: corrupted saved state and garbage share links must not break start-up
+    const bad = await browser.newContext({ viewport: { width: 1200, height: 900 } }); const bp = await bad.newPage(); const badErrors = [];
+    bp.on('pageerror', e => badErrors.push(e.message));
+    await bp.addInitScript(() => { try { localStorage.setItem('cs_session', '{not json'); localStorage.setItem('cs_history', '[1,2,'); localStorage.setItem('accent', 'nonsense'); localStorage.setItem('themeMode', 42); } catch (e) { /* ignore */ } });
+    for (const hash of ['', '#s=!!!notbase64!!!', '#s=' + Buffer.from('{"m":"nope","f":1}').toString('base64'), '#s=' + Buffer.from('{"m":"integral","f":"<b>x</b>","o":{"lower":{"a":1}}}').toString('base64')]) {
+        await bp.goto(BASE + '/index.html' + hash); await bp.waitForFunction(() => window.__calc, null, { timeout: 15000 }); await bp.waitForTimeout(600);
+    }
+    check('app starts with corrupted storage and malformed share links', badErrors.length === 0 && (await bp.$$('.mode-btn')).length === 16, badErrors);
+    await bad.close();
+
+    // 10. rapid interaction: hammering Compute and switching tools mid-computation must leave the UI usable
+    await page.goto(BASE + '/index.html'); await ready(); await mode('integral'); await page.fill('#functionInput', 'x*e^x');
+    for (let i = 0; i < 6; i++) { await page.click('#computeBtn', { noWaitAfter: true }); await page.waitForTimeout(30); }
+    await mode('derivative'); await mode('limit'); await mode('integral'); await idle();
+    await page.fill('#functionInput', 'x^3'); await page.click('#computeBtn'); await idle();
+    check('UI recovers after rapid clicks and mode switching', /x/.test(await page.textContent('#results .result-content')) && !(await page.$('#computeBtn.loading')));
+
+    // 11. very long expression stays responsive
+    const long = Array.from({ length: 400 }, (_, i) => `${i + 1}*x`).join('+');
+    await mode('derivative'); const t0 = Date.now(); await page.fill('#functionInput', long); await page.click('#computeBtn'); await idle();
+    check('a 400-term expression is handled in reasonable time', Date.now() - t0 < 20000, Date.now() - t0);
+
     check('no uncaught page errors / console errors', errors.length === 0, errors.slice(0, 5));
     await browser.close();
     console.log(failed ? `\n${failed} check(s) failed` : '\nall UI checks passed');
