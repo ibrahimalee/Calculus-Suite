@@ -35,6 +35,17 @@ Plus: command palette (`Ctrl+K`), installable offline PWA, Markdown report expor
 
 Open `index.html` (or `npm run serve` and visit http://localhost:8080). All libraries are vendored in `vendor/` (math.js, Algebrite, Plotly, KaTeX); a CDN fallback is used only if a local file is missing. Deploys as-is to GitHub Pages.
 
+## Deploy to Vercel
+
+The app is a static site (`vercel.json` sets caching, security headers and the service-worker rules).
+
+```
+npm i -g vercel
+vercel --prod        # run from the repository root; accept the defaults
+```
+
+or import the GitHub repository at <https://vercel.com/new> (Framework Preset: *Other*; no build command needed). Vercel deploys the repository's production branch – merge the work branch into `main`, or choose it as the production branch in *Project → Settings → Git*.
+
 ## Develop
 
 ```
