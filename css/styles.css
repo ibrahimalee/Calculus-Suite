@@ -460,3 +460,34 @@ body.dark .badge.ok { color: #4ade80; } body.dark .badge.warn { color: #fbbf24; 
 .cmd-btn kbd { flex: none; }
 .tab.dim { opacity: 1; color: var(--text-3); }
 .tab.dim .ico { opacity: .7; }
+
+/* ---------- v4: mobile & touch optimisation ---------- */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+button, .tab, .mode, select, summary { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+@media (pointer: coarse) {
+    textarea, select, input:not([type=range]):not([type=checkbox]):not([type=radio]) { font-size: 16px !important; }
+    .mini-btn, .template-btn, .keypad button, .icon-btn, .tab { min-height: 44px; min-width: 44px; }
+    .mini-btn { padding: 10px 14px; }
+    input[type=range] { height: 32px; touch-action: pan-y; }
+    input[type=range]::-webkit-slider-thumb { width: 26px; height: 26px; }
+    input[type=range]::-moz-range-thumb { width: 26px; height: 26px; }
+    .footer-contact a { display: inline-block; padding: 10px 4px; }
+    .btn-grid { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 720px) {
+    .container, main, .app-wrap { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+    .tabs { overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab { flex: 0 0 auto; padding: 9px 14px; scroll-snap-align: center; white-space: nowrap; }
+    .plot-area, .plot-3d { min-height: min(340px, 60dvh); }
+    table { display: block; overflow-x: auto; max-width: 100%; }
+    .katex-display { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+    pre, code { overflow-wrap: anywhere; }
+}
+@media (max-width: 360px) {
+    .mode-grid, .modes { grid-template-columns: minmax(0, 1fr); }
+    .brand + * { min-width: 0; }
+}
+@media (max-width: 900px) and (orientation: landscape) { .btn-grid { position: static; } .plot-area { min-height: 260px; } }
+@media (pointer: coarse) { .brand { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; } .cmd-btn { min-width: 44px; } }
