@@ -11,5 +11,5 @@ test('linear and quadratic solve steps', () => {
 test('matrix row operations', () => {
   const r = E.run.matrix('1 2;3 4', { op: 'inverse' }); assert.match(titles(r), /R2 → R2 \+ 3·R1/);
   assert.match(titles(E.run.matrix('1 2 3;4 5 6;7 8 10', { op: 'det' })), /Cofactor/);
-  assert.match(titles(E.run.matrix('2 1 -1;-3 -1 2;-2 1 2', { op: 'rref' })), /rank 3/);
+  assert.match(E.run.matrix('2 1 -1;-3 -1 2;-2 1 2', { op: 'rref' }).steps.map(s => s.text).join(' '), /rank 3/);
 });
