@@ -1,0 +1,198 @@
+/*
+ * Plain-English input → { mode, fn, opts, say }.
+ * Rule based (no AI, no network). Returns null when nothing is recognised.
+ * DOM-free, so it is unit-tested in Node.
+ */
+(function (root, factory) {
+    if (typeof module === 'object' && module.exports) module.exports = factory();
+    else root.NL = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+    'use strict';
+
+    const FN = 'sin|cos|tan|sec|csc|cot|asin|acos|atan|sinh|cosh|tanh|ln|log|exp|sqrt|abs|cbrt';
+    const ALIAS = { arcsin: 'asin', arccos: 'acos', arctan: 'atan', arcsinh: 'asinh', arccosh: 'acosh', arctanh: 'atanh', sine: 'sin', cosine: 'cos', tangent: 'tan' };
+    const NUM = { zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+    const ORD = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10 };
+
+    /** Turn a phrase such as "sin x times e to the x squared" into "sin(x)*e^(x^2)". */
+    function mathify(s) {
+        let t = ' ' + String(s).toLowerCase().replace(/[?!]/g, ' ').replace(/\s+/g, ' ') + ' ';
+        t = t.replace(/\b(arcsin|arccos|arctan|arcsinh|arccosh|arctanh|sine|cosine|tangent)\b/g, (m, a) => ALIAS[a]);
+        t = t.replace(/\bnatural (log|logarithm)\b/g, 'ln').replace(/\blogarithm\b/g, 'log');
+        t = t.replace(/\b(square root|root) of\b/g, 'sqrt of').replace(/\bcube root of\b/g, 'cbrt of');
+        t = t.replace(/\binfinity\b|\binfinite\b|∞/g, 'inf');
+        t = t.replace(/\bplus\b/g, '+').replace(/\bminus\b|\bless\b|\bnegative\b/g, '-').replace(/\bequals?\b|\bis equal to\b/g, '=');
+        t = t.replace(/\b(\w+) (squared)\b/g, '$1^2').replace(/\b(\w+) (cubed)\b/g, '$1^3');
+        t = t.replace(/\be to the (-? ?[\w.]+(?:\^[\w.]+)?)/g, 'e^($1)');
+        t = t.replace(/\bto the power(?: of)? (\w+)/g, '^$1').replace(/\braised to (?:the )?(?:power )?(?:of )?(\w+)/g, '^$1');
+        t = t.replace(/\bto the (\w+)(?: power)?\b(?! of)/g, (m, a) => (/^(\d+|[a-z])$/.test(a) ? '^' + a : m));
+        t = t.replace(/\bone over (\w+)/g, '1/$1').replace(/\bmultiplied by\b|\btimes\b/g, '*').replace(/\bdivided by\b|\bover\b/g, '/');
+        t = t.replace(/\bplus\b/g, '+').replace(/\bminus\b|\bless\b/g, '-');
+        t = t.replace(/\blog base (\w+) of (\w+(?:\^\w+)?)/g, '(log($2)/log($1))');
+        for (let i = 0; i < 6; i++) {
+            const before = t;
+            t = t.replace(new RegExp(`\\b(${FN}|a?(?:sin|cos|tan)h?)(?: of)? (-?[\\w.]+(?:\\^-?[\\w.]+)?)(?![\\w(])`, 'g'), '$1($2)');
+            if (t === before) break;
+        }
+        t = t.replace(/\^\((\w+)\)/g, '^$1').replace(/\be ?\^ ?(\w+)/g, 'e^$1').replace(/\be to (\w+)/g, 'e^$1');
+        t = t.replace(/\band\b/g, ' ');
+        return t.replace(/\s*([+\-*/^=()])\s*/g, '$1').replace(/\s+/g, ' ').trim();
+    }
+
+    const num = w => (w in NUM ? NUM[w] : w in ORD ? ORD[w] : (/^\d+$/.test(w) ? +w : null));
+    const limitWord = w => String(w).replace(/\binfinity\b|∞/g, 'inf').replace(/minus\s+inf/, '-inf').replace(/negative\s+inf/, '-inf').replace(/\s+/g, '');
+
+    function matrixFrom(text) {
+        const m = text.match(/\[\s*\[.*\]\s*\]|\[.*;.*\]/s);
+        if (!m) return null;
+        const body = m[0].replace(/^\[+|\]+$/g, '');
+        return body.split(/\]\s*,?\s*\[|;/).map(r => r.replace(/[\[\]]/g, '').trim().split(/[\s,]+/).filter(Boolean).join(' ')).join(' ; ');
+    }
+
+    function grabVar(t) {
+        const m = t.match(/(?:with respect to|wrt|w\.r\.t\.?|in terms of|for|d)\s*\(?\s*([a-z])\s*\)?\s*$/);
+        return m ? m[1] : undefined;
+    }
+
+    function parse(raw) {
+        if (!raw || !String(raw).trim()) return null;
+        let t = String(raw).trim().replace(/’|’/g, "'");
+        const lower = t.toLowerCase().replace(/[.?!]+$/g, '');
+        const strip = s => s.replace(/^(please |hey |hi )?(can|could|would) you (please )?/, '').replace(/^(please )?(find|calculate|compute|evaluate|determine|work out|give me|tell me|show me|what is|what's|whats|what are|how (do|would) (i|you)|how to)\s+/, '').replace(/^(the )/, '');
+        let s = strip(lower);
+
+        // ---- matrices ------------------------------------------------------
+        const M = matrixFrom(t);
+        if (M) {
+            const ops = [['determinant|det\\b', 'det'], ['inverse', 'inverse'], ['eigen', 'eigen'], ['rank', 'rank'], ['transpose', 'transpose'], ['trace', 'trace'], ['row reduc|rref|echelon', 'rref'], ['char(acteristic)? poly', 'charpoly'], ['\\blu\\b', 'lu'], ['\\bqr\\b', 'qr'], ['singular value|\\bsvd\\b', 'svd']];
+            for (const [re, op] of ops) if (new RegExp(re).test(lower)) return { mode: 'matrix', fn: M, opts: { op }, say: `Matrix → ${op}` };
+        }
+
+        // ---- ODEs ----------------------------------------------------------
+        let m = s.match(/(?:solve |ode |differential equation )?(?:the )?(?:dy\/dx|y')\s*=\s*(.+)$/);
+        if (m) return { mode: 'ode', fn: mathify(m[1]), opts: { odeType: 'first', x0: '0', xEnd: '10', y0: '1' }, say: 'First-order ODE (y(0)=1 assumed)' };
+        m = s.match(/(?:solve )?(?:the )?(?:d2y\/dx2|y'')\s*=\s*(.+)$/);
+        if (m) return { mode: 'ode', fn: mathify(m[1]).replace(/y'/g, 'yp'), opts: { odeType: 'second', x0: '0', xEnd: '10', y0: '1', v0: '0' }, say: 'Second-order ODE' };
+
+        // ---- Laplace / Fourier transforms ----------------------------------
+        m = s.match(/^(inverse laplace(?: transform)?|laplace(?: transform)?|fourier transform) (?:of )?(.+)$/);
+        if (m) return { mode: 'laplace', fn: mathify(m[2]), opts: { op: /inverse/.test(m[1]) ? 'inverse' : /fourier/.test(m[1]) ? 'fourier' : 'laplace' }, say: m[1] };
+
+        // ---- derivatives ---------------------------------------------------
+        m = s.match(/^(?:the )?(?:(\w+) )?(?:derivative|differentiate|differentiation)(?: of)? (.+)$/) || s.match(/^d\/d([a-z]) (.+)$/);
+        if (m) {
+            let order = 1, body = m[2], variable;
+            if (m[1] && /^d\/d/.test(s)) variable = m[1];
+            else if (m[1]) order = num(m[1]) || 1;
+            const nth = body.match(/^(\w+) derivative of (.+)$/);
+            if (nth && num(nth[1])) { order = num(nth[1]); body = nth[2]; }
+            let point = '';
+            const at = body.match(/^(.*?)\s+(?:at|when)\s+(?:[a-z]\s*=\s*|the point )?(-?[\w./^]+)$/);
+            if (at) { body = at[1]; point = mathify(at[2]); }
+            const wrt = body.match(/^(.*?)\s+(?:with respect to|wrt|w\.r\.t\.?)\s+([a-z])$/);
+            if (wrt) { body = wrt[1]; variable = wrt[2]; }
+            return { mode: 'derivative', fn: mathify(body.replace(/^of /, '')), opts: { order: String(order), point, variable: variable || '' }, say: `${order > 1 ? order + 'th ' : ''}derivative` };
+        }
+
+        // ---- integrals -----------------------------------------------------
+        m = s.match(/^(?:the )?(?:definite |indefinite |improper )?(?:integral|integrate|antiderivative|anti-derivative|area under(?: the curve)?)(?: of)? (.+)$/);
+        if (m) {
+            let body = m[1], lower = '', upper = '', variable;
+            const lim = body.match(/^(.*?)\s*(?:from|between)\s+(.+?)\s+(?:to|and)\s+(.+)$/);
+            if (lim) { body = lim[1]; lower = mathify(limitWord(lim[2])); upper = mathify(limitWord(lim[3])); }
+            const wrt = body.match(/^(.*?)\s+(?:with respect to|wrt)\s+([a-z])$/); if (wrt) { body = wrt[1]; variable = wrt[2]; }
+            const dx = body.match(/^(.*?)\s*d([a-z])$/); if (dx && dx[1] && /[^a-z]$|\s$|\)$|\d$|[a-z]$/.test(dx[1])) { body = dx[1]; variable = variable || dx[2]; }
+            return { mode: 'integral', fn: mathify(body), opts: { method: 'auto', lower, upper, variable: variable || '' }, say: lower || upper ? 'Definite integral' : 'Indefinite integral' };
+        }
+        m = s.match(/^(?:the )?(?:area|volume) (?:of|under|between) (.+)$/);
+        if (m && /from .+ to/.test(m[1])) {
+            const lim = m[1].match(/^(.*?)\s*from\s+(.+?)\s+to\s+(.+)$/);
+            return { mode: 'integral', fn: mathify(lim[1].replace(/^the curve /, '')), opts: { method: 'auto', lower: mathify(limitWord(lim[2])), upper: mathify(limitWord(lim[3])), variable: '' }, say: 'Area as a definite integral' };
+        }
+
+        // ---- limits --------------------------------------------------------
+        m = s.match(/^(?:the )?limit(?: of)? (.+?)\s+as\s+([a-z])\s*(?:->|→|approaches|tends to|goes to|going to|→)\s*(.+)$/);
+        if (m) {
+            let target = m[3], direction = 'both';
+            const side = target.match(/^(.*?)\s*(?:from the )?(left|right|above|below|\+|-|⁺|⁻)$/);
+            if (side && /(?:from the |^)/.test(target) && / from the | from |\^?[+-]$/.test(' ' + target)) {
+                if (/left|below|-|⁻/.test(side[2])) direction = 'left'; else direction = 'right';
+                target = side[1].replace(/\s*from( the)?$/, '');
+            }
+            return { mode: 'limit', fn: mathify(m[1]), opts: { point: mathify(limitWord(target)), direction, variable: m[2] === 'x' ? '' : m[2] }, say: 'Limit' };
+        }
+
+        // ---- Taylor series -------------------------------------------------
+        m = s.match(/^(?:the )?(taylor|maclaurin|power)(?: series| polynomial| expansion)?(?: of| for)? (.+)$/);
+        if (m) {
+            let body = m[2], point = m[1] === 'maclaurin' ? '0' : '0', terms = '6';
+            const deg = body.match(/^(.*?)\s*(?:up to|to|with|of|degree|order|until)\s+(?:degree |order |n\s*=\s*)?(\w+)(?: terms?| degree| order)?$/);
+            if (deg && num(deg[2]) != null) { body = deg[1]; terms = String(num(deg[2])); }
+            const at = body.match(/^(.*?)\s*(?:around|about|at|centered at|centred at)\s+(?:[a-z]\s*=\s*)?(.+)$/);
+            if (at) { body = at[1]; point = mathify(at[2]); }
+            return { mode: 'series', fn: mathify(body), opts: { point, terms, variable: '' }, say: `${m[1]} series` };
+        }
+
+        // ---- sums ----------------------------------------------------------
+        m = s.match(/^(?:the )?sum of (.+?)\s+from\s+([a-z])\s*=\s*(\w+)\s+to\s+(\w+)$/);
+        if (m) return { mode: 'sums', fn: mathify(m[1]), opts: { lower: m[3], upper: limitWord(m[4]), variable: m[2] }, say: 'Series sum' };
+        m = s.match(/^(?:does|do) (?:the )?(?:series|sum) (?:of )?(.+?) converge$/);
+        if (m) return { mode: 'sums', fn: mathify(m[1]), opts: { lower: '1', upper: 'inf', variable: 'k' }, say: 'Convergence test' };
+
+        // ---- roots / zeros -------------------------------------------------
+        m = s.match(/^(?:the )?(?:roots|zeros|zeroes|solutions|root|zero) of (.+)$/);
+        if (m) { const e = mathify(m[1]); return { mode: 'solve', fn: /=|<|>/.test(e) ? e : e + '=0', opts: {}, say: 'Solve f(x) = 0' }; }
+
+        // ---- analysis ------------------------------------------------------
+        m = s.match(/^(?:analy[sz]e|study|examine|(?:the )?(?:extrema|maxima|minima|maximum|minimum|critical points|inflection points|asymptotes|turning points|stationary points))(?: of| for)? (.+)$/);
+        if (m) return { mode: 'analysis', fn: mathify(m[1].replace(/^the function /, '')), opts: { min: '-10', max: '10' }, say: 'Function analysis' };
+        m = s.match(/^where is (.+?) (?:increasing|decreasing|concave.*|convex.*)$/);
+        if (m) return { mode: 'analysis', fn: mathify(m[1]), opts: { min: '-10', max: '10' }, say: 'Function analysis' };
+
+        // ---- plots ---------------------------------------------------------
+        m = s.match(/^(?:plot|graph|draw|sketch|visuali[sz]e)(?: the)?(?: function| curve)?(?: of)? (.+)$/);
+        if (m) return { mode: 'graph', fn: mathify(m[1].replace(/^y\s*=\s*/, '')), opts: {}, say: 'Graph' };
+
+        // ---- units ---------------------------------------------------------
+        m = s.match(/^(?:convert )?(-?[\d.]+(?:e-?\d+)?\s*[a-z°/%²³^0-9 ]*?)\s+(?:to|in|into)\s+([a-z°/%²³^0-9]+)$/);
+        if (m && /\d\s*[a-z]/.test(m[1].replace(/\s/g, ''))) return { mode: 'units', fn: `${m[1].trim()} to ${m[2]}`, opts: {}, say: 'Unit conversion' };
+
+        // ---- number theory ---------------------------------------------------
+        m = s.match(/^(?:prime )?factori[sz]e (?:the number )?(\d+)$|^prime factors? of (\d+)$|^factor (\d+)$/);
+        if (m) return { mode: 'number', fn: m[1] || m[2] || m[3], opts: { op: 'factor' }, say: 'Prime factorisation' };
+        m = s.match(/^(?:is )?(\d+) (?:a )?prime\??$/);
+        if (m) return { mode: 'number', fn: m[1], opts: { op: 'isprime' }, say: 'Primality test' };
+        m = s.match(/^(gcd|lcm|greatest common (?:divisor|factor)|least common multiple)(?: of)? (\d+)(?: and |, ?| )(\d+)$/);
+        if (m) return { mode: 'number', fn: `${m[2]}, ${m[3]}`, opts: { op: /gcd|greatest/.test(m[1]) ? 'gcd' : 'lcm' }, say: m[1] };
+        m = s.match(/^(\d+) (?:choose|c) (\d+)$|^combinations? of (\d+) (?:and|choose|taken) (\d+)$/);
+        if (m) return { mode: 'number', fn: `${m[1] || m[3]}, ${m[2] || m[4]}`, opts: { op: 'ncr' }, say: 'Combinations' };
+        m = s.match(/^(\d+)(?:th|st|nd|rd)? fibonacci(?: number)?$|^fibonacci(?: number)?(?: of)? (\d+)$/);
+        if (m) return { mode: 'number', fn: m[1] || m[2], opts: { op: 'fib' }, say: 'Fibonacci' };
+
+        // ---- statistics ----------------------------------------------------
+        m = s.match(/^(?:the )?(mean|average|median|mode|standard deviation|variance|summary statistics|statistics|describe)(?: of)? ([-\d.,\s]+)$/);
+        if (m) return { mode: 'stats', fn: m[2].trim(), opts: { op: 'describe' }, say: 'Descriptive statistics' };
+        m = s.match(/^(?:linear |quadratic )?regression(?: of| for| on)? (.+)$/);
+        if (m) return { mode: 'stats', fn: m[1], opts: { op: 'regression', model: /quadratic/.test(s) ? 'quadratic' : 'linear' }, say: 'Regression' };
+
+        // ---- complex -------------------------------------------------------
+        m = s.match(/^(?:domain colou?ring|complex plot|plot (?:the )?complex function)(?: of)? (.+)$/);
+        if (m) return { mode: 'complex', fn: mathify(m[1]), opts: { op: 'domain' }, say: 'Complex function plot' };
+
+        // ---- solve ---------------------------------------------------------
+        m = s.match(/^(?:solve|find x|find the solutions? (?:of|to))(?: the)?(?: equation| inequality)?(?: for ([a-z]))?:?\s*(.+)$/);
+        if (m) {
+            let body = m[2].replace(/\s+for\s+([a-z])$/, (x, v) => ''); const e = mathify(body);
+            return { mode: 'solve', fn: e, opts: {}, say: 'Equation solver' };
+        }
+        if (/[a-z0-9)]\s*=\s*[^=]*[a-z0-9(]/.test(s) && /[a-z]/.test(s) && !/\b(plot|graph)\b/.test(s)) return { mode: 'solve', fn: mathify(s), opts: {}, say: 'Equation solver' };
+
+        // ---- arithmetic -----------------------------------------------------
+        const e = mathify(s.replace(/^(what is|calculate|compute)\s+/, ''));
+        if (e && /^[-+*/^().\w\s]+$/.test(e) && /\b[xyt]\b|\b[xyt]\^|\([xyt]\)/.test(e) && !/[a-z]{4,}\s[a-z]{3,}/.test(e.replace(/(sin|cos|tan|sqrt|abs|exp|log|ln|asin|acos|atan|sinh|cosh|tanh|cbrt|sec|csc|cot)/g, ''))) return { mode: 'graph', fn: e, opts: {}, say: 'Graph' };
+        if (e && /^[-+*/^().\d\sa-z,%!]+$/.test(e) && /[\d]/.test(e) && !/\bx\b/.test(e)) return { mode: 'calc', fn: e, opts: {}, say: 'Calculator' };
+        return null;
+    }
+
+    return { parse, mathify };
+});

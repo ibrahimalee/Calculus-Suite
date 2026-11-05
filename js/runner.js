@@ -12,7 +12,11 @@
     const pending = new Map();
 
     function getEngine() {
-        if (!engine) engine = CalcEngine.create(math, typeof Algebrite !== 'undefined' ? Algebrite : null);
+        if (!engine) {
+            const alg = typeof Algebrite !== 'undefined' ? Algebrite : null;
+            engine = CalcEngine.create(math, alg);
+            if (typeof CalcExtras !== 'undefined') CalcExtras.install(engine, math, alg);
+        }
         return engine;
     }
 

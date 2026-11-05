@@ -618,3 +618,6 @@ a { color: var(--accent); }
 .progress { border-radius: 0; }
 .mode-btn:last-child:nth-child(odd) { grid-column: 1 / -1; }
 #inputLabel, .field-label #inputLabel { text-transform: none; font-family: var(--serif); font-style: italic; font-size: 15px; letter-spacing: 0; }
+.ask-row { display: flex; gap: 8px; } .ask-row input { flex: 1; min-width: 0; font-family: var(--font); }
+.ask-go { flex: 0 0 auto; min-width: 46px; padding: 0 14px; }
+.ask-note { margin-top: 8px; font-size: 12.5px; color: var(--text-2); line-height: 1.45; } .ask-note.bad { color: var(--err); }

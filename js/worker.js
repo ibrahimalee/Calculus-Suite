@@ -3,10 +3,11 @@
 try {
     // The vendored browser bundles expect a `window`; a worker only has `self`.
     if (typeof window === 'undefined') self.window = self;
-    importScripts('../vendor/math.min.js', '../vendor/algebrite.min.js', 'engine.js');
+    importScripts('../vendor/math.min.js', '../vendor/algebrite.min.js', 'engine.js', 'extras.js');
     const g = self;
     const Alg = g.Algebrite || (g.window && g.window.Algebrite);
     const engine = g.CalcEngine.create(g.math, Alg);
+    g.CalcExtras.install(engine, g.math, Alg);
     g.onmessage = ev => {
         const { id, mode, src, opts } = ev.data;
         try {

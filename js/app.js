@@ -647,6 +647,22 @@
         return vals;
     }
 
+    /** Plain-English question → the right tool, filled in and run. */
+    function askNL(text) {
+        const note = $('askNote');
+        const res = window.NL && window.NL.parse(text);
+        if (!res || !MODES[res.mode]) { note.textContent = text.trim() ? 'I could not understand that. Try “integrate x squared from 0 to 3” or use a tool directly.' : 'Type a question first.'; note.classList.add('bad'); return; }
+        note.classList.remove('bad');
+        setMode(res.mode, true);
+        const vals = currentValues();
+        MODES[res.mode].fields.forEach(f => { vals[f.key] = f.def; });
+        Object.assign(vals, res.opts);
+        $('functionInput').value = res.fn;
+        renderOptions(); updateInputLabels(); validateInput();
+        note.textContent = 'Understood as: ' + res.say + ' – ' + res.fn;
+        compute();
+    }
+
     async function compute() {
         if (state.busy) { Runner.cancel(); return; }
         if (!validateInput()) { showError('Please enter a valid expression first.'); return; }
@@ -1352,6 +1368,7 @@
         $('resolution').addEventListener('change', refreshActivePlot);
 
         $('computeBtn').addEventListener('click', compute);
+        $('askForm').addEventListener('submit', e => { e.preventDefault(); askNL($('askInput').value); });
         $('clearBtn').addEventListener('click', clearAll);
         $('clearHistory').addEventListener('click', () => { try { localStorage.removeItem('cs_history'); } catch (e) { /* ignore */ } renderHistory(); });
 

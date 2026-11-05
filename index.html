@@ -46,6 +46,17 @@
 
         <div class="main-grid">
             <aside class="sidebar" aria-label="Inputs">
+                <section class="panel ask" aria-label="Ask in plain English">
+                    <form id="askForm" autocomplete="off">
+                        <label class="field-label" for="askInput">Ask in plain English</label>
+                        <div class="ask-row">
+                            <input id="askInput" type="text" spellcheck="false" placeholder="e.g. integrate x squared from 0 to 3">
+                            <button class="btn btn-primary ask-go" type="submit" aria-label="Run this question"><span data-icon="play" data-size="16"></span></button>
+                        </div>
+                        <div class="ask-note" id="askNote" aria-live="polite">Try: “derivative of sin x times e to the x”, “limit of sin x over x as x goes to 0”, “5 km/h to m/s”.</div>
+                    </form>
+                </section>
+
                 <section class="panel" aria-label="Choose a tool">
                     <div id="modeGrid"></div>
                 </section>
