@@ -257,7 +257,7 @@
     const fact = n => { let f = 1; for (let i = 2; i <= n; i++) f *= i; return f; };
 
     const polyStr = (co, v, tex) => {
-        const T = x => nice(x, 8, 1e-9);
+        const T = x => { const r0 = Math.round(x); return Math.abs(x - r0) < 1e-9 * Math.max(1, Math.abs(x)) ? nice(r0, 12, 1e-12) : nice(x, 8, 1e-9); };
         const parts = [];
         for (let k = co.length - 1; k >= 0; k--) {
             const c = co[k]; if (Math.abs(c) < 1e-11) continue;
@@ -290,7 +290,11 @@
             if (Math.abs(p.z.im) < 1e-9) fac.push({ kind: 'real', a: p.z.re, m: p.m });
             else { const j = poles.findIndex((q, k) => !used[k] && Math.abs(q.z.re - p.z.re) < 1e-8 && Math.abs(q.z.im + p.z.im) < 1e-8); if (j >= 0) used[j] = true; fac.push({ kind: 'quad', a: p.z.re, b: Math.abs(p.z.im), m: p.m }); }
         });
-        let numR = num.map(c => c.re); while (numR.length > 1 && Math.abs(numR[numR.length - 1]) < 1e-11 * mag) numR.pop();
+        let numR = num.map(c => c.re);
+        const maxNum = Math.max(1e-300, ...numR.map(Math.abs));
+        const topDeg = (den.length - 1) - (Math.min(...terms.map(t => t.n)) + 1);     // F(s) ~ s^-(n+1): no higher power can occur
+        while (numR.length - 1 > Math.max(topDeg, 0)) numR.pop();
+        while (numR.length > 1 && Math.abs(numR[numR.length - 1]) < 1e-12 * maxNum) numR.pop();
         return { num: numR, den: den.map(c => c.re), fac, sigma: Math.max(...poles.map(p => p.z.re)) };
     }
     function facStr(fac, v, tex) {
@@ -313,7 +317,7 @@
         const terms = Array.from(toExpPoly(node, v).values());
         const r = I.makeResult('laplace', 'Laplace transform');
         r.items.push({ label: `f(${v}) =`, text: engine.strOf(node), tex: `f(${v})=${engine.texOf(node)}` });
-        if (!terms.length) { r.main = { label: `ℒ{f}(s) =`, text: '0', tex: '\\mathcal{L}\\{f\\}(s)=0' }; return I.finalizeText(r); }
+        if (!terms.length) { r.main = { label: `ℒ{f}(s) =`, text: '0', tex: '\\mathcal{L}\\{f\\}(s)=0' }; r.meta.push('Verified: after expansion every term cancels, so f(t) = 0 identically.'); return I.finalizeText(r); }
         const L = laplaceOfTerms(terms);
         const nStr = polyStr(L.num, 's'), dStr = facStr(L.fac, 's'), nTex = polyStr(L.num, 's', true), dTex = facStr(L.fac, 's', true);
         r.main = { label: 'F(s) =', text: `(${nStr}) / (${dStr})`, tex: `F(s)=\\dfrac{${nTex}}{${dTex}}` };
@@ -445,6 +449,7 @@
         return I.finalizeText(r);
     }
     register({ laplace: runLaplace });
+    Object.assign(engine.extras, { toExpPoly, laplaceOfTerms });
 
     // ======================================================================
     // Vector calculus: Jacobian, line integrals, work, triple integrals
@@ -602,7 +607,7 @@
         if (op === 'lu') {
             if (m !== n) throw new CalcError('LU decomposition needs a square matrix.');
             const d = math.lup(M); const L = d.L.toArray ? d.L.toArray() : d.L, U = d.U.toArray ? d.U.toArray() : d.U, p = d.p;
-            const P = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (p[i] === j ? 1 : 0)));
+            const P = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (p[j] === i ? 1 : 0)));   // row i of PA is row p⁻¹(i) of A
             r.title = 'LU decomposition (partial pivoting)';
             r.main = { label: 'PA = LU', text: `L = ${mTxt(L)},  U = ${mTxt(U)}`, tex: `PA=LU,\\quad L=${mTex(L)},\; U=${mTex(U)}` };
             r.items.push({ label: 'P =', text: mTxt(P), tex: `P=${mTex(P)}` });
@@ -945,8 +950,9 @@
         const toC = z => { const c = math.complex(z); return { re: c.re, im: c.im }; };
         const cstr = z => { const a = nice(z.re, 8, 1e-9).text, b = nice(Math.abs(z.im), 8, 1e-9).text; if (Math.abs(z.im) < 1e-12) return a; const bi = b === '1' ? 'i' : `${b}i`; if (Math.abs(z.re) < 1e-12) return `${z.im < 0 ? '-' : ''}${bi}`; return `${a} ${z.im < 0 ? '−' : '+'} ${bi}`; };
         if (op === 'arith') {
-            const node = engine.parse(src); let z; try { z = node.compile().evaluate({}); } catch (e) { throw new CalcError('Could not evaluate that complex expression.'); }
-            const c = toC(z); if (!Number.isFinite(c.re) || !Number.isFinite(c.im)) throw new CalcError('The result is not finite.');
+            const node = engine.parse(src); const fv = engine.freeVars(node).filter(n => n !== 'i'); if (fv.length) throw new CalcError(`Unknown symbol “${fv[0]}”. Use numbers and i only (or switch to Domain colouring for functions of z).`);
+            let z; try { z = node.compile().evaluate({}); } catch (e) { throw new CalcError('Could not evaluate that complex expression.'); }
+            let c; try { c = toC(z); } catch (e) { throw new CalcError('That is not a complex number.'); } if (!Number.isFinite(c.re) || !Number.isFinite(c.im)) throw new CalcError('The result is not finite.');
             const mod = Math.hypot(c.re, c.im), arg = Math.atan2(c.im, c.re);
             r.title = 'Complex number'; r.main = { label: 'z =', text: cstr(c), tex: `z=${nice(c.re, 8, 1e-9).tex}${c.im < 0 ? '-' : '+'}${nice(Math.abs(c.im), 8, 1e-9).tex}i` };
             r.items.push({ label: 'Modulus |z| =', text: nice(mod, 8, 1e-9).text, tex: '' }); r.items.push({ label: 'Argument arg z =', text: `${engine.fmt(arg, 8)} rad = ${engine.fmt(arg * 180 / Math.PI, 8)}°`, tex: '' });

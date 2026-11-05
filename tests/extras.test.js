@@ -61,3 +61,13 @@ test('complex tools', () => {
   assert.equal(E.run.complex('z^4-1', { op: 'roots' }).main.text, '1,  i,  -1,  -i');
   const d = E.run.complex('(z^2-1)/(z^2+1)', { op: 'domain' }); assert.ok(d.plot.generic.traces[0].z.length === 150);
 });
+test('regression: LU with several row swaps verifies (permutation convention)', () => {
+  for (const m of ['-3 5 3 -3 ; -5 3 -3 0 ; -1 1 0 -5 ; -5 -1 1 5', '-4 1 -3 -3 ; -3 3 5 5 ; 2 -3 -3 3 ; 4 0 1 0']) {
+    const r = E.run.matrix(m, { op: 'lu' }); assert.ok(parseFloat(r.meta.find(x => /^Verified/.test(x)).match(/= ([\d.e+-]+)/)[1]) < 1e-9);
+  }
+});
+test('regression: Laplace of a three-pole-group sum keeps its leading numerator terms', () => {
+  const r = E.run.laplace('0.5*t^3*exp(2t)*cos(3t) - 1*t*exp(-3t)*cos(t) + 2*t^3*exp(-3t)*sin(2t)', {});
+  assert.ok(r.meta.some(m => /Verified/.test(m)), r.warnings.join());
+});
+test('complex arithmetic rejects unknown symbols cleanly', () => { assert.throws(() => E.run.complex('s+1', { op: 'arith' }), /Unknown symbol/); });
