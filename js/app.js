@@ -254,8 +254,8 @@
         label: 'Matrices', icon: '[ ]',
         input: () => ({ label: 'Matrix A  (rows separated by ; or new lines)', placeholder: 'e.g. 2 1 ; 1 3', hint: 'Entries may be numbers or expressions like pi/2. Up to 8×8.' }),
         fields: [
-            { key: 'op', label: 'Operation', type: 'select', def: 'det', options: [['det', 'Determinant'], ['inverse', 'Inverse'], ['eigen', 'Eigenvalues & eigenvectors'], ['rank', 'Rank & row-reduced form'], ['rref', 'Reduced row echelon form'], ['transpose', 'Transpose'], ['trace', 'Trace'], ['charpoly', 'Characteristic polynomial'], ['solve', 'Solve A·x = b'], ['power', 'Matrix power Aⁿ']] },
-            { key: 'b', label: 'Right-hand side b (column, rows split by ;)', type: 'text', def: '1 ; 2', show: v => v.op === 'solve' },
+            { key: 'op', label: 'Operation', type: 'select', def: 'det', options: [['det', 'Determinant'], ['inverse', 'Inverse'], ['eigen', 'Eigenvalues & eigenvectors'], ['rank', 'Rank & row-reduced form'], ['rref', 'Reduced row echelon form'], ['transpose', 'Transpose'], ['trace', 'Trace'], ['charpoly', 'Characteristic polynomial'], ['solve', 'Solve A·x = b'], ['power', 'Matrix power Aⁿ'], ['lu', 'LU decomposition'], ['qr', 'QR decomposition'], ['cholesky', 'Cholesky decomposition'], ['svd', 'Singular value decomposition'], ['pinv', 'Pseudoinverse A⁺'], ['cond', 'Condition number'], ['nullspace', 'Null space'], ['colspace', 'Column space'], ['diagonalize', 'Diagonalise A = PDP⁻¹'], ['leastsquares', 'Least-squares A·x ≈ b']] },
+            { key: 'b', label: 'Right-hand side b (column, rows split by ;)', type: 'text', def: '1 ; 2', show: v => v.op === 'solve' || v.op === 'leastsquares' },
             { key: 'power', label: 'Exponent n', type: 'number', def: '5', min: -20, max: 20, show: v => v.op === 'power' }
         ],
         examples: [
@@ -264,7 +264,12 @@
             { label: 'Eigenvalues of [[2,1],[1,2]]', fn: '2 1 ; 1 2', opts: { op: 'eigen' } },
             { label: 'Rank of a singular matrix', fn: '1 2 3 ; 4 5 6 ; 7 8 9', opts: { op: 'rank' } },
             { label: 'Solve a linear system', fn: '2 1 ; 1 3', opts: { op: 'solve', b: '3 ; 5' } },
-            { label: 'Fibonacci via matrix power', fn: '1 1 ; 1 0', opts: { op: 'power', power: '10' } }
+            { label: 'Fibonacci via matrix power', fn: '1 1 ; 1 0', opts: { op: 'power', power: '10' } },
+            { label: 'LU decomposition', fn: '4 3 ; 6 3', opts: { op: 'lu' } },
+            { label: 'Singular values of a 3×2 matrix', fn: '1 2 ; 3 4 ; 5 6', opts: { op: 'svd' } },
+            { label: 'Best-fit line (least squares)', fn: '1 1 ; 1 2 ; 1 3', opts: { op: 'leastsquares', b: '1 ; 2 ; 2' } },
+            { label: 'Diagonalise a symmetric matrix', fn: '2 1 ; 1 2', opts: { op: 'diagonalize' } },
+            { label: 'Null space of a singular matrix', fn: '1 2 3 ; 4 5 6 ; 7 8 9', opts: { op: 'nullspace' } }
         ]
     };
 
@@ -320,17 +325,131 @@
         ]
     };
 
+
+    MODES.laplace = {
+        label: 'Transforms', icon: 'ℒ',
+        input: v => ({ laplace: { label: 'f(t)', placeholder: 'e.g. t^2*exp(-3t)*cos(2t)', hint: 'Laplace transform of sums and products of polynomials, exponentials, sin, cos, sinh and cosh.' }, inverse: { label: 'F(s)', placeholder: 'e.g. (s+3)/(s^2+2s+5)', hint: 'A proper rational function of s: partial fractions with complex and repeated poles.' }, fourier: { label: 'f(t)', placeholder: 'e.g. exp(-abs(t))', hint: 'Fourier transform F(ω) = ∫ f(t)e^(−iωt) dt of an absolutely integrable function.' } }[v.op || 'laplace']),
+        fields: [{ key: 'op', label: 'Transform', type: 'select', def: 'laplace', options: [['laplace', 'Laplace  ℒ{f(t)}'], ['inverse', 'Inverse Laplace  ℒ⁻¹{F(s)}'], ['fourier', 'Fourier transform']] }],
+        examples: [
+            { label: 'ℒ{t²·e^(−3t)}', fn: 't^2*exp(-3t)', opts: { op: 'laplace' } },
+            { label: 'ℒ{e^(−t)·cos 2t + 3}', fn: 'exp(-t)*cos(2t)+3', opts: { op: 'laplace' } },
+            { label: 'ℒ{sin 2t · cos t}', fn: 'sin(2t)*cos(t)', opts: { op: 'laplace' } },
+            { label: 'ℒ⁻¹{(s+3)/(s²+2s+5)}', fn: '(s+3)/(s^2+2s+5)', opts: { op: 'inverse' } },
+            { label: 'ℒ⁻¹{1/(s(s+1)²)} (repeated pole)', fn: '1/(s*(s+1)^2)', opts: { op: 'inverse' } },
+            { label: 'Fourier: e^(−|t|)', fn: 'exp(-abs(t))', opts: { op: 'fourier' } },
+            { label: 'Fourier: Gaussian e^(−t²/2)', fn: 'exp(-t^2/2)', opts: { op: 'fourier' } },
+            { label: 'Fourier: 1/(1+t²)', fn: '1/(1+t^2)', opts: { op: 'fourier' } }
+        ]
+    };
+    MODES.vector = {
+        label: 'Vector calculus', icon: '∮',
+        input: v => ({ jacobian: { label: 'F = (F₁ ; F₂ ; …)', placeholder: 'e.g. x^2*y ; sin(x)+z', hint: 'Components separated by ;  The Jacobian holds every partial derivative ∂Fᵢ/∂xⱼ.' }, line: { label: 'Scalar field f(x, y, z)', placeholder: 'e.g. x^2 + y^2', hint: 'Integrates f along the path with ds = |r′(t)| dt.' }, work: { label: 'Vector field F = (P ; Q ; R)', placeholder: 'e.g. -y ; x', hint: 'Work / circulation ∫ F·dr along the path r(t).' }, triple: { label: 'f(x, y, z)', placeholder: 'e.g. x*y*z', hint: 'Iterated triple integral: z is innermost, then y, then x.' } }[v.op || 'jacobian']),
+        fields: [
+            { key: 'op', label: 'Operation', type: 'select', def: 'jacobian', options: [['jacobian', 'Jacobian matrix & determinant'], ['line', 'Line integral of a scalar field ∫ f ds'], ['work', 'Work / circulation ∫ F·dr'], ['triple', 'Triple integral ∭ f dV']] },
+            { key: 'vars', label: 'Variables (comma-separated, blank = auto)', type: 'text', def: '', placeholder: 'x, y, z', show: v => v.op === 'jacobian' || v.op === 'triple' },
+            { key: 'point', label: 'Evaluate at point (optional)', type: 'text', def: '', placeholder: 'e.g. 1, 2', show: v => v.op === 'jacobian' },
+            { key: 'px', label: 'x(t) =', type: 'text', def: 'cos(t)', show: v => v.op === 'line' || v.op === 'work' },
+            { key: 'py', label: 'y(t) =', type: 'text', def: 'sin(t)', show: v => v.op === 'line' || v.op === 'work' },
+            { key: 'pz', label: 'z(t) = (optional)', type: 'text', def: '', show: v => v.op === 'line' || v.op === 'work' },
+            { key: 'ta', label: 't from', type: 'text', def: '0', show: v => v.op === 'line' || v.op === 'work' },
+            { key: 'tb', label: 't to', type: 'text', def: '2*pi', show: v => v.op === 'line' || v.op === 'work' },
+            { key: 'xLow', label: 'x from', type: 'text', def: '0', show: v => v.op === 'triple' }, { key: 'xHigh', label: 'x to', type: 'text', def: '1', show: v => v.op === 'triple' },
+            { key: 'yLow', label: 'y from (may use x)', type: 'text', def: '0', show: v => v.op === 'triple' }, { key: 'yHigh', label: 'y to (may use x)', type: 'text', def: 'x', show: v => v.op === 'triple' },
+            { key: 'zLow', label: 'z from (may use x, y)', type: 'text', def: '0', show: v => v.op === 'triple' }, { key: 'zHigh', label: 'z to (may use x, y)', type: 'text', def: 'x+y', show: v => v.op === 'triple' }
+        ],
+        examples: [
+            { label: 'Jacobian of polar → Cartesian', fn: 'r*cos(t) ; r*sin(t)', opts: { op: 'jacobian', vars: 'r, t', point: '' } },
+            { label: 'Jacobian of a 3-D map at a point', fn: 'x^2*y ; sin(x)+z ; x*y*z', opts: { op: 'jacobian', vars: '', point: '1, 2, 3' } },
+            { label: '∮ (x²+y²) ds around the unit circle', fn: 'x^2+y^2', opts: { op: 'line', px: 'cos(t)', py: 'sin(t)', pz: '', ta: '0', tb: '2*pi' } },
+            { label: 'Circulation of (−y, x) on the unit circle', fn: '-y ; x', opts: { op: 'work', px: 'cos(t)', py: 'sin(t)', pz: '', ta: '0', tb: '2*pi' } },
+            { label: 'Work of (xy, x+y) along y = x²', fn: 'x*y ; x+y', opts: { op: 'work', px: 't', py: 't^2', pz: '', ta: '0', tb: '1' } },
+            { label: 'Line integral along a helix', fn: 'z', opts: { op: 'line', px: 'cos(t)', py: 'sin(t)', pz: 't', ta: '0', tb: 'pi' } },
+            { label: '∭ xyz over a tetrahedron-like region', fn: 'x*y*z', opts: { op: 'triple', vars: 'x, y, z', xLow: '0', xHigh: '1', yLow: '0', yHigh: 'x', zLow: '0', zHigh: 'x+y' } },
+            { label: 'Volume of the unit ball', fn: '1', opts: { op: 'triple', vars: 'x, y, z', xLow: '-1', xHigh: '1', yLow: '-sqrt(1-x^2)', yHigh: 'sqrt(1-x^2)', zLow: '-sqrt(1-x^2-y^2)', zHigh: 'sqrt(1-x^2-y^2)' } }
+        ]
+    };
+    MODES.stats = {
+        label: 'Statistics', icon: 'x̄',
+        input: v => ({ describe: { label: 'Data', placeholder: 'e.g. 2 4 4 4 5 5 7 9', hint: 'Numbers separated by spaces, commas or new lines.' }, regression: { label: 'Data points (x y pairs)', placeholder: 'e.g. 1 2.1 ; 2 3.9 ; 3 6.2 ; 4 7.8', hint: 'Pairs separated by ;  or a flat list x₁ y₁ x₂ y₂ …' }, dist: { label: 'x  (or  a, b  for an interval)', placeholder: 'e.g. 1.96', hint: 'Value(s) at which to evaluate the distribution; for “inverse” enter a probability.' }, ttest: { label: 'Sample', placeholder: 'e.g. 5.1 4.9 5.6 5.8 6.0', hint: 'One sample against μ₀, or add a second sample below for Welch’s test.' } }[v.op || 'describe']),
+        fields: [
+            { key: 'op', label: 'Tool', type: 'select', def: 'describe', options: [['describe', 'Descriptive statistics'], ['regression', 'Regression & curve fitting'], ['dist', 'Probability distributions'], ['ttest', 't-tests & confidence intervals']] },
+            { key: 'model', label: 'Model', type: 'select', def: 'linear', options: [['linear', 'Linear'], ['quadratic', 'Quadratic'], ['cubic', 'Cubic'], ['exponential', 'Exponential  A·e^(Bx)'], ['power', 'Power  A·x^B'], ['logarithmic', 'Logarithmic  a + b·ln x']], show: v => v.op === 'regression' },
+            { key: 'predict', label: 'Predict y at x = (optional)', type: 'text', def: '', show: v => v.op === 'regression' },
+            { key: 'dist', label: 'Distribution', type: 'select', def: 'normal', options: [['normal', 'Normal (μ, σ)'], ['t', "Student's t (ν)"], ['chisq', 'Chi-square (k)'], ['exponential', 'Exponential (λ)'], ['uniform', 'Uniform (a, b)'], ['binomial', 'Binomial (n, p)'], ['poisson', 'Poisson (λ)']], show: v => v.op === 'dist' },
+            { key: 'params', label: 'Parameters (comma-separated)', type: 'text', def: '0, 1', placeholder: 'μ, σ', show: v => v.op === 'dist' },
+            { key: 'what', label: 'Calculate', type: 'select', def: 'le', options: [['le', 'P(X ≤ x)'], ['ge', 'P(X ≥ x)'], ['between', 'P(a ≤ X ≤ b)'], ['pdf', 'Density / probability at x'], ['inv', 'Inverse: x for a given probability']], show: v => v.op === 'dist' },
+            { key: 'mu0', label: 'Hypothesised mean μ₀', type: 'text', def: '0', show: v => v.op === 'ttest' },
+            { key: 'data2', label: 'Second sample (optional – Welch test)', type: 'text', def: '', show: v => v.op === 'ttest' },
+            { key: 'alpha', label: 'Significance level α', type: 'text', def: '0.05', show: v => v.op === 'ttest' }
+        ],
+        examples: [
+            { label: 'Summary of a data set', fn: '2 4 4 4 5 5 7 9', opts: { op: 'describe' } },
+            { label: 'Linear regression with prediction', fn: '1 2.1 ; 2 3.9 ; 3 6.2 ; 4 7.8 ; 5 10.1', opts: { op: 'regression', model: 'linear', predict: '6' } },
+            { label: 'Exponential growth fit', fn: '0 1.1 ; 1 2.7 ; 2 7.4 ; 3 20 ; 4 54.6', opts: { op: 'regression', model: 'exponential', predict: '' } },
+            { label: 'Normal: P(Z ≤ 1.96)', fn: '1.96', opts: { op: 'dist', dist: 'normal', params: '0, 1', what: 'le' } },
+            { label: 'Normal: 97.5th percentile', fn: '0.975', opts: { op: 'dist', dist: 'normal', params: '0, 1', what: 'inv' } },
+            { label: 'Binomial: P(X ≤ 3), n = 10, p = ½', fn: '3', opts: { op: 'dist', dist: 'binomial', params: '10, 0.5', what: 'le' } },
+            { label: 'One-sample t-test against μ₀ = 5', fn: '5.1 4.9 5.6 5.8 6.0 5.2 5.9', opts: { op: 'ttest', mu0: '5', data2: '', alpha: '0.05' } },
+            { label: 'Welch two-sample test', fn: '5.1 4.9 5.6 5.8 6.0', opts: { op: 'ttest', mu0: '0', data2: '4.1 4.4 3.9 4.8 4.5', alpha: '0.05' } }
+        ]
+    };
+    const NUM_HELP = { factor: ['Integer n', '360', 'Prime factorisation, divisors, φ(n) and σ(n).'], isprime: ['Integer n', '1000000007', 'Deterministic Miller–Rabin.'], gcd: ['Integers (comma-separated)', '48, 18', 'Two or more numbers; two numbers also give the Bézout identity.'], lcm: ['Integers (comma-separated)', '12, 18, 30', 'Least common multiple.'], modinv: ['a, m', '3, 11', 'Inverse of a modulo m.'], powmod: ['a, e, m', '2, 100, 13', 'a^e mod m by square-and-multiply.'], totient: ['Integer n', '360', 'Euler’s totient φ(n).'], ncr: ['n, k', '10, 3', 'Number of combinations C(n, k).'], npr: ['n, k', '10, 3', 'Number of permutations P(n, k).'], fib: ['Index n', '100', 'The n-th Fibonacci number (exact).'], primes: ['Limit n', '100', 'All primes up to n (sieve of Eratosthenes).'], base: ['n, base', '255, 2', 'Convert n to another base (2–36).'], crt: ['Congruences  a mod m ; …', '2 mod 3 ; 3 mod 5 ; 2 mod 7', 'Chinese remainder theorem.'] };
+    MODES.number = {
+        label: 'Number theory', icon: '#',
+        input: v => { const a = NUM_HELP[v.op || 'factor']; return { label: a[0], placeholder: 'e.g. ' + a[1], hint: a[2] }; },
+        fields: [{ key: 'op', label: 'Operation', type: 'select', def: 'factor', options: [['factor', 'Prime factorisation'], ['isprime', 'Primality test'], ['gcd', 'GCD (+ Bézout)'], ['lcm', 'LCM'], ['modinv', 'Modular inverse'], ['powmod', 'Modular exponentiation'], ['totient', "Euler's totient φ(n)"], ['ncr', 'Combinations C(n, k)'], ['npr', 'Permutations P(n, k)'], ['fib', 'Fibonacci number'], ['primes', 'Primes up to n'], ['base', 'Base conversion'], ['crt', 'Chinese remainder theorem']] }],
+        examples: [
+            { label: 'Factorise 360', fn: '360', opts: { op: 'factor' } },
+            { label: 'Factorise 600851475143', fn: '600851475143', opts: { op: 'factor' } },
+            { label: 'Is 10⁹+7 prime?', fn: '1000000007', opts: { op: 'isprime' } },
+            { label: 'gcd(48, 18) with Bézout', fn: '48, 18', opts: { op: 'gcd' } },
+            { label: '3⁻¹ mod 11', fn: '3, 11', opts: { op: 'modinv' } },
+            { label: '2¹⁰⁰ mod 13', fn: '2, 100, 13', opts: { op: 'powmod' } },
+            { label: 'C(52, 5) poker hands', fn: '52, 5', opts: { op: 'ncr' } },
+            { label: 'Fibonacci F(200)', fn: '200', opts: { op: 'fib' } },
+            { label: 'Chinese remainder theorem', fn: '2 mod 3 ; 3 mod 5 ; 2 mod 7', opts: { op: 'crt' } }
+        ]
+    };
+    MODES.units = {
+        label: 'Units', icon: '⇄',
+        input: () => ({ label: 'Quantity and target', placeholder: 'e.g. 5 km/h to m/s', hint: 'Length, mass, time, temperature (degC, degF, K), speed, area, volume, energy, power, pressure … with + − × ÷ and “to”.' }),
+        fields: [],
+        examples: [
+            { label: '5 km/h → m/s', fn: '5 km/h to m/s', opts: {} }, { label: '72 °F → °C', fn: '72 degF to degC', opts: {} }, { label: '100 mph → km/h', fn: '100 mph to km/h', opts: {} },
+            { label: '3 h 20 min → seconds', fn: '3 hours + 20 minutes to seconds', opts: {} }, { label: '1 mile → km', fn: '1 mile to km', opts: {} }, { label: '2.5 L → US gallons', fn: '2.5 liter to gallon', opts: {} },
+            { label: '1 atm → psi', fn: '1 atm to psi', opts: {} }, { label: '500 kcal → kJ', fn: '500 kcal to kJ', opts: {} }
+        ]
+    };
+    MODES.complex = {
+        label: 'Complex', icon: 'ℂ',
+        input: v => ({ domain: { label: 'f(z)', placeholder: 'e.g. (z^2-1)/(z^2+1)', hint: 'Domain colouring shows the argument of f(z) as hue; zeros and poles are marked for rational functions.' }, roots: { label: 'Polynomial p(z)', placeholder: 'e.g. z^4 - 1', hint: 'All complex roots with multiplicity, plotted in the complex plane.' }, arith: { label: 'Complex expression', placeholder: 'e.g. (3+4i)*(1-2i)/(2+i)', hint: 'Use i for the imaginary unit. Gives rectangular and polar form, roots and the Argand diagram.' } }[v.op || 'domain']),
+        fields: [
+            { key: 'op', label: 'Tool', type: 'select', def: 'domain', options: [['domain', 'Domain colouring of f(z)'], ['roots', 'Roots of a polynomial'], ['arith', 'Complex arithmetic & polar form']] },
+            { key: 'range', label: 'Window half-width', type: 'text', def: '2', show: v => v.op === 'domain' },
+            { key: 'nth', label: 'Show n-th roots, n =', type: 'number', def: '3', min: 2, max: 12, show: v => v.op === 'arith' }
+        ],
+        examples: [
+            { label: 'Domain colouring: (z²−1)/(z²+1)', fn: '(z^2-1)/(z^2+1)', opts: { op: 'domain', range: '2' } },
+            { label: 'Domain colouring: sin z', fn: 'sin(z)', opts: { op: 'domain', range: '5' } },
+            { label: 'Domain colouring: eᶻ', fn: 'exp(z)', opts: { op: 'domain', range: '4' } },
+            { label: 'Roots of z⁴ − 1', fn: 'z^4-1', opts: { op: 'roots' } },
+            { label: 'Roots of z⁵ + 3z + 1', fn: 'z^5+3z+1', opts: { op: 'roots' } },
+            { label: '(3+4i)(1−2i)/(2+i)', fn: '(3+4i)*(1-2i)/(2+i)', opts: { op: 'arith', nth: '3' } }
+        ]
+    };
+
     const MODE_GROUPS = [
         ['Core calculus', ['derivative', 'integral', 'limit', 'series', 'analysis']],
         ['Explore & visualise', ['graph', 'riemann', 'applications', 'root', 'fourier']],
-        ['Algebra & sums', ['calc', 'solve', 'sums']],
-        ['Advanced', ['ode', 'multivariable', 'matrix']]
+        ['Algebra & sums', ['calc', 'solve', 'sums', 'number', 'units', 'stats']],
+        ['Advanced', ['ode', 'multivariable', 'vector', 'matrix', 'laplace', 'complex']]
     ];
     const MODE_ORDER = MODE_GROUPS.flatMap(g => g[1]);
     const MODE_DESC = {
         derivative: 'Rules, steps, tangent', integral: 'Symbolic, definite, improper', limit: 'Two-sided & at ∞', series: 'Taylor / Maclaurin', analysis: 'Roots, extrema, asymptotes',
         graph: 'Sliders & intersections', riemann: 'Left, mid, trap, Simpson', applications: 'Area, volume, arc length', root: 'Newton, bisection, secant', fourier: 'Coefficients & Gibbs',
-        calc: 'Variables, exact, ans', solve: 'Equations & inequalities', sums: 'Convergence tests', ode: 'Closed form + RK45', multivariable: '∇, Hessian, ∬, curl', matrix: 'det, inverse, eigen'
+        calc: 'Variables, exact, ans', solve: 'Equations & inequalities', sums: 'Convergence tests', ode: 'Closed form + RK45', multivariable: '∇, Hessian, ∬, curl', matrix: 'det, inverse, eigen, SVD, LU, QR',
+        laplace: 'Laplace, inverse, Fourier', vector: 'Jacobian, ∮, work, ∭', stats: 'Describe, fit, distributions', number: 'Factor, gcd, mod, CRT', units: 'Convert anything', complex: 'Domain colouring, roots'
     };
 
     const TEMPLATES = [
@@ -544,7 +663,7 @@
         $('modeGrid').innerHTML = MODE_GROUPS.map(([title, ids]) => `
             <div class="mode-group">${esc(title)}</div>
             <div class="mode-grid">${ids.map(id => `
-                <button class="mode-btn" type="button" data-mode="${id}" aria-pressed="false" title="${esc(MODES[id].label)} – Alt+${MODE_ORDER.indexOf(id) + 1}">
+                <button class="mode-btn" type="button" data-mode="${id}" aria-pressed="false" title="${esc(MODES[id].label)}${MODE_ORDER.indexOf(id) < 9 ? ' – Alt+' + (MODE_ORDER.indexOf(id) + 1) : ''}">
                     <span class="mode-ico">${esc(MODES[id].icon)}</span>
                     <span class="mode-txt"><b>${esc(MODES[id].label)}</b><small>${esc(MODE_DESC[id])}</small></span>
                 </button>`).join('')}</div>`).join('');
@@ -603,6 +722,12 @@
                 }
                 preview.className = 'preview-box valid';
                 preview.innerHTML = `<span class="preview-tex plain">${esc(lines[0] || '')}</span><span class="preview-meta">${lines.length} line${lines.length === 1 ? '' : 's'}</span>`;
+                return true;
+            }
+            if (['number', 'units', 'stats', 'vector'].includes(state.mode)) {
+                preview.className = 'preview-box valid';
+                const n = src.split(/[\n;]+/).filter(x => x.trim()).length;
+                preview.innerHTML = `<span class="preview-tex plain">${esc(src.length > 160 ? src.slice(0, 160) + '…' : src)}</span><span class="preview-meta">${state.mode === 'stats' ? (src.split(/[\s,;]+/).filter(Boolean).length + ' values') : state.mode === 'vector' ? (n + ' component' + (n === 1 ? '' : 's')) : 'ready'}</span>`;
                 return true;
             }
             if (state.mode === 'matrix') {
@@ -708,7 +833,7 @@
     // ------------------------------------------------------------------
     // Result rendering
     // ------------------------------------------------------------------
-    const KIND_ICON = { derivative: '∂', integral: '∫', definite: '∫', series: 'Σ', limit: 'lim', analysis: 'f', ode: 'y′', multivariable: '∇', vector: '∇', graph: '∿', riemann: 'Δx', applications: 'V', root: 'x*', fourier: '∼', matrix: '[ ]', calc: '=', solve: 'x=', sum: 'Σk' };
+    const KIND_ICON = { derivative: '∂', integral: '∫', definite: '∫', series: 'Σ', limit: 'lim', analysis: 'f', ode: 'y′', multivariable: '∇', vector: '∇', graph: '∿', riemann: 'Δx', applications: 'V', root: 'x*', fourier: '∼', matrix: '[ ]', calc: '=', solve: 'x=', sum: 'Σk', laplace: 'ℒ', stats: 'x̄', number: '#', units: '⇄', complex: 'ℂ' };
 
     /** Metadata lines that are not already shown as trust badges. */
     function metaRest(r) { return r.meta.filter(m => !/^Method: /.test(m) && !/^Verified|cross-?checked|verified against/i.test(m)); }
@@ -863,7 +988,7 @@
     // ------------------------------------------------------------------
     // Plotting
     // ------------------------------------------------------------------
-    const COLORS = ['#007aff', '#ff9500', '#34c759', '#af52de', '#ff3b30', '#5ac8fa'];
+    const COLORS = ['#d2501f', '#3a78c2', '#3f9a62', '#c48a1c', '#8a5cb5', '#7a8594'];
 
     function plotTheme() {
         const dark = isDark();
@@ -916,6 +1041,21 @@
         return { variable: v, curves: [{ name: `f(${v})`, fn: engine.compile(info.node, [v]) }] };
     }
 
+    /** Data-driven plots (statistics, transforms, complex plane …): traces come straight from the engine. */
+    function renderGeneric(div, g) {
+        const th = plotTheme();
+        const ax = (title, extra) => Object.assign({ title, gridcolor: th.grid, zerolinecolor: th.zero, color: th.text }, extra || {});
+        const layout = {
+            title: { text: g.title || '', font: { size: 16, color: th.text } },
+            xaxis: ax(g.xTitle, g.xRange ? { range: g.xRange } : (g.equal ? { constrain: 'domain' } : {})),
+            yaxis: ax(g.yTitle, g.y2 ? { domain: [0, 0.74] } : (g.equal ? { scaleanchor: 'x', scaleratio: 1 } : {})),
+            paper_bgcolor: th.bg, plot_bgcolor: th.bg, font: { color: th.text }, colorway: COLORS,
+            margin: { t: 50, r: 30, b: 55, l: 60 }, legend: { orientation: 'h', y: -0.2 }, hovermode: 'closest', bargap: 0.04
+        };
+        if (g.y2) layout.yaxis2 = ax('', { domain: [0.8, 1], showticklabels: false });
+        Plotly.react(div, g.traces, layout, { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['lasso2d', 'select2d'], toImageButtonOptions: { filename: 'calculus-suite-plot', scale: 2 } });
+    }
+
     function plot2D() {
         const div = $('plot2d'), phase = $('plotPhase');
         phase.style.display = 'none';
@@ -929,6 +1069,7 @@
             return;
         }
         if (div.querySelector('.empty-state')) div.innerHTML = '';
+        if (spec && spec.generic) { renderGeneric(div, spec.generic); return; }
         const th = plotTheme();
         const traces = [], shapes = [], annotations = [];
         let lo, hi;
@@ -1139,6 +1280,10 @@
     function nbLoad() {
         let d = null;
         try { d = JSON.parse(localStorage.getItem(NB_KEY) || 'null'); } catch (e) { d = null; }
+        const okItem = i => i && typeof i === 'object' && i.s && typeof i.s === 'object' && MODES[i.s.m] && typeof i.s.f === 'string';
+        if (d && Array.isArray(d.list)) {
+            d.list = d.list.filter(p => p && typeof p === 'object' && typeof p.id === 'string' && typeof p.name === 'string').map(p => ({ id: p.id, name: p.name.slice(0, 40), items: (Array.isArray(p.items) ? p.items : []).filter(okItem).map(i => ({ id: String(i.id || uid()), s: { m: i.s.m, f: i.s.f, o: i.s.o && typeof i.s.o === 'object' ? i.s.o : {} }, title: String(i.title || ''), text: String(i.text || ''), tex: String(i.tex || ''), pinned: !!i.pinned, note: String(i.note || '').slice(0, 300), ts: +i.ts || 0 })) }));
+        }
         if (!d || !Array.isArray(d.list) || !d.list.length) d = { cur: null, list: [{ id: uid(), name: 'My notebook', items: [] }] };
         if (!d.list.some(p => p.id === d.cur)) d.cur = d.list[0].id;
         return d;
@@ -1269,7 +1414,7 @@
     // ---------- command palette ----------
     function paletteCommands() {
         const cmds = [];
-        MODE_ORDER.forEach((id, i) => cmds.push({ group: 'Tools', ico: MODES[id].icon, label: `Open ${MODES[id].label}`, hint: `Alt+${i + 1}`, keys: MODE_DESC[id], run: () => { setMode(id); $('functionInput').focus(); } }));
+        MODE_ORDER.forEach((id, i) => cmds.push({ group: 'Tools', ico: MODES[id].icon, label: `Open ${MODES[id].label}`, hint: i < 9 ? `Alt+${i + 1}` : '', keys: MODE_DESC[id], run: () => { setMode(id); $('functionInput').focus(); } }));
         const acts = [
             ['Actions', 'play', 'Compute', 'Ctrl+Enter', 'run calculate solve', compute],
             ['Actions', 'trash', 'Clear everything', 'Ctrl+Shift+K', 'reset', clearAll],

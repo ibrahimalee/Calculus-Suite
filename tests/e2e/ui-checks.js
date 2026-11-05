@@ -95,11 +95,11 @@ const check = (name, ok, extra) => { if (!ok) failed++; console.log((ok ? 'ok   
     // 9. resilience: corrupted saved state and garbage share links must not break start-up
     const bad = await browser.newContext({ viewport: { width: 1200, height: 900 } }); const bp = await bad.newPage(); const badErrors = [];
     bp.on('pageerror', e => badErrors.push(e.message));
-    await bp.addInitScript(() => { try { localStorage.setItem('cs_session', '{not json'); localStorage.setItem('cs_history', '[1,2,'); localStorage.setItem('accent', 'nonsense'); localStorage.setItem('themeMode', 42); } catch (e) { /* ignore */ } });
+    await bp.addInitScript(() => { try { localStorage.setItem('cs_session', '{not json'); localStorage.setItem('cs_history', '[1,2,'); localStorage.setItem('cs_projects', '{"list":[null,{"id":5}]}'); localStorage.setItem('accent', 'nonsense'); localStorage.setItem('themeMode', 42); } catch (e) { /* ignore */ } });
     for (const hash of ['', '#s=!!!notbase64!!!', '#s=' + Buffer.from('{"m":"nope","f":1}').toString('base64'), '#s=' + Buffer.from('{"m":"integral","f":"<b>x</b>","o":{"lower":{"a":1}}}').toString('base64')]) {
         await bp.goto(BASE + '/index.html' + hash); await bp.waitForFunction(() => window.__calc, null, { timeout: 15000 }); await bp.waitForTimeout(600);
     }
-    check('app starts with corrupted storage and malformed share links', badErrors.length === 0 && (await bp.$$('.mode-btn')).length === 16, badErrors);
+    check('app starts with corrupted storage and malformed share links', badErrors.length === 0 && (await bp.$$('.mode-btn')).length === 22, badErrors);
     await bad.close();
 
     // 10. rapid interaction: hammering Compute and switching tools mid-computation must leave the UI usable

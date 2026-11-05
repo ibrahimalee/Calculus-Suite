@@ -64,7 +64,7 @@
         // ---- matrices ------------------------------------------------------
         const M = matrixFrom(t);
         if (M) {
-            const ops = [['determinant|det\\b', 'det'], ['inverse', 'inverse'], ['eigen', 'eigen'], ['rank', 'rank'], ['transpose', 'transpose'], ['trace', 'trace'], ['row reduc|rref|echelon', 'rref'], ['char(acteristic)? poly', 'charpoly'], ['\\blu\\b', 'lu'], ['\\bqr\\b', 'qr'], ['singular value|\\bsvd\\b', 'svd']];
+            const ops = [['determinant|det\\b', 'det'], ['inverse', 'inverse'], ['eigen', 'eigen'], ['rank', 'rank'], ['transpose', 'transpose'], ['trace', 'trace'], ['row reduc|rref|echelon', 'rref'], ['char(acteristic)? poly', 'charpoly'], ['\\blu\\b', 'lu'], ['\\bqr\\b', 'qr'], ['singular value|\\bsvd\\b', 'svd'], ['diagonali', 'diagonalize'], ['null ?space|kernel', 'nullspace'], ['column space|range of', 'colspace'], ['pseudo', 'pinv'], ['condition number', 'cond'], ['cholesky', 'cholesky']];
             for (const [re, op] of ops) if (new RegExp(re).test(lower)) return { mode: 'matrix', fn: M, opts: { op }, say: `Matrix → ${op}` };
         }
 
@@ -77,6 +77,9 @@
         // ---- Laplace / Fourier transforms ----------------------------------
         m = s.match(/^(inverse laplace(?: transform)?|laplace(?: transform)?|fourier transform) (?:of )?(.+)$/);
         if (m) return { mode: 'laplace', fn: mathify(m[2]), opts: { op: /inverse/.test(m[1]) ? 'inverse' : /fourier/.test(m[1]) ? 'fourier' : 'laplace' }, say: m[1] };
+
+        m = s.match(/^(?:the )?jacobian(?: matrix)?(?: of)? (.+)$/);
+        if (m) return { mode: 'vector', fn: mathify(m[1]).replace(/,/g, ' ; '), opts: { op: 'jacobian', vars: '', point: '' }, say: 'Jacobian matrix' };
 
         // ---- derivatives ---------------------------------------------------
         m = s.match(/^(?:the )?(?:(\w+) )?(?:derivative|differentiate|differentiation)(?: of)? (.+)$/) || s.match(/^d\/d([a-z]) (.+)$/);

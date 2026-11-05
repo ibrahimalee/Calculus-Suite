@@ -916,6 +916,7 @@
     // ======================================================================
     // Units: safe parsing, dimension checking
     // ======================================================================
+    ['kcal:4.184 kJ', 'cal:4.184 J', 'ly:9460730472580800 m', 'MPa:1000000 Pa', 'kWh:3600000 J'].forEach(d => { const [n, v] = d.split(':'); try { math.createUnit(n, v); } catch (e) { /* already defined */ } });
     function runUnits(src) {
         const text = String(src).trim().replace(/°\s*([CFK])/gi, 'deg$1').replace(/[×·]/g, '*').replace(/\bin\b(?=\s+[a-zA-Z°])/g, ' to ').replace(/\binto\b/g, ' to ').replace(/²/g, '^2').replace(/³/g, '^3').replace(/µ/g, 'u').replace(/\bmph\b/gi, 'mile/hour').replace(/\b(kph|kmh|kmph)\b/gi, 'km/hour').replace(/\bfps\b/gi, 'ft/s').replace(/\bsq\s*(m|km|ft|mi|cm|in)\b/gi, '$1^2');
         if (!text) throw new CalcError('Enter a quantity and a target, e.g.  5 km/h to m/s');
