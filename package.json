@@ -1,13 +1,13 @@
 {
   "name": "calculus-suite-pro",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "description": "Browser-based calculus workstation: derivatives, integrals, series, limits, ODEs, multivariable calculus and live plots.",
   "private": true,
   "license": "MIT",
   "scripts": {
     "test": "node --test tests/*.test.js",
     "serve": "python3 -m http.server 8080",
-    "e2e": "node tests/e2e/ui-checks.js && node tests/e2e/plot-checks.js"
+    "e2e": "node tests/e2e/ui-checks.js && node tests/e2e/plot-checks.js && node tests/e2e/new-tools.js"
   },
   "devDependencies": {
     "algebrite": "1.4.0",

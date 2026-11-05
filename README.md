@@ -22,6 +22,20 @@ A calculus workstation that runs entirely in the browser – no backend, no buil
 | **Equation solver** | All real and complex roots of polynomials, numerical roots for anything else, inequalities → interval notation |
 | **Sums & series** | Finite sums (exact when possible); infinite series with nth-term / ratio / p-series / alternating tests and accurate values |
 | **Multivariable** | Gradient (+ tangent plane, directional derivative), partials, Hessian, Laplacian, critical-point classification, double integrals with variable limits, divergence, curl |
+| **Matrices** (extended) | LU, QR, Cholesky, SVD, pseudoinverse, condition number, null/column space, diagonalisation, least squares – each decomposition checks itself (A − LU, QᵀQ − I, …) |
+| **Transforms** | Laplace and inverse Laplace (complex and repeated poles, verified by numerical integration), Fourier transform with standard-pair recognition and spectrum plot |
+| **Vector calculus** | Jacobian & determinant, line integrals ∫ f ds, work/circulation ∫ F·dr, triple integrals (exact when possible) |
+| **Statistics** | Descriptive statistics, regression (linear … exponential, power, log) with R², probability distributions (normal, t, χ², binomial, Poisson …) via exact special functions, one- and two-sample t-tests |
+| **Number theory** | Prime factorisation (Pollard rho), Miller–Rabin, gcd with Bézout, modular inverse/power, totient, C(n,k), Fibonacci, sieve, base conversion, Chinese remainder theorem |
+| **Units** | Dimension-checked conversions (`72 degF to degC`) through a sandboxed parser |
+| **Complex** | Domain colouring of f(z) with zeros/poles, all complex roots, Argand diagram, polar form |
+
+### Ask, scan, save
+
+* **Plain-English input** – “integrate x squared from 0 to 3”, “limit of sin x over x as x goes to 0”, “5 km/h to m/s”. A rule-based parser (`js/nlp.js`): no AI, no network; it says plainly when it cannot parse something.
+* **Worked solutions** – row operations for matrices, cofactor expansion, L'Hôpital rounds for limits, linear/quadratic equation walk-throughs, and the integration technique (by parts, substitution, partial fractions) behind CAS results.
+* **Scan an expression** – the *Scan* button reads printed text from a photo with Tesseract.js, entirely on the device. The ~11 MB recogniser (`vendor/tesseract/`) is fetched only when someone taps Scan, then cached for offline use. Accuracy on superscripts and fractions is limited, so the text is always shown for correction first. Handwriting is not supported.
+* **Notebook** – named projects of saved results with pins and notes, stored on the device; export a notebook as Markdown, back up or import everything as JSON.
 
 Plus: command palette (`Ctrl+K`), installable offline PWA, Markdown report export, PNG plot export, LaTeX rendering, 2D/3D/contour plots, history, shareable links (`#s=…`), copy as text/LaTeX, dark mode, keyboard shortcuts, example gallery, background worker with timeout.
 
@@ -66,7 +80,7 @@ tests/              node:test suite
 
 ## Honest limitations
 
-Symbolic integration is not complete (e.g. `e^(x²)` has no elementary antiderivative; the app says so). Limits, roots and extrema are numerical, not proofs. ODE closed forms cover linear/separable first-order and constant-coefficient homogeneous second-order; everything else is solved numerically.
+Symbolic integration is not complete (e.g. `e^(x²)` has no elementary antiderivative; the app says so). Limits, roots and extrema are numerical, not proofs. ODE closed forms cover linear/separable first-order and constant-coefficient homogeneous second-order; everything else is solved numerically. The Laplace table covers sums and products of polynomials, exponentials and sin/cos/sinh/cosh (no step functions or delta impulses). Fourier transforms of non-decaying functions are not ordinary functions and are refused. Image scanning reads printed text only and often mis-reads exponents; always check the recognised text.
 
 ## License
 MIT

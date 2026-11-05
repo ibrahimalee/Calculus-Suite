@@ -1678,8 +1678,87 @@
         });
     }
 
+
+    // ------------------------------------------------------------------
+    // Camera / image input: Tesseract.js is fetched only when the user scans
+    // ------------------------------------------------------------------
+    let tessPromise = null;
+    function loadTesseract() {
+        if (tessPromise) return tessPromise;
+        tessPromise = new Promise((resolve, reject) => {
+            if (window.Tesseract) { resolve(window.Tesseract); return; }
+            const sc = document.createElement('script');
+            sc.src = 'vendor/tesseract/tesseract.min.js';
+            sc.onload = () => (window.Tesseract ? resolve(window.Tesseract) : reject(new Error('Tesseract missing')));
+            sc.onerror = () => { tessPromise = null; reject(new Error('download failed')); };
+            document.head.appendChild(sc);
+        });
+        return tessPromise;
+    }
+    /** grayscale → contrast stretch → Otsu threshold, so photos of paper OCR cleanly */
+    function prepareImage(img, canvas) {
+        const max = 1800, k = Math.min(1, max / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
+        const d = ctx.getImageData(0, 0, w, h), px = d.data, g = new Uint8Array(w * h), hist = new Array(256).fill(0);
+        for (let i = 0, j = 0; i < px.length; i += 4, j++) { const v = Math.round(0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]); g[j] = v; hist[v]++; }
+        const total = w * h; let sum = 0; for (let t = 0; t < 256; t++) sum += t * hist[t];
+        let sumB = 0, wB = 0, best = 0, thr = 128;
+        for (let t = 0; t < 256; t++) { wB += hist[t]; if (!wB) continue; const wF = total - wB; if (!wF) break; sumB += t * hist[t]; const mB = sumB / wB, mF = (sum - sumB) / wF, between = wB * wF * (mB - mF) * (mB - mF); if (between > best) { best = between; thr = t; } }
+        let dark = 0; for (let j = 0; j < g.length; j++) if (g[j] <= thr) dark++;
+        const invert = dark > total * 0.5;   // light text on a dark background
+        for (let i = 0, j = 0; i < px.length; i += 4, j++) { const on = invert ? g[j] > thr : g[j] <= thr; const v = on ? 0 : 255; px[i] = px[i + 1] = px[i + 2] = v; px[i + 3] = 255; }
+        ctx.putImageData(d, 0, 0);
+    }
+    function cleanOCR(t) {
+        return String(t).replace(/™/g, '^').replace(/\bOto\b/g, '0 to').replace(/(\d)[Oo](?=\s|$|\d|\))/g, '$10').replace(/\bX\b/g, 'x').replace(/[×✕✖·•∙]/g, '*').replace(/÷/g, '/').replace(/[−–—‒]/g, '-').replace(/[“”"‘’`´]/g, '').replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim();
+    }
+    function initScan() {
+        const dlg = $('scanDialog'); if (!dlg || !$('scanBtn')) return;
+        const status = $('scanStatus'), bar = $('scanBar'), fill = $('scanBarFill'), out = $('scanText'), prev = $('scanPreview'), file = $('scanFile');
+        const say = (m, bad) => { status.textContent = m; status.classList.toggle('bad', !!bad); };
+        const setProgress = f => { bar.hidden = f == null; if (f != null) fill.style.width = Math.round(Math.max(0, Math.min(1, f)) * 100) + '%'; };
+        $('scanBtn').addEventListener('click', () => { out.value = ''; prev.hidden = true; setProgress(null); say('No image yet.'); if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); });
+        $('scanClose').addEventListener('click', () => dlg.close());
+        $('scanUse').addEventListener('click', () => { const t = cleanOCR(out.value); if (!t) { say('Nothing to use yet.', true); return; } $('functionInput').value = t; dlg.close(); validateInput(); saveSession(); $('functionInput').focus(); });
+        $('scanAsk').addEventListener('click', () => { const t = out.value.trim(); if (!t) { say('Nothing to ask yet.', true); return; } dlg.close(); $('askInput').value = t; askNL(t); });
+        let busy = false;
+        file.addEventListener('change', async () => {
+            const f = file.files && file.files[0]; file.value = '';
+            if (!f || busy) return;
+            if (!/^image\//.test(f.type)) { say('Please choose an image file.', true); return; }
+            if (f.size > 20 * 1024 * 1024) { say('That image is larger than 20 MB – please use a smaller one.', true); return; }
+            busy = true; out.value = '';
+            try {
+                say('Preparing the image…'); setProgress(0.02);
+                const url = URL.createObjectURL(f);
+                const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('decode')); im.src = url; });
+                prepareImage(img, prev); URL.revokeObjectURL(url); prev.hidden = false;
+                say('Loading the text recogniser (first use only, about 11 MB)…');
+                const T = await loadTesseract();
+                const worker = await T.createWorker('eng', 1, {
+                    workerPath: 'vendor/tesseract/worker.min.js', corePath: 'vendor/tesseract/', langPath: 'vendor/tesseract/lang/', gzip: true,
+                    logger: m => { if (m.status === 'recognizing text') { say(`Reading the text… ${Math.round(m.progress * 100)}%`); setProgress(0.2 + 0.8 * m.progress); } else if (/loading|initializ/.test(m.status)) { setProgress(0.05 + 0.15 * (m.progress || 0)); } }
+                });
+                try {
+                    await worker.setParameters({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' });
+                    const r = await worker.recognize(prev);
+                    out.value = cleanOCR(r.data.text);
+                    const conf = Math.round(r.data.confidence || 0);
+                    say(out.value ? `Done – recognition confidence ${conf}%. Check the text, fix any mistakes, then use it.` : 'No text was found. Try a sharper, well-lit photo with dark print on light paper.', !out.value);
+                } finally { try { await worker.terminate(); } catch (e) { /* ignore */ } }
+            } catch (err) {
+                say(err && /download|importScripts|network|fetch|Failed/i.test(String(err.message || err)) ? 'The recogniser could not be loaded. It needs to download once (about 11 MB) – connect to the internet and try again.' : 'Could not read that image. Try another photo.', true);
+            } finally { busy = false; setProgress(null); }
+            out.focus();
+        });
+    }
+
     function init() {
         initNotebook();
+        initScan();
         initTheme();
         initUI();
         renderHistory();

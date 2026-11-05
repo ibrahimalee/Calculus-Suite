@@ -24,6 +24,21 @@ const MODES = ['laplace', 'vector', 'stats', 'number', 'units', 'complex', 'matr
             if (good && plotOk === 'none') console.log('  note: no plot data for', mode, label);
         }
     }
+    // camera/image input: the recogniser must not be fetched until the user scans, and must read printed text
+    {
+        const reqs = []; p.on('request', r => reqs.push(r.url()));
+        const lazy = !reqs.some(u => /tesseract/.test(u));
+        const mk = await (await b.newContext({ viewport: { width: 900, height: 200 } })).newPage();
+        await mk.setContent('<body style="margin:0;background:#fff"><div style="font:64px Arial;padding:50px;color:#111">sin(x)/x</div></body>');
+        const file = require('os').tmpdir() + '/cs-scan-test.png'; await mk.screenshot({ path: file });
+        await p.click('#scanBtn'); await p.setInputFiles('#scanFile', file);
+        await p.waitForFunction(() => /Done|No text|Could not|could not/.test(document.getElementById('scanStatus').textContent), null, { timeout: 120000 });
+        const text = await p.inputValue('#scanText');
+        const read = /sin\s*\(x\)\s*\/\s*x/i.test(text);
+        console.log(`scan: lazy-loaded=${lazy}, text=${JSON.stringify(text)}`);
+        if (!lazy || !read) { fail++; console.log('FAIL scan check'); } else ok++;
+        await p.click('#scanClose');
+    }
     console.log(`${ok} examples ok, ${fail} failed`);
     if (errs.length) { console.log('console errors:', errs.slice(0, 5)); fail++; }
     await b.close(); process.exit(fail ? 1 : 0);

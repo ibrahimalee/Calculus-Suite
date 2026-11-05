@@ -631,3 +631,16 @@ a { color: var(--accent); }
 .nb-text small { color: var(--text-2); font-size: 12px; overflow-wrap: anywhere; } .nb-text em { font-size: 12px; color: var(--accent); font-style: normal; }
 .nb-tools { display: flex; flex-direction: column; border-left: 1px solid var(--border); }
 .nb-btn { flex: 1; min-width: 34px; background: none; border: 0; border-bottom: 1px solid var(--border); color: var(--text-2); cursor: pointer; font-size: 13px; } .nb-btn:last-child { border-bottom: 0; } .nb-btn:hover, .nb-btn.on { color: var(--accent); background: var(--surface-2); }
+/* scan dialog */
+.label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; } .label-row .field-label { margin: 0; }
+.scan-sheet { display: grid; gap: 12px; width: min(560px, 92vw); padding: 18px; }
+.scan-sheet .sheet-head { display: flex; align-items: center; justify-content: space-between; } .scan-sheet h2 { margin: 0; font-family: var(--serif); font-weight: 500; font-size: 22px; }
+.scan-help { margin: 0; color: var(--text-2); font-size: 13.5px; line-height: 1.5; }
+.scan-actions { display: flex; flex-wrap: wrap; gap: 8px; } .scan-pick { cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.scan-preview { max-width: 100%; max-height: 220px; object-fit: contain; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: #fff; }
+.scan-status { font-size: 13px; color: var(--text-2); min-height: 1.4em; } .scan-status.bad { color: var(--err); }
+.scan-bar { height: 4px; background: var(--surface-3); border-radius: 0; } .scan-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+#scanText { font-family: var(--mono); }
+#scanDialog, #helpDialog, #paletteDialog { margin: auto; }
+#scanDialog { margin: max(4vh, 16px) auto; }
+.sheet { border-radius: var(--r-lg); }
