@@ -95,6 +95,23 @@
                     </div>
                 </details>
 
+                <details class="panel" id="projectPanel" open>
+                    <summary><span data-icon="bookmark" data-size="15"></span>Notebook</summary>
+                    <div class="proj-bar">
+                        <select id="projSelect" aria-label="Choose notebook"></select>
+                        <button class="mini-btn" id="projNew" type="button">New</button>
+                        <button class="mini-btn" id="projRename" type="button">Rename</button>
+                        <button class="mini-btn" id="projDelete" type="button">Delete</button>
+                    </div>
+                    <div id="projItems" class="nb-list"></div>
+                    <div class="proj-bar">
+                        <button class="mini-btn" id="projExport" type="button">Export notebook (.md)</button>
+                        <button class="mini-btn" id="projBackup" type="button">Back up all</button>
+                        <button class="mini-btn" id="projImport" type="button">Import</button>
+                        <input type="file" id="projFile" accept="application/json,.json" hidden>
+                    </div>
+                </details>
+
                 <details class="panel" id="historyPanel" open>
                     <summary><span data-icon="clock" data-size="15"></span>History</summary>
                     <div style="display:flex;justify-content:flex-end"><button class="mini-btn" id="clearHistory" type="button">Clear history</button></div>

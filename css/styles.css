@@ -621,3 +621,13 @@ a { color: var(--accent); }
 .ask-row { display: flex; gap: 8px; } .ask-row input { flex: 1; min-width: 0; font-family: var(--font); }
 .ask-go { flex: 0 0 auto; min-width: 46px; padding: 0 14px; }
 .ask-note { margin-top: 8px; font-size: 12.5px; color: var(--text-2); line-height: 1.45; } .ask-note.bad { color: var(--err); }
+/* notebook */
+.proj-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; } .proj-bar select { flex: 1 1 100%; }
+.nb-list { display: grid; gap: 6px; margin: 8px 0; }
+.nb-item { display: flex; align-items: stretch; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface-solid); }
+.nb-open { flex: 1; min-width: 0; display: flex; gap: 8px; align-items: flex-start; text-align: left; background: none; border: 0; padding: 8px; color: var(--text); cursor: pointer; }
+.nb-open:hover { background: var(--surface-2); }
+.nb-text { display: grid; min-width: 0; gap: 1px; } .nb-text b { font-family: var(--mono); font-size: 12.5px; font-weight: 500; overflow-wrap: anywhere; }
+.nb-text small { color: var(--text-2); font-size: 12px; overflow-wrap: anywhere; } .nb-text em { font-size: 12px; color: var(--accent); font-style: normal; }
+.nb-tools { display: flex; flex-direction: column; border-left: 1px solid var(--border); }
+.nb-btn { flex: 1; min-width: 34px; background: none; border: 0; border-bottom: 1px solid var(--border); color: var(--text-2); cursor: pointer; font-size: 13px; } .nb-btn:last-child { border-bottom: 0; } .nb-btn:hover, .nb-btn.on { color: var(--accent); background: var(--surface-2); }

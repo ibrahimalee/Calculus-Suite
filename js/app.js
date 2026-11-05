@@ -373,6 +373,7 @@
         copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>',
         tex: '<path d="M4 6h8M8 6v12M14 10l6 8M20 10l-6 8"/>',
         link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1"/>',
+        bookmark: '<path d="M6 3h12v18l-6-4-6 4z"/>',
         file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
         camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
         keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
@@ -724,6 +725,7 @@
                     <div class="result-actions">
                         <button class="mini-btn" data-act="copy" title="Copy result as text">${icon('copy', 14)}Copy</button>
                         <button class="mini-btn" data-act="copytex" title="Copy LaTeX">${icon('tex', 14)}LaTeX</button>
+                        <button class="mini-btn" data-act="save" title="Save to your notebook">${icon('bookmark', 14)}Save</button>
                         <button class="mini-btn" data-act="share" title="Copy a link to this calculation">${icon('link', 14)}Share</button>
                         <button class="mini-btn" data-act="export" title="Download a Markdown report">${icon('file', 14)}Export</button>
                     </div>
@@ -741,6 +743,7 @@
         container.querySelector('[data-act="copy"]').addEventListener('click', () => copyText(r.text, 'Result copied'));
         container.querySelector('[data-act="copytex"]').addEventListener('click', () => copyText(r.main && r.main.tex ? r.main.tex : r.text, 'LaTeX copied'));
         container.querySelector('[data-act="share"]').addEventListener('click', shareLink);
+        container.querySelector('[data-act="save"]').addEventListener('click', saveToNotebook);
         container.querySelector('[data-act="export"]').addEventListener('click', exportReport);
         displaySteps(r.steps);
     }
@@ -1127,6 +1130,118 @@
     }
 
     // ---------- export ----------
+
+    // ------------------------------------------------------------------
+    // Notebook: named projects of saved results (stored on this device)
+    // ------------------------------------------------------------------
+    const NB_KEY = 'cs_projects';
+    const uid = () => Math.random().toString(36).slice(2, 10);
+    function nbLoad() {
+        let d = null;
+        try { d = JSON.parse(localStorage.getItem(NB_KEY) || 'null'); } catch (e) { d = null; }
+        if (!d || !Array.isArray(d.list) || !d.list.length) d = { cur: null, list: [{ id: uid(), name: 'My notebook', items: [] }] };
+        if (!d.list.some(p => p.id === d.cur)) d.cur = d.list[0].id;
+        return d;
+    }
+    let nb = nbLoad();
+    function nbSave() { try { localStorage.setItem(NB_KEY, JSON.stringify(nb)); } catch (e) { toast('Could not save – browser storage is full or blocked', 'err'); } }
+    const nbCur = () => nb.list.find(p => p.id === nb.cur) || nb.list[0];
+
+    function saveToNotebook() {
+        const r = state.result; if (!r) return;
+        const p = nbCur();
+        const snap = snapshot();
+        if (p.items.some(i => JSON.stringify(i.s) === JSON.stringify(snap))) { toast('Already saved in this notebook', 'ok'); return; }
+        p.items.unshift({ id: uid(), s: JSON.parse(JSON.stringify(snap)), title: r.title, text: r.main ? `${r.main.label} ${r.main.text}` : r.title, tex: r.main && r.main.tex || '', pinned: false, note: '', ts: Date.now() });
+        nbSave(); renderNotebook();
+        toast(`Saved to “${p.name}”`, 'ok');
+    }
+
+    function renderNotebook() {
+        const sel = $('projSelect'); if (!sel) return;
+        sel.innerHTML = nb.list.map(p => `<option value="${esc(p.id)}" ${p.id === nb.cur ? 'selected' : ''}>${esc(p.name)} (${p.items.length})</option>`).join('');
+        const p = nbCur();
+        const items = p.items.map((it, i) => ({ it, i })).sort((a, b) => (b.it.pinned - a.it.pinned) || (b.it.ts - a.it.ts));
+        const box = $('projItems');
+        if (!items.length) { box.innerHTML = '<div class="history-empty">Nothing saved yet. Press <b>Save</b> on any result.</div>'; return; }
+        box.innerHTML = items.map(({ it }) => `
+            <div class="nb-item" data-id="${esc(it.id)}">
+                <button class="nb-open" type="button" data-nb="open" title="Open and recompute">
+                    <span class="history-mode">${esc((MODES[it.s.m] || {}).icon || '=')}</span>
+                    <span class="nb-text"><b>${esc(it.s.f.length > 34 ? it.s.f.slice(0, 34) + '…' : it.s.f)}</b><small>${esc(it.text.length > 70 ? it.text.slice(0, 70) + '…' : it.text)}</small>${it.note ? `<em>${esc(it.note)}</em>` : ''}</span>
+                </button>
+                <div class="nb-tools">
+                    <button type="button" class="nb-btn ${it.pinned ? 'on' : ''}" data-nb="pin" aria-label="${it.pinned ? 'Unpin' : 'Pin'}" aria-pressed="${it.pinned}" title="Pin">★</button>
+                    <button type="button" class="nb-btn" data-nb="note" aria-label="Edit note" title="Note">✎</button>
+                    <button type="button" class="nb-btn" data-nb="del" aria-label="Delete" title="Delete">✕</button>
+                </div>
+            </div>`).join('');
+        box.querySelectorAll('.nb-item').forEach(row => row.addEventListener('click', e => {
+            const btn = e.target.closest('[data-nb]'); if (!btn) return;
+            const proj = nbCur(); const it = proj.items.find(x => x.id === row.dataset.id); if (!it) return;
+            const act = btn.dataset.nb;
+            if (act === 'open') { if (restoreSnapshot(it.s)) compute(); }
+            else if (act === 'pin') { it.pinned = !it.pinned; }
+            else if (act === 'note') { const n = window.prompt('Note for this result:', it.note || ''); if (n === null) return; it.note = n.trim().slice(0, 300); }
+            else if (act === 'del') { proj.items = proj.items.filter(x => x.id !== it.id); }
+            nbSave(); renderNotebook();
+        }));
+    }
+
+    function downloadText(name, text, type) {
+        const blob = new Blob([text], { type: type || 'text/plain' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+    function exportNotebook() {
+        const p = nbCur();
+        if (!p.items.length) { toast('Save some results first', 'err'); return; }
+        const L = [`# ${p.name}`, '', `*Calculus Suite Pro notebook – ${new Date().toISOString().slice(0, 10)}*`, ''];
+        p.items.slice().sort((a, b) => (b.pinned - a.pinned) || (a.ts - b.ts)).forEach((it, i) => {
+            L.push(`## ${i + 1}. ${it.pinned ? '★ ' : ''}${(MODES[it.s.m] || {}).label || it.s.m}: \`${it.s.f}\``, '');
+            const o = Object.keys(it.s.o || {}).filter(k => String(it.s.o[k]).trim() !== '' && k !== 'digits').map(k => `${k} = ${it.s.o[k]}`);
+            if (o.length) L.push(`*Options: ${o.join(', ')}*`, '');
+            L.push(`**${it.text}**`, '');
+            if (it.tex) L.push('$$', it.tex, '$$', '');
+            if (it.note) L.push(`> ${it.note}`, '');
+        });
+        downloadText(`${p.name.replace(/[^\w-]+/g, '_') || 'notebook'}.md`, L.join('\n'), 'text/markdown');
+        toast('Notebook exported', 'ok');
+    }
+    function initNotebook() {
+        if (!$('projSelect')) return;
+        renderNotebook();
+        $('projSelect').addEventListener('change', e => { nb.cur = e.target.value; nbSave(); renderNotebook(); });
+        $('projNew').addEventListener('click', () => { const n = window.prompt('Name for the new notebook:', 'Homework'); if (!n || !n.trim()) return; const p = { id: uid(), name: n.trim().slice(0, 40), items: [] }; nb.list.push(p); nb.cur = p.id; nbSave(); renderNotebook(); });
+        $('projRename').addEventListener('click', () => { const p = nbCur(); const n = window.prompt('Rename notebook:', p.name); if (!n || !n.trim()) return; p.name = n.trim().slice(0, 40); nbSave(); renderNotebook(); });
+        $('projDelete').addEventListener('click', () => {
+            const p = nbCur(); if (!window.confirm(`Delete “${p.name}” and its ${p.items.length} saved result(s)?`)) return;
+            nb.list = nb.list.filter(x => x.id !== p.id); nb = (nb.list.length ? nb : { cur: null, list: [{ id: uid(), name: 'My notebook', items: [] }] }); nb.cur = nb.list[0].id; nbSave(); renderNotebook();
+        });
+        $('projExport').addEventListener('click', exportNotebook);
+        $('projBackup').addEventListener('click', () => { downloadText(`calculus-suite-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ app: 'calculus-suite', version: 1, notebooks: nb.list }, null, 2), 'application/json'); toast('Backup downloaded', 'ok'); });
+        $('projImport').addEventListener('click', () => $('projFile').click());
+        $('projFile').addEventListener('change', e => {
+            const file = e.target.files && e.target.files[0]; if (!file) return;
+            const fr = new FileReader();
+            fr.onload = () => {
+                try {
+                    const d = JSON.parse(String(fr.result));
+                    if (!d || d.app !== 'calculus-suite' || !Array.isArray(d.notebooks)) throw new Error('bad');
+                    let added = 0;
+                    d.notebooks.forEach(p => {
+                        if (!p || typeof p.name !== 'string' || !Array.isArray(p.items)) return;
+                        const items = p.items.filter(i => i && i.s && MODES[i.s.m] && typeof i.s.f === 'string').map(i => ({ id: uid(), s: { m: i.s.m, f: i.s.f, o: i.s.o && typeof i.s.o === 'object' ? i.s.o : {} }, title: String(i.title || ''), text: String(i.text || ''), tex: String(i.tex || ''), pinned: !!i.pinned, note: String(i.note || '').slice(0, 300), ts: +i.ts || Date.now() }));
+                        nb.list.push({ id: uid(), name: p.name.slice(0, 40) + ' (imported)', items }); added += items.length;
+                    });
+                    nbSave(); renderNotebook(); toast(`Imported ${added} result(s)`, 'ok');
+                } catch (err) { toast('That file is not a Calculus Suite backup', 'err'); }
+                e.target.value = '';
+            };
+            fr.readAsText(file);
+        });
+    }
+
     function exportReport() {
         const r = state.result; if (!r) return;
         const lines = [`# ${r.title}`, '', `*Calculus Suite Pro – ${new Date().toISOString().slice(0, 10)}*`, '', '## Input', '', '```', $('functionInput').value, '```', ''];
@@ -1419,6 +1534,7 @@
     }
 
     function init() {
+        initNotebook();
         initTheme();
         initUI();
         renderHistory();
