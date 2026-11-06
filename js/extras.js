@@ -469,20 +469,52 @@
         const degOf = seq => { let d = seq.slice(); for (let deg = 0; deg < 10; deg++) { if (d.every(x => Math.abs(x) < 1e-9 * (1 + Math.max(...seq.map(Math.abs))))) return deg - 1 < 0 ? 0 : deg - 1 + (deg === 0 ? 1 : 0); d = d.slice(1).map((x, i) => x - d[i]); } return -1; };
         const degPoly = seq => { let d = seq.slice(); const scale = 1 + Math.max(...seq.map(Math.abs)); for (let deg = 0; deg <= 9; deg++) { if (d.length > 1 && d.every(x => Math.abs(x) < 1e-8 * scale)) return Math.max(0, deg - 1); d = d.slice(1).map((x, i) => x - d[i]); } return -1; };
         const T = x => nice(x, 10, 1e-9);
-        let kind, expr, coeffs, rr = 1;
+        let kind, expr, coeffs, rr = 1, teleNote = '';
         const dp = degPoly(pts);
+
+        // ---- telescoping: rational terms with integer simple poles (via harmonic-number differences) and g(k+1) − g(k) patterns ----
+        function telescopeSum() {
+            const rat = (() => { try { return I.toRational(node, kv); } catch (e) { return null; } })();
+            if (rat && rat.d.length >= 3 && rat.d.length <= 12) {
+                const D = rat.d.slice(), Nn = rat.n.slice(); const roots = I.polyRootsMult(D);
+                const dD = D.map((c, i) => c * i).slice(1), pe = (co, x) => co.reduceRight((acc, c) => acc * x + c, 0);
+                if (roots.length === D.length - 1 && roots.every(z => Math.abs(z.im) < 1e-7 && z.mult === 1 && Math.abs(z.re - Math.round(z.re)) < 1e-6) && Nn.length <= D.length - 2) {
+                    const poles = roots.map(z => Math.round(z.re)), A = poles.map(r0 => pe(Nn, r0) / pe(dD, r0));
+                    const tot = A.reduce((x, y) => x + y, 0);
+                    if (Math.abs(tot) < 1e-8 * (1 + Math.max(...A.map(Math.abs)))) {
+                        const sh = poles.map(r0 => -r0);                                    // term A/(k + s)
+                        if (sh.every(sv => a + sv >= 1)) {
+                            const H = m => { let h = 0; for (let i = 1; i <= m; i++) h += 1 / i; return h; };
+                            const konst = -A.reduce((acc, Aj, j) => acc + Aj * H(a - 1 + sh[j]), 0);
+                            const part = A.map((Aj, j) => { const sv = sh[j]; if (sv === 0) return null; const terms = sv > 0 ? Array.from({ length: sv }, (_, i) => `1/(${nv}+${i + 1})`) : Array.from({ length: -sv }, (_, i) => `-1/(${nv}${i ? '-' + i : ''})`); return `(${nice(Aj, 12, 1e-9).text})*(${terms.join('+')})`; }).filter(Boolean);
+                            return { expr: `(${nice(konst, 12, 1e-9).text}) + ${part.join(' + ') || '0'}`, how: 'partial fractions: the terms A/(k + s) telescope because ΣA = 0, leaving finitely many terms 1/(n + i)' };
+                        }
+                    }
+                }
+            }
+            const G = [['sqrt', x => Math.sqrt(x), x => `sqrt(${x})`], ['ln', x => Math.log(x), x => `ln(${x})`], ['atan', x => Math.atan(x), x => `atan(${x})`], ['1/k', x => 1 / x, x => `1/(${x})`], ['1/k²', x => 1 / (x * x), x => `1/(${x})^2`], ['1/k³', x => 1 / x ** 3, x => `1/(${x})^3`], ['1/√k', x => 1 / Math.sqrt(x), x => `1/sqrt(${x})`], ['(k)!', x => 1, x => '1']].slice(0, 7);
+            for (const [name, g, str] of G) {
+                const d0 = g(a + 1) - g(a); if (!Number.isFinite(d0) || Math.abs(d0) < 1e-12) continue; const cc = f(a) / d0; if (!Number.isFinite(cc)) continue;
+                let ok = true; for (let q = 0; q < 14 && ok; q++) { const k = a + q, want = cc * (g(k + 1) - g(k)); if (!Number.isFinite(want) || Math.abs(want - f(k)) > 1e-9 * (1 + Math.abs(want))) ok = false; }
+                if (ok) { const cs = nice(cc, 12, 1e-9).text; return { expr: `(${cs})*((${str(`${nv}+1`)}) - (${str(String(a))}))`, how: `the term equals ${Math.abs(cc - 1) < 1e-12 ? '' : cs + '·'}[g(k+1) − g(k)] with g(k) = ${name === 'sqrt' ? '√k' : name === 'ln' ? 'ln k' : name}, so the partial sums collapse to g(n+1) − g(${a})` }; }
+            }
+            return null;
+        }
+        const tele = (dp >= 0 && dp <= 8) ? null : telescopeSum();
         if (dp >= 0 && dp <= 8) {
             kind = 'polynomial'; const m0 = a - 1, nn = dp + 2;
             const V = Array.from({ length: nn }, (_, i) => Array.from({ length: nn }, (_, j) => Math.pow(m0 + i, j))), y = Array.from({ length: nn }, (_, i) => [S(m0 + i)]);
             coeffs = math.lusolve(V, y).map(r => r[0]);
             expr = coeffs.map((c, j) => (Math.abs(c) < 1e-11 ? '' : `(${T(c).text})*${nv}^${j}`)).filter(Boolean).join(' + ') || '0';
+        } else if (tele) {
+            kind = 'telescoping'; expr = tele.expr; teleNote = tele.how;
         } else {
             rr = pts[1] / pts[0]; if (!Number.isFinite(rr) || Math.abs(rr) < 1e-12) rr = NaN;
             // f(k) = p(k)·r^k with r constant?  try r from the ratio of far-apart terms
             const cand = []; for (let i = 0; i < 6; i++) { const q = pts[i + 6] / pts[i]; if (Number.isFinite(q) && q !== 0) cand.push(Math.pow(Math.abs(q), 1 / 6) * Math.sign(q) ** (1)); }
             const r0 = cand.length ? cand[cand.length - 1] : NaN; let found = null;
             for (const rc of [rr, r0, 2, 3, 0.5, -1, -2, 1 / 3, 10].filter(Number.isFinite)) { for (const rs of [rc, Math.round(rc), (() => { const q = nice(rc, 6, 1e-6); try { return math.evaluate(q.text); } catch (e) { return NaN; } })()]) { if (!Number.isFinite(rs) || rs === 0 || rs === 1) continue; const g = pts.map((x, i) => x / Math.pow(rs, a + i)); const d = degPoly(g); if (d >= 0 && d <= 6) { found = { r: rs, d }; break; } } if (found) break; }
-            if (!found) throw new CalcError('No closed form found. Supported: polynomials in k (Faulhaber sums) and polynomial·rᵏ terms such as 2^k, k·3^k, 1/2^k.');
+            if (!found) throw new CalcError('No closed form found. Supported: polynomials in k (Faulhaber sums), polynomial·rᵏ terms such as 2^k, k·3^k, 1/2^k, and telescoping sums such as 1/(k(k+1)), ln(1+1/k), √(k+1) − √k.');
             kind = 'geometric'; rr = found.r; const d = found.d, nn = d + 2, m0 = a - 1;
             const V = Array.from({ length: nn }, (_, i) => Array.from({ length: nn }, (_, j) => (j < nn - 1 ? Math.pow(rr, m0 + i) * Math.pow(m0 + i, j) : 1))), y = Array.from({ length: nn }, (_, i) => [S(m0 + i)]);
             coeffs = math.lusolve(V, y).map(r => r[0]);
@@ -500,8 +532,8 @@
         r.items.push({ label: 'Sum:', text: `Σ ${kv}=${a}…${engine.strOf(up)} of ${engine.strOf(node)}`, tex: `\\sum_{${kv}=${a}}^{${engine.texOf(up)}} ${engine.texOf(node)}` });
         r.main = { label: 'Closed form =', text: engine.strOf(shownS), tex: `\\sum_{${kv}=${a}}^{${engine.texOf(up)}} ${engine.texOf(node)}=${engine.texOf(shownS)}` };
         r.meta.push(`Verified: the closed form equals the direct sum for ${16} consecutive values of the upper limit (max relative gap ${worst.toExponential(1)}).`);
-        r.meta.push(kind === 'polynomial' ? `Method: the sum of a degree-${dp} polynomial is a degree-${dp + 1} polynomial in n (Faulhaber); its coefficients are found by exact interpolation` : `Method: for p(k)·r^k with r = ${nice(rr, 6, 1e-9).text} the sum has the form r^n·q(n) + C; q and C are found by solving a linear system`);
-        r.steps.push({ title: 'Recognise the type', text: kind === 'polynomial' ? `The term is a polynomial of degree ${dp} in ${kv}, so its partial sums form a polynomial of degree ${dp + 1} in n.` : `The term is a polynomial times ${nice(rr, 6, 1e-9).text}^${kv}.`, tex: '' });
+        r.meta.push(kind === 'telescoping' ? `Method: telescoping – ${teleNote}` : kind === 'polynomial' ? `Method: the sum of a degree-${dp} polynomial is a degree-${dp + 1} polynomial in n (Faulhaber); its coefficients are found by exact interpolation` : `Method: for p(k)·r^k with r = ${nice(rr, 6, 1e-9).text} the sum has the form r^n·q(n) + C; q and C are found by solving a linear system`);
+        r.steps.push({ title: 'Recognise the type', text: kind === 'telescoping' ? `The sum telescopes: ${teleNote}.` : kind === 'polynomial' ? `The term is a polynomial of degree ${dp} in ${kv}, so its partial sums form a polynomial of degree ${dp + 1} in n.` : `The term is a polynomial times ${nice(rr, 6, 1e-9).text}^${kv}.`, tex: '' });
         r.steps.push({ title: 'Solve for the coefficients', text: 'Evaluate the first partial sums S(a−1) = 0, S(a), S(a+1), … and solve for the unknown coefficients.', tex: '' });
         r.steps.push({ title: 'Verify', text: 'The formula is compared with the direct sum for many values of n.', tex: '' });
         return I.finalizeText(r);
@@ -1256,6 +1288,39 @@
         return I.finalizeText(r);
     }
     { const oBase = engine.run.ode; engine.run.ode = (src, opt) => { opt = opt || {}; return opt.series === 'yes' && opt.odeType !== 'system' ? runSeriesODE(src, opt) : oBase(src, opt); }; }
+
+    // ======================================================================
+    // 3-D direction fields and trajectories for ODE systems  x′ = …, y′ = …, z′ = …
+    // ======================================================================
+    function systemPlot3D(src, opt, r) {
+        const comps = splitComps(src); if (comps.length !== 3) return r;
+        const nodes = comps.map(c => engine.parse(c)), vars = ['x', 'y', 'z', 't'];
+        nodes.forEach(n => engine.freeVars(n).forEach(q => { if (!vars.includes(q)) throw new CalcError(`Unknown symbol “${q}”. Use x, y, z and t.`); }));
+        const f = nodes.map(n => engine.compile(n, vars));
+        const t0 = I.parseLimit(opt.x0 === undefined || opt.x0 === '' ? '0' : opt.x0, 'Start').value, t1 = I.parseLimit(opt.xEnd === undefined || opt.xEnd === '' ? '10' : opt.xEnd, 'End').value;
+        const init = String(opt.initial || '1, 1, 1').split(/[,\s;]+/).filter(Boolean).map(q => I.parseLimit(q, 'Initial value').value); if (init.length !== 3 || !init.every(Number.isFinite)) return r;
+        const F = (t, u) => f.map(g => g(u[0], u[1], u[2], t));
+        const steps = 1500, h = (t1 - t0) / steps; let u = init.slice(), t = t0; const X = [u[0]], Y = [u[1]], Z = [u[2]];
+        for (let i = 0; i < steps; i++) {
+            const k1 = F(t, u), k2 = F(t + h / 2, u.map((v, j) => v + h / 2 * k1[j])), k3 = F(t + h / 2, u.map((v, j) => v + h / 2 * k2[j])), k4 = F(t + h, u.map((v, j) => v + h * k3[j]));
+            u = u.map((v, j) => v + h / 6 * (k1[j] + 2 * k2[j] + 2 * k3[j] + k4[j])); t += h;
+            if (!u.every(v => Number.isFinite(v) && Math.abs(v) < 1e6)) break; X.push(u[0]); Y.push(u[1]); Z.push(u[2]);
+        }
+        const span = a => { const lo = Math.min(...a), hi = Math.max(...a); const pad = (hi - lo) * 0.15 || 1; return [lo - pad, hi + pad]; };
+        const [xr, yr, zr] = [span(X), span(Y), span(Z)]; const n = 5, cx = [], cy = [], cz = [], cu = [], cv = [], cw = [];
+        for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) for (let k = 0; k < n; k++) {
+            const x = xr[0] + (xr[1] - xr[0]) * i / (n - 1), y = yr[0] + (yr[1] - yr[0]) * j / (n - 1), z = zr[0] + (zr[1] - zr[0]) * k / (n - 1), v = F(t0, [x, y, z]);
+            if (v.every(Number.isFinite)) { cx.push(x); cy.push(y); cz.push(z); cu.push(v[0]); cv.push(v[1]); cw.push(v[2]); }
+        }
+        const traces = [];
+        if (cx.length) traces.push({ type: 'cone', x: cx, y: cy, z: cz, u: cu, v: cv, w: cw, sizemode: 'scaled', sizeref: 0.7, anchor: 'tail', opacity: 0.55, colorscale: 'Blues', showscale: false, name: 'direction field', hoverinfo: 'skip' });
+        traces.push({ type: 'scatter3d', mode: 'lines', x: X, y: Y, z: Z, line: { width: 5 }, name: 'trajectory' }, { type: 'scatter3d', mode: 'markers', x: [X[0]], y: [Y[0]], z: [Z[0]], marker: { size: 5 }, name: 'start' });
+        r.plot3 = { generic: { title: '3-D direction field and trajectory', axes: ['x', 'y', 'z'], traces } };
+        r.meta.push('3-D tab: cones show the direction field F(x, y, z) at the start time; the line is the solution through the initial point (RK4).');
+        if (X.length < steps) r.warnings.push('The trajectory leaves the plotted range (the solution blows up), so it is cut short.');
+        return r;
+    }
+    { const oBase3 = engine.run.ode; engine.run.ode = (src, opt) => { opt = opt || {}; const r = oBase3(src, opt); if (opt.odeType === 'system') { try { return systemPlot3D(src, opt, r); } catch (e) { if (e instanceof CalcError) throw e; } } return r; }; }
     { const mBase = engine.run.matrix; engine.run.matrix = (src, opt) => { opt = opt || {}; return LA_OPS.has(opt.op) ? runLinalg(src, opt) : mBase(src, opt); }; }
 
 

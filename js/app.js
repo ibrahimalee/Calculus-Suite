@@ -137,6 +137,8 @@
                 { label: 'Spring: y″ = −y', fn: '-y', opts: { odeType: 'second', x0: '0', xEnd: '12', y0: '1', v0: '0' } },
                 { label: 'Damped oscillator', fn: '-0.4*yp-4*y', opts: { odeType: 'second', x0: '0', xEnd: '15', y0: '1', v0: '0' } },
                 { label: 'Rotation system', fn: 'y ; -x', opts: { odeType: 'system', x0: '0', xEnd: '12', initial: '1, 0' } },
+                { label: 'Lorenz attractor (3-D tab: direction field)', fn: '10*(y-x) ; x*(28-z)-y ; x*y-8/3*z', opts: { odeType: 'system', x0: '0', xEnd: '25', initial: '1, 1, 1' } },
+                { label: '3-D spiral with drift', fn: '-y ; x ; 0.1', opts: { odeType: 'system', x0: '0', xEnd: '14', initial: '1, 0, 0' } },
                 { label: 'Power series: y′ = x + y', fn: 'x+y', opts: { odeType: 'first', x0: '0', xEnd: '2', y0: '1', series: 'yes', terms: '8' } },
                 { label: 'Power series: y″ = x·y (Airy-type)', fn: 'x*y', opts: { odeType: 'second', x0: '0', xEnd: '2', y0: '1', v0: '0', series: 'yes', terms: '10' } },
                 { label: 'Predator–prey (Lotka–Volterra)', fn: 'x*(1-0.5*y) ; y*(0.5*x-1)', opts: { odeType: 'system', x0: '0', xEnd: '30', initial: '3, 1' } }
@@ -312,7 +314,7 @@
     };
     MODES.sums = {
         label: 'Sums & series', icon: 'Σk',
-        input: () => ({ label: 'Term  tₖ  (variable k or n)', placeholder: 'e.g. 1/k^2', hint: 'Finite sums are exact when possible. Infinite series are tested for convergence (nth-term, ratio, p-series, alternating) and summed accurately.' }),
+        input: () => ({ label: 'Term  tₖ  (variable k or n)', placeholder: 'e.g. 1/k^2', hint: 'Finite sums are exact when possible; with an end index like n you get a closed form (Faulhaber, geometric, telescoping). Infinite series are tested for convergence (nth-term, ratio, p-series, alternating) and summed accurately.' }),
         fields: [
             { key: 'lower', label: 'Start index', type: 'text', def: '1' },
             { key: 'upper', label: 'End index (inf = infinite, or n for a closed form)', type: 'text', def: 'inf' }
@@ -328,6 +330,10 @@
             { label: 'Ratio test: Σ k/2^k', fn: 'k/2^k', opts: { lower: '1', upper: 'inf' } },
             { label: 'Closed form: Σ k² from 1 to n', fn: 'k^2', opts: { lower: '1', upper: 'n' } },
             { label: 'Closed form: Σ k·2^k', fn: 'k*2^k', opts: { lower: '1', upper: 'n' } },
+            { label: 'Telescoping: Σ 1/(k(k+1)) to n', fn: '1/(k*(k+1))', opts: { lower: '1', upper: 'n' } },
+            { label: 'Telescoping: Σ 1/(k(k+2)) to n', fn: '1/(k*(k+2))', opts: { lower: '1', upper: 'n' } },
+            { label: 'Telescoping: Σ ln(1 + 1/k) to n', fn: 'ln(1+1/k)', opts: { lower: '1', upper: 'n' } },
+            { label: 'Telescoping: Σ (√(k+1) − √k) to n', fn: 'sqrt(k+1)-sqrt(k)', opts: { lower: '1', upper: 'n' } },
             { label: 'Closed form: Σ (2k−1) from 1 to 2n', fn: '2*k-1', opts: { lower: '1', upper: '2*n' } }
         ]
     };
@@ -1630,6 +1636,12 @@
         const baseLayout = { paper_bgcolor: th.scene, font: { color: th.text }, margin: { t: 50, r: 10, b: 10, l: 10 } };
         const config = { responsive: true, displaylogo: false, toImageButtonOptions: { filename: 'calculus-suite-3d', scale: 2 } };
 
+        const choices = $('view3dChoices'); if (choices) choices.hidden = !!spec.generic;
+        if (spec.generic) { // data-driven 3D plots (direction fields, trajectories)
+            const g = spec.generic, ax = t => ({ title: t, gridcolor: th.grid, zerolinecolor: th.zero, color: th.text });
+            Plotly.react(div, g.traces, Object.assign({}, baseLayout, { title: { text: g.title || '', font: { size: 16, color: th.text } }, colorway: COLORS, legend: { orientation: 'h', y: -0.02 }, scene: { bgcolor: th.scene, xaxis: ax(g.axes ? g.axes[0] : 'x'), yaxis: ax(g.axes ? g.axes[1] : 'y'), zaxis: ax(g.axes ? g.axes[2] : 'z'), aspectmode: 'cube' } }), config);
+            return;
+        }
         if (spec.field) { // 3D vector field
             const R = 3, k = 5, xs = [], ys = [], zs = [], us = [], vs = [], ws = [];
             for (let i = 0; i < k; i++) for (let j = 0; j < k; j++) for (let l = 0; l < k; l++) {

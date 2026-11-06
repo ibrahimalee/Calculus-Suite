@@ -22,6 +22,7 @@ const MODES = ['laplace', 'vector', 'stats', 'number', 'units', 'complex', 'matr
             const good = card && !bad;
             if (good) ok++; else { fail++; console.log('FAIL', mode, label, bad ? (await p.locator('#results .alert-error').first().textContent()).slice(0, 120) : 'no card'); }
             if (good && plotOk === 'none') console.log('  note: no plot data for', mode, label);
+            if (good && /Lorenz|3-D spiral/.test(label)) { await p.click('#tab-plot3d'); await p.waitForTimeout(600); const n3 = await p.evaluate(() => { const d = document.getElementById('plot3dDiv'); return d.data ? d.data.map(t => t.type).join(',') : 'none'; }); await p.click('#tab-results'); if (!/cone/.test(n3) || !/scatter3d/.test(n3)) { fail++; console.log('FAIL 3D field', label, n3); } else ok++; }
         }
     }
     // camera/image input: the recogniser must not be fetched until the user scans, and must read printed text

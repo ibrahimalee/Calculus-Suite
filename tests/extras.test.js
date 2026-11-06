@@ -92,3 +92,14 @@ test('power-series ODE solutions match known series and verify against RK4', () 
   const c = E.run.ode('-y', { odeType: 'second', x0: '0', y0: '1', v0: '0', terms: '8', series: 'yes' }); assert.match(c.main.text, /^1 − 1\/2\*x\^2 \+ 1\/24\*x\^4/); assert.ok(c.meta.some(m => /Verified/.test(m)));
   assert.throws(() => E.run.ode('1/x', { odeType: 'first', x0: '0', y0: '1', series: 'yes' }), /singular|cannot|finite/i);
 });
+test('telescoping sums collapse to verified closed forms', () => {
+  const S = (t, up) => E.run.sums(t, { lower: '1', upper: up || 'n' });
+  assert.equal(S('1/(k*(k+1))').main.text, '1 - 1 / (n + 1)');
+  for (const t of ['1/(k*(k+2))', '1/(k*(k+1)*(k+2))', '1/(k*(k+3))', 'ln(1+1/k)', 'sqrt(k+1)-sqrt(k)', '1/(sqrt(k)+sqrt(k+1))', '(2*k+1)/(k^2*(k+1)^2)', 'atan(1/(1+k*(k+1)))']) { const r = S(t); assert.ok(r.meta.some(m => /Verified/.test(m)), t); assert.ok(r.meta.some(m => /telescop/i.test(m)), t); }
+  assert.throws(() => S('1/k'), /closed form/);       // the harmonic numbers are not elementary
+});
+test('3-D direction field for a 3-equation ODE system', () => {
+  const r = E.run.ode('10*(y-x) ; x*(28-z)-y ; x*y-8/3*z', { odeType: 'system', x0: '0', xEnd: '20', initial: '1, 1, 1' });
+  assert.deepEqual(r.plot3.generic.traces.map(t => t.type), ['cone', 'scatter3d', 'scatter3d']); assert.ok(r.plot3.generic.traces[1].x.length > 500);
+  assert.equal(E.run.ode('y ; -x', { odeType: 'system', x0: '0', xEnd: '6', initial: '1, 0' }).plot3, null);
+});

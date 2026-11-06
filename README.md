@@ -20,7 +20,8 @@ A calculus workstation that runs entirely in the browser – no backend, no buil
 | **Matrices** | det, exact inverse, eigen-decomposition, rank/RREF, charpoly, solve Ax=b, powers |
 | **Calculator** | Variables across lines, `ans`, exact fractions / π / e recognition, complex numbers, prime factorisation, binary & hex |
 | **Equation solver** | All real and complex roots of polynomials, numerical roots for anything else, inequalities → interval notation |
-| **Sums & series** (closed forms) | Symbolic upper limits: Σk^p (Faulhaber), polynomial·rᵏ terms such as k·2^k – each closed form is verified against direct summation |
+| **Sums & series** (closed forms) | Symbolic upper limits: Σk^p (Faulhaber), polynomial·rᵏ terms such as k·2^k, telescoping sums (1/(k(k+1)), ln(1+1/k), √(k+1)−√k, …) – each closed form is verified against direct summation |
+| **ODEs** (3-D) | Systems of three equations get a 3-D direction field (cones) with the solution trajectory, e.g. the Lorenz attractor |
 | **ODEs** (series) | Power-series solutions of first- and second-order equations about x₀, checked against RK4 |
 | **Sums & series** | Finite sums (exact when possible); infinite series with nth-term / ratio / p-series / alternating tests and accurate values |
 | **Multivariable** | Gradient (+ tangent plane, directional derivative), partials, Hessian, Laplacian, critical-point classification, double integrals with variable limits, divergence, curl |
