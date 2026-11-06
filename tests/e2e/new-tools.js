@@ -55,6 +55,15 @@ const MODES = ['laplace', 'vector', 'stats', 'number', 'units', 'complex', 'matr
         const stat = await p.textContent('#pracStats'); console.log('practice stats:', stat);
         await p.click('#practiceClose');
     }
+    // interface languages: switching translates the chrome, sets text direction and can be undone
+    {
+        const pick = async l => { await p.click('#appearBtn'); await p.selectOption('#langSelect', l); await p.waitForTimeout(300); await p.keyboard.press('Escape'); };
+        await pick('es'); const es = (await p.textContent('#tab-results')).trim();
+        await pick('ar'); const dir = await p.evaluate(() => document.documentElement.dir); const over = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        await pick('en'); const en = (await p.textContent('#tab-results')).trim();
+        const good = es === 'Resultados' && dir === 'rtl' && over <= 1 && en === 'Results';
+        console.log(`i18n: es=${es} dir=${dir} overflow=${over} back=${en}`); if (good) ok++; else { fail++; console.log('FAIL i18n'); }
+    }
     console.log(`${ok} examples ok, ${fail} failed`);
     if (errs.length) { console.log('console errors:', errs.slice(0, 5)); fail++; }
     await b.close(); process.exit(fail ? 1 : 0);

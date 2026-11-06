@@ -2006,6 +2006,7 @@
         } else $('offlineStatus').textContent = 'Offline install needs http(s)';
         if (restored) compute(); else showWelcome();
         $('app').classList.add('ready');
+        if (window.I18N) window.I18N.init();
     }
 
     // Debug/testing hook

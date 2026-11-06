@@ -684,3 +684,8 @@ body.embed .container { padding: 8px; } body.embed .main-grid { display: block; 
     .btn-grid { bottom: calc(60px + env(safe-area-inset-bottom)) !important; }
     body.embed .bottom-nav { display: none; } body.embed { padding-bottom: 0; }
 }
+/* right-to-left languages: chrome mirrors, maths stays left-to-right */
+body.rtl .workspace .tab-content, body.rtl .preview-box, body.rtl textarea, body.rtl input[type=text], body.rtl .keypad, body.rtl .plot-area { direction: ltr; text-align: left; }
+body.rtl .mode-toggle-label, body.rtl .field-label, body.rtl .option-label { text-align: right; }
+:root { --font: "IBM Plex Sans", "Noto Sans", "Noto Sans Arabic", "Noto Naskh Arabic", "Noto Nastaliq Urdu", "Noto Sans Devanagari", "Segoe UI", system-ui, -apple-system, sans-serif; }
+.skip-link { left: 8px !important; transform: translateY(-300%); } .skip-link:focus { transform: none; }
