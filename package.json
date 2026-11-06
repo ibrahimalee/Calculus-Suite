@@ -1,6 +1,6 @@
 {
   "name": "calculus-suite-pro",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Browser-based calculus workstation: derivatives, integrals, series, limits, ODEs, multivariable calculus and live plots.",
   "private": true,
   "license": "MIT",
@@ -10,6 +10,35 @@
     "e2e": "node tests/e2e/ui-checks.js && node tests/e2e/plot-checks.js && node tests/e2e/new-tools.js"
   },
   "devDependencies": {
+    "playwright": "^1.49.0"
+  },
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./nlp": "./js/nlp.js",
+    "./practice": "./js/practice.js"
+  },
+  "files": [
+    "lib/",
+    "js/engine.js",
+    "js/extras.js",
+    "js/nlp.js",
+    "js/practice.js",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "keywords": [
+    "calculus",
+    "symbolic",
+    "math",
+    "derivative",
+    "integral",
+    "laplace",
+    "offline",
+    "education"
+  ],
+  "dependencies": {
     "algebrite": "1.4.0",
     "mathjs": "11.11.0"
   }
