@@ -557,6 +557,12 @@
         requestAnimationFrame(moveIndicator);
         refreshActivePlot();
     }
+    function initTeaching() {
+        const t = $('teachToggle'); if (!t) return;
+        let on = false; try { on = localStorage.getItem('cs_teaching') === '1'; } catch (e) { /* blocked */ }
+        document.body.classList.toggle('teaching', on); t.checked = on;
+        t.addEventListener('change', () => { document.body.classList.toggle('teaching', t.checked); try { localStorage.setItem('cs_teaching', t.checked ? '1' : '0'); } catch (e) { /* blocked */ } if (state.result) { state.stepsShown = 1; displayResult(state.result); } });
+    }
     function initTheme() {
         const legacy = store.get('theme');
         themeMode = store.get('themeMode') || (legacy ? legacy : 'auto');
@@ -870,7 +876,19 @@
         container.querySelector('[data-act="share"]').addEventListener('click', shareLink);
         container.querySelector('[data-act="save"]').addEventListener('click', saveToNotebook);
         container.querySelector('[data-act="export"]').addEventListener('click', exportReport);
+        state.stepsShown = 1;
+        applyTeachingToResult(container);
         displaySteps(r.steps);
+    }
+
+    function applyTeachingToResult(container) {
+        if (!document.body.classList.contains('teaching')) return;
+        const box = container.querySelector('.result-content'); if (!box) return;
+        const rows = container.querySelector('.result-rows');
+        box.classList.add('teach-hidden'); if (rows) rows.classList.add('teach-hidden');
+        const btn = document.createElement('button'); btn.className = 'btn teach-show'; btn.type = 'button'; btn.textContent = 'Try it yourself first – show the answer';
+        box.parentNode.insertBefore(btn, box);
+        btn.addEventListener('click', () => { box.classList.remove('teach-hidden'); if (rows) rows.classList.remove('teach-hidden'); btn.remove(); });
     }
 
     function displaySteps(steps) {
@@ -881,12 +899,18 @@
             return;
         }
         el.classList.add('show-timeline');
-        el.innerHTML = steps.map((s, i) => `
+        const teaching = document.body.classList.contains('teaching');
+        const shown = teaching ? Math.min(steps.length, state.stepsShown || 1) : steps.length;
+        el.innerHTML = steps.slice(0, shown).map((s, i) => `
             <div class="step-card" style="--delay:${Math.min(i, 12) * 60}ms">
                 <div class="step-header"><div class="step-number">${i + 1}</div><div class="step-title">${esc(s.title)}</div></div>
                 <div class="step-content">${esc(s.text)}</div>
                 ${s.tex ? `<div class="step-tex">${texSpan(s.tex, '', true)}</div>` : ''}
-            </div>`).join('');
+            </div>`).join('') + (teaching && shown < steps.length ? `<div class="teach-reveal"><button class="btn" type="button" id="revealNext">Reveal next step (${shown} of ${steps.length})</button><button class="mini-btn" type="button" id="revealAll">Show all</button></div>` : '');
+        if (teaching && shown < steps.length) {
+            $('revealNext').addEventListener('click', () => { state.stepsShown = shown + 1; displaySteps(steps); });
+            $('revealAll').addEventListener('click', () => { state.stepsShown = steps.length; displaySteps(steps); });
+        }
         renderTex(el);
     }
 
@@ -1756,10 +1780,75 @@
         });
     }
 
+
+    // ------------------------------------------------------------------
+    // Practice mode (teaching): generated problems, checking, progressive hints
+    // ------------------------------------------------------------------
+    function initPractice() {
+        const dlg = $('practiceDialog'); if (!dlg || !window.Practice) return;
+        const P = window.Practice.create(engine, window.math);
+        const KEY = 'cs_practice';
+        const load = () => { try { const d = JSON.parse(localStorage.getItem(KEY) || '{}'); return { solved: +d.solved || 0, tried: +d.tried || 0, streak: +d.streak || 0, best: +d.best || 0, topic: P.TOPICS.some(t => t[0] === d.topic) ? d.topic : 'derivative', level: [1, 2, 3].includes(+d.level) ? +d.level : 1, seed: Number.isFinite(+d.seed) && +d.seed > 0 ? +d.seed : 1 }; } catch (e) { return { solved: 0, tried: 0, streak: 0, best: 0, topic: 'derivative', level: 1, seed: 1 }; } };
+        let st = load(), cur = null, hintsShown = 0, finished = false;
+        const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* storage blocked */ } };
+        $('pracTopic').innerHTML = P.TOPICS.map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('');
+        $('pracTopic').value = st.topic; $('pracLevel').value = String(st.level);
+        const stats = () => { $('pracStats').textContent = `Solved ${st.solved} of ${st.tried} · streak ${st.streak} · best streak ${st.best}`; };
+        const texLine = (t, display) => `<span class="${display ? 'tex-display ' : ''}tex" data-tex="${esc(t)}"></span>`;
+        const draw = el => { renderTex(el); };
+        function next(sameSeed) {
+            st.topic = $('pracTopic').value; st.level = +$('pracLevel').value; if (!sameSeed) st.seed = (st.seed % 999999) + 1; save();
+            try { cur = P.generate(st.topic, st.level, st.seed); } catch (e) { $('pracProblem').textContent = 'Could not create a problem. Try another topic.'; return; }
+            hintsShown = 0; finished = false; $('pracHints').innerHTML = ''; $('pracFeedback').textContent = ''; $('pracFeedback').className = 'practice-feedback'; $('pracAnswer').value = ''; $('pracPreview').innerHTML = ''; $('pracAnswer').placeholder = cur.placeholder || 'Your answer'; $('pracAnswer').disabled = false;
+            $('pracProblem').innerHTML = `<div class="prob-id">Problem #${st.seed} · ${esc(P.TOPICS.find(t => t[0] === st.topic)[1])} · level ${st.level}</div><div class="prob-body">${texLine(cur.tex, true)}</div>${cur.prompt ? `<div class="prob-prompt">${esc(cur.prompt)}</div>` : (st.topic === 'derivative' ? '<div class="prob-prompt">Differentiate.</div>' : st.topic === 'integral' ? '<div class="prob-prompt">Find an antiderivative.</div>' : '')}`;
+            draw($('pracProblem')); stats(); $('pracAnswer').focus();
+        }
+        function showSteps(n) {
+            const steps = cur.steps().filter(s => s.text || s.tex).slice(0, n);
+            $('pracHints').innerHTML = steps.map(s => `<li><b>${esc(s.title)}</b> – ${esc(s.text)}${s.tex ? `<div>${texLine(s.tex, false)}</div>` : ''}</li>`).join('');
+            draw($('pracHints'));
+            return steps.length;
+        }
+        $('practiceBtn').addEventListener('click', () => { if (!cur) next(true); if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); $('pracAnswer').focus(); });
+        $('practiceClose').addEventListener('click', () => dlg.close());
+        $('pracNew').addEventListener('click', () => next(false));
+        $('pracTopic').addEventListener('change', () => next(true)); $('pracLevel').addEventListener('change', () => next(true));
+        $('pracAnswer').addEventListener('input', () => {
+            const v = $('pracAnswer').value, box = $('pracPreview');
+            if (!cur || !v.trim() || !['expression', 'number'].includes(cur.input)) { box.innerHTML = ''; return; }
+            try { const info = engine.inspect(v.replace(/\s*\+\s*[cC]\s*$/, '')); box.innerHTML = `<span class="tex" data-tex="${esc(info.tex)}"></span>`; draw(box); } catch (e) { box.textContent = ''; }
+        });
+        $('pracForm').addEventListener('submit', e => {
+            e.preventDefault(); if (!cur || finished) return;
+            const fb = $('pracFeedback'); let r;
+            try { r = cur.check($('pracAnswer').value); } catch (err) { r = { ok: false, msg: err.message }; }
+            if (r.ok) {
+                finished = true; st.tried++; st.solved++; st.streak++; st.best = Math.max(st.best, st.streak); save(); stats();
+                fb.className = 'practice-feedback good'; fb.textContent = hintsShown ? `Correct! (with ${hintsShown} hint${hintsShown === 1 ? '' : 's'}) Press “New problem” for the next one.` : 'Correct! Press “New problem” for the next one.';
+                $('pracAnswer').disabled = true;
+            } else { fb.className = 'practice-feedback bad'; fb.textContent = r.msg || 'Not quite – try again, or ask for a hint.'; st.streak = 0; save(); stats(); }
+        });
+        $('pracHint').addEventListener('click', () => {
+            if (!cur) return; const total = cur.steps().filter(s => s.text || s.tex).length;
+            if (!total) { $('pracFeedback').className = 'practice-feedback'; $('pracFeedback').textContent = 'No hints are available for this problem – try “Show solution”.'; return; }
+            hintsShown = Math.min(total, hintsShown + 1); showSteps(hintsShown);
+            if (hintsShown === total) $('pracFeedback').textContent = 'That was the last hint. Use “Show solution” to see the answer.';
+        });
+        $('pracSolution').addEventListener('click', () => {
+            if (!cur) return;
+            if (!finished) { finished = true; st.tried++; st.streak = 0; save(); stats(); }
+            showSteps(99); $('pracAnswer').disabled = true;
+            const fb = $('pracFeedback'); fb.className = 'practice-feedback'; fb.innerHTML = `Answer: ${cur.answerTex ? texLine(cur.answerTex, false) : esc(cur.answerText)}`; draw(fb);
+        });
+        stats();
+    }
+
     function init() {
         initNotebook();
+        initPractice();
         initScan();
         initTheme();
+        initTeaching();
         initUI();
         renderHistory();
         setMode('derivative');

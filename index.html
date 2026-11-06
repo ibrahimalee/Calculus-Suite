@@ -27,6 +27,7 @@
             <span data-icon="search" data-size="16"></span><span>Search tools, examples, actions…</span><kbd>Ctrl K</kbd>
         </button>
         <button class="icon-btn" id="installBtn" type="button" title="Install as an app" aria-label="Install app" hidden><span data-icon="download"></span></button>
+        <button class="icon-btn" id="practiceBtn" type="button" title="Practice problems" aria-label="Open practice mode"><span data-icon="sparkle"></span></button>
         <button class="icon-btn" id="helpBtn" type="button" title="Syntax help (?)" aria-label="Open syntax help"><span data-icon="help"></span></button>
         <div class="pop-wrap">
             <button class="icon-btn" id="appearBtn" type="button" title="Appearance" aria-label="Appearance settings" aria-expanded="false" aria-controls="appearPop"><span data-icon="palette"></span></button>
@@ -35,6 +36,8 @@
                 <div class="seg" id="themeSeg"><button type="button" data-theme="light"><span data-icon="sun" data-size="15"></span>Light</button><button type="button" data-theme="dark"><span data-icon="moon" data-size="15"></span>Dark</button><button type="button" data-theme="auto"><span data-icon="sparkle" data-size="15"></span>Auto</button></div>
                 <h4>Accent colour</h4>
                 <div class="swatches" id="accentSwatches"></div>
+                <h4>Learning</h4>
+                <label class="toggle-row"><input type="checkbox" id="teachToggle"> <span>Teaching mode – hide answers and steps until I ask</span></label>
                 <p class="density-note">Your choices are remembered on this device. Plots follow the theme automatically.</p>
             </div>
         </div>
@@ -174,6 +177,31 @@
             </div>
         </div>
     </footer>
+
+    <dialog id="practiceDialog" aria-labelledby="practiceTitle">
+        <div class="sheet practice-sheet">
+            <div class="sheet-head"><h2 id="practiceTitle">Practice</h2><button class="icon-btn" id="practiceClose" type="button" aria-label="Close"><span data-icon="x"></span></button></div>
+            <div class="practice-controls">
+                <label>Topic <select id="pracTopic"></select></label>
+                <label>Level <select id="pracLevel"><option value="1">1 · Warm-up</option><option value="2">2 · Standard</option><option value="3">3 · Challenge</option></select></label>
+                <button class="btn" id="pracNew" type="button">New problem</button>
+            </div>
+            <div class="practice-stats" id="pracStats" aria-live="polite"></div>
+            <div class="practice-problem" id="pracProblem" aria-live="polite"></div>
+            <form id="pracForm" class="practice-answer" autocomplete="off">
+                <input id="pracAnswer" type="text" spellcheck="false" autocapitalize="off" aria-label="Your answer" placeholder="Your answer">
+                <button class="btn btn-primary" type="submit">Check</button>
+            </form>
+            <div class="practice-preview" id="pracPreview" aria-hidden="true"></div>
+            <div class="practice-feedback" id="pracFeedback" role="status" aria-live="polite"></div>
+            <div class="practice-actions">
+                <button class="btn" id="pracHint" type="button">Hint</button>
+                <button class="btn" id="pracSolution" type="button">Show solution</button>
+            </div>
+            <ol class="practice-hints" id="pracHints"></ol>
+            <p class="practice-note">Any equivalent form is accepted. Problems come from a seed, so the same problem number always gives the same question. Progress is kept on this device only.</p>
+        </div>
+    </dialog>
 
     <dialog id="scanDialog" aria-labelledby="scanTitle">
         <div class="sheet scan-sheet">

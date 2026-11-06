@@ -39,6 +39,22 @@ const MODES = ['laplace', 'vector', 'stats', 'number', 'units', 'complex', 'matr
         if (!lazy || !read) { fail++; console.log('FAIL scan check'); } else ok++;
         await p.click('#scanClose');
     }
+    // practice mode: every topic must accept its own answer through the real UI and persist the score
+    {
+        await p.click('#practiceBtn'); await p.waitForTimeout(300);
+        const topics = await p.$$eval('#pracTopic option', o => o.map(x => x.value));
+        for (const t of topics) for (const lvl of ['1', '3']) {
+            await p.selectOption('#pracTopic', t); await p.selectOption('#pracLevel', lvl); await p.waitForTimeout(200);
+            const id = await p.evaluate(() => +/#(\d+)/.exec(document.querySelector('#pracProblem .prob-id').textContent)[1]);
+            const ans = await p.evaluate(([t, l, id]) => { const E = CalcEngine.create(math, Algebrite); CalcExtras.install(E, math, Algebrite); return Practice.create(E, math).generate(t, +l, id).answerText.replace(/\s*\+\s*C$/, ''); }, [t, lvl, id]);
+            await p.fill('#pracAnswer', ans + (t === 'integral' ? ' + C' : '')); await p.press('#pracAnswer', 'Enter'); await p.waitForTimeout(150);
+            const good = await p.locator('#pracFeedback.good').count();
+            if (good) ok++; else { fail++; console.log('FAIL practice', t, lvl, JSON.stringify(ans), (await p.textContent('#pracFeedback')).slice(0, 80)); }
+            await p.click('#pracHint'); await p.waitForTimeout(100);
+        }
+        const stat = await p.textContent('#pracStats'); console.log('practice stats:', stat);
+        await p.click('#practiceClose');
+    }
     console.log(`${ok} examples ok, ${fail} failed`);
     if (errs.length) { console.log('console errors:', errs.slice(0, 5)); fail++; }
     await b.close(); process.exit(fail ? 1 : 0);
