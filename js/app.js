@@ -858,12 +858,15 @@
                         <button class="mini-btn" data-act="copytex" title="Copy LaTeX">${icon('tex', 14)}LaTeX</button>
                         <button class="mini-btn" data-act="save" title="Save to your notebook">${icon('bookmark', 14)}Save</button>
                         <button class="mini-btn" data-act="share" title="Copy a link to this calculation">${icon('link', 14)}Share</button>
+                        <button class="mini-btn" data-act="embed" title="Copy an embed code for a web page or LMS">${icon('link', 14)}Embed</button>
+                        ${'speechSynthesis' in window ? `<button class="mini-btn" data-act="listen" title="Read the result aloud">${icon('sparkle', 14)}Listen</button>` : ''}
                         <button class="mini-btn" data-act="export" title="Download a Markdown report">${icon('file', 14)}Export</button>
                     </div>
                 </div>
                 ${r.main ? `<div class="result-content">${r.main.tex ? '' : `<span class="row-label">${esc(r.main.label)}</span> `}${texSpan(r.main.tex, r.main.text, true)}</div>` : ''}
                 ${rows ? `<div class="result-rows">${rows}</div>` : ''}
                 ${(r.badges && r.badges.length) ? `<div class="badges">${r.badges.map(b => `<span class="badge ${esc(b.kind)}">${icon(b.kind === 'ok' ? 'shield' : b.kind === 'warn' ? 'alert' : 'info', 14)}${esc(b.text)}</span>`).join('')}</div>` : ''}
+                ${checkBox(r)}
                 ${metaRest(r).length ? `<div class="result-meta">${metaRest(r).map(m => esc(m)).join('<br>')}</div>` : ''}
                 ${r.warnings.map(w => `<div class="alert alert-warning"><span class="alert-icon">${icon('info', 18)}</span><span>${esc(w)}</span></div>`).join('')}
                 <div class="result-foot"><span>${icon('bolt', 14)}${r.ms != null ? `${r.ms} ms` : 'instant'}</span><span>${icon('cpu', 14)}${esc(r.engine || 'worker')}</span><span>${icon('clock', 14)}${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span></div>
@@ -876,6 +879,9 @@
         container.querySelector('[data-act="share"]').addEventListener('click', shareLink);
         container.querySelector('[data-act="save"]').addEventListener('click', saveToNotebook);
         container.querySelector('[data-act="export"]').addEventListener('click', exportReport);
+        container.querySelector('[data-act="embed"]').addEventListener('click', embedCode);
+        const lb = container.querySelector('[data-act="listen"]'); if (lb) lb.addEventListener('click', () => speakResult(r));
+        applyPlotDescription(r);
         state.stepsShown = 1;
         applyTeachingToResult(container);
         displaySteps(r.steps);
@@ -1295,6 +1301,71 @@
     }
 
     // ---------- export ----------
+
+
+    // ------------------------------------------------------------------
+    // "How was this checked?", embed code, read-aloud, plot descriptions
+    // ------------------------------------------------------------------
+    function checkBox(r) {
+        const lines = (r.meta || []).filter(m => /^Verified|^Method:|cross-?checked|agree|independent/i.test(m));
+        if (!lines.length) return '';
+        const explain = { derivative: 'The derivative is compared with a numerical derivative (central differences) at several sample points.', integral: 'An antiderivative is differentiated and compared with the integrand; definite integrals are also evaluated by numerical quadrature.', definite: 'The exact value is compared with an independent numerical integration.', limit: 'The limit is approached from both sides numerically and compared with the closed form.', laplace: 'The transform is checked by numerically integrating f(t)·e^(−st) at a test value of s.', matrix: 'The decomposition is multiplied back together and compared with the original matrix.', stats: 'Probabilities use exact special functions rather than tables or simulation.', number: 'Factorisations are multiplied back; congruences are substituted back.' }[r.kind] || 'The engine compares its answer with an independent calculation, shown below. Results that cannot be checked independently are labelled numerical.';
+        return `<details class="check-box"><summary>${icon('shield', 14)}How was this checked?</summary><div class="check-body"><p>${esc(explain)}</p><ul>${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul><p class="check-note">Checks catch most mistakes but are not formal proofs – for anything important, confirm with a second source.</p></div></details>`;
+    }
+
+    function embedCode() {
+        const url = location.origin + location.pathname + '?embed=1#s=' + encodeHash(snapshot());
+        const code = `<iframe src="${url}" width="760" height="560" style="border:1px solid #bbb;max-width:100%" loading="lazy" title="Calculus Suite Pro – ${(state.result && state.result.title || 'calculation').replace(/"/g, '')}"></iframe>`;
+        copyText(code, 'Embed code copied – paste it into your page');
+    }
+
+    /** Turn maths text into something a speech engine reads naturally. */
+    function toSpeech(t) {
+        return String(t)
+            .replace(/∫/g, ' integral of ').replace(/≈/g, ' is approximately ').replace(/≤/g, ' is at most ').replace(/≥/g, ' is at least ').replace(/→/g, ' tends to ').replace(/∞/g, ' infinity ').replace(/π/g, ' pi ').replace(/√/g, ' square root of ')
+            .replace(/\^2\b|²/g, ' squared ').replace(/\^3\b|³/g, ' cubed ').replace(/\^\(?(-?[\w.]+)\)?/g, ' to the power $1 ')
+            .replace(/sqrt\(/g, ' square root of (').replace(/\bexp\(/g, ' e to the (').replace(/\bln\(/g, ' natural log of (').replace(/\babs\(/g, ' absolute value of (')
+            .replace(/\*/g, ' times ').replace(/\//g, ' over ').replace(/\+/g, ' plus ').replace(/(^|[\s(=])-(?=[\w(])/g, '$1 negative ').replace(/-/g, ' minus ').replace(/=/g, ' equals ')
+            .replace(/[()[\]{}]/g, ' ').replace(/\bC\b/g, ' plus C ').replace(/\s+/g, ' ').trim();
+    }
+    function speakResult(r) {
+        const synth = window.speechSynthesis; if (!synth) return;
+        if (synth.speaking) { synth.cancel(); return; }
+        const parts = [r.title + '.'];
+        if (r.main) parts.push(`${toSpeech(r.main.label)} ${toSpeech(r.main.text)}.`);
+        r.items.slice(0, 6).forEach(i => parts.push(`${toSpeech(i.label)} ${toSpeech(i.text)}.`));
+        r.warnings.forEach(w => parts.push('Note: ' + w));
+        const u = new SpeechSynthesisUtterance(parts.join(' ')); u.lang = document.documentElement.lang || 'en'; u.rate = 0.95; synth.speak(u);
+    }
+
+    /** A text description of the plot so screen-reader users get the shape of the result. */
+    function describePlot(r) {
+        const p = r && r.plot; if (!p) return '';
+        const fmt = x => engine.fmt(x, 4); const out = [`Graph for ${r.title}.`];
+        try {
+            if (p.generic) {
+                const g = p.generic; out.push(`${g.title || 'Plot'}, horizontal axis ${g.xTitle || 'x'}, vertical axis ${g.yTitle || 'y'}.`);
+                g.traces.forEach(t => { const ys = (t.y || []).filter(Number.isFinite); const kind = t.type === 'heatmap' ? 'colour map' : t.type === 'histogram' ? 'histogram' : t.type === 'box' ? 'box plot' : t.mode === 'markers' ? 'scatter points' : 'line'; out.push(`${t.name || 'Series'}: ${kind}${ys.length ? `, ${ys.length} points, values from ${fmt(Math.min(...ys))} to ${fmt(Math.max(...ys))}` : ''}.`); });
+            } else if (p.curves && p.curves.length) {
+                const lo = p.xRange ? p.xRange[0] : -10, hi = p.xRange ? p.xRange[1] : 10; out.push(`${p.curves.length} curve${p.curves.length > 1 ? 's' : ''} over ${p.variable || 'x'} from ${fmt(lo)} to ${fmt(hi)}.`);
+                p.curves.slice(0, 4).forEach(c => { if (!c.fn) return; let mn = Infinity, mx = -Infinity, xm = 0, xM = 0; for (let i = 0; i <= 80; i++) { const x = lo + (hi - lo) * i / 80, y = c.fn(x); if (!Number.isFinite(y)) continue; if (y < mn) { mn = y; xm = x; } if (y > mx) { mx = y; xM = x; } } if (Number.isFinite(mn)) out.push(`${c.name}: lowest sampled value ${fmt(mn)} near ${fmt(xm)}, highest ${fmt(mx)} near ${fmt(xM)}.`); });
+                (p.points || []).slice(0, 8).forEach(pt => out.push(`${pt.name || 'Point'} at (${fmt(pt.x)}, ${fmt(pt.y)}).`));
+            }
+        } catch (e) { /* description is best-effort */ }
+        return out.join(' ');
+    }
+    function applyPlotDescription(r) {
+        const desc = describePlot(r), div = $('plot2d'); let el = $('plotDesc');
+        if (!el) { el = document.createElement('p'); el.id = 'plotDesc'; el.className = 'sr-only'; div.parentNode.insertBefore(el, div); }
+        el.textContent = desc; div.setAttribute('role', 'img'); div.setAttribute('aria-label', desc || 'Plot'); div.setAttribute('aria-describedby', 'plotDesc');
+    }
+    function initEmbed() {
+        if (!/[?&]embed=1\b/.test(location.search)) return;
+        document.body.classList.add('embed');
+        const a = document.createElement('a'); a.className = 'embed-link'; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Open in Calculus Suite ↗';
+        a.href = location.origin + location.pathname + location.hash; document.body.appendChild(a);
+        window.addEventListener('hashchange', () => { a.href = location.origin + location.pathname + location.hash; });
+    }
 
     // ------------------------------------------------------------------
     // Notebook: named projects of saved results (stored on this device)
@@ -1844,6 +1915,7 @@
     }
 
     function init() {
+        initEmbed();
         initNotebook();
         initPractice();
         initScan();

@@ -660,3 +660,13 @@ a { color: var(--accent); }
 /* teaching mode */
 .toggle-row { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; line-height: 1.4; cursor: pointer; } .toggle-row input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); }
 .teach-hidden { display: none !important; } .teach-show { margin: 8px 0; } .teach-reveal { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* check box */
+.check-box { margin: 10px 0; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); }
+.check-box summary { cursor: pointer; padding: 8px 12px; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); display: flex; align-items: center; gap: 6px; list-style: none; }
+.check-box summary::-webkit-details-marker { display: none; } .check-box[open] summary { border-bottom: 1px solid var(--border); color: var(--text); }
+.check-body { padding: 8px 14px 12px; font-size: 13.5px; line-height: 1.55; } .check-body p { margin: 6px 0; } .check-body ul { margin: 6px 0; padding-left: 20px; } .check-note { color: var(--text-2); font-size: 12.5px; }
+/* embed mode */
+body.embed .appbar, body.embed .sidebar, body.embed .footer, body.embed .statusbar, body.embed .aurora, body.embed .skip-link { display: none !important; }
+body.embed .container { padding: 8px; } body.embed .main-grid { display: block; } body.embed .workspace { margin: 0; }
+.embed-link { position: fixed; right: 8px; bottom: 8px; z-index: 50; padding: 4px 10px; font: 500 11.5px var(--mono); background: var(--ink); color: var(--on-ink) !important; text-decoration: none; border-radius: 2px; }
