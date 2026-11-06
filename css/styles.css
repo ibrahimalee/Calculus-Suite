@@ -670,3 +670,17 @@ a { color: var(--accent); }
 body.embed .appbar, body.embed .sidebar, body.embed .footer, body.embed .statusbar, body.embed .aurora, body.embed .skip-link { display: none !important; }
 body.embed .container { padding: 8px; } body.embed .main-grid { display: block; } body.embed .workspace { margin: 0; }
 .embed-link { position: fixed; right: 8px; bottom: 8px; z-index: 50; padding: 4px 10px; font: 500 11.5px var(--mono); background: var(--ink); color: var(--on-ink) !important; text-decoration: none; border-radius: 2px; }
+/* phone layout: collapsible tool list and bottom jump bar */
+.mode-toggle { display: none; } .bottom-nav { display: none; }
+@media (max-width: 720px) {
+    .mode-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 48px; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface-solid); color: var(--text); cursor: pointer; text-align: left; }
+    .mode-toggle-label { display: grid; } .mode-toggle-label small { font: 500 10.5px var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-2); } .mode-toggle-label b { font-family: var(--serif); font-weight: 500; font-size: 18px; }
+    .mode-toggle-chev { font-size: 18px; transition: transform .2s; } .mode-toggle[aria-expanded="true"] .mode-toggle-chev { transform: rotate(180deg); }
+    #modeGrid.collapsed { display: none; } #modeGrid { margin-top: 10px; }
+    .bottom-nav { display: grid; grid-template-columns: repeat(4, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: var(--bg); border-top: 1px solid var(--border-strong); padding-bottom: env(safe-area-inset-bottom); }
+    .bottom-nav button { min-height: 52px; display: grid; place-items: center; gap: 0; padding: 6px 2px; background: none; border: 0; color: var(--text-2); font: 500 11px var(--mono); letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+    .bottom-nav button span { font-size: 17px; line-height: 1; color: var(--accent); } .bottom-nav button:active { background: var(--surface-3); }
+    body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+    .btn-grid { bottom: calc(60px + env(safe-area-inset-bottom)) !important; }
+    body.embed .bottom-nav { display: none; } body.embed { padding-bottom: 0; }
+}

@@ -61,6 +61,7 @@
                 </section>
 
                 <section class="panel" aria-label="Choose a tool">
+                    <button class="mode-toggle" id="modeToggle" type="button" aria-expanded="true" aria-controls="modeGrid"><span class="mode-toggle-label"><small>Tool</small><b id="modeToggleName">Derivative</b></span><span class="mode-toggle-chev" aria-hidden="true">▾</span></button>
                     <div id="modeGrid"></div>
                 </section>
 
@@ -167,6 +168,13 @@
             </main>
         </div>
     </div>
+
+    <nav class="bottom-nav" id="bottomNav" aria-label="Jump to section">
+        <button type="button" data-jump="tools"><span aria-hidden="true">∫</span>Tools</button>
+        <button type="button" data-jump="input"><span aria-hidden="true">✎</span>Input</button>
+        <button type="button" data-jump="result"><span aria-hidden="true">▤</span>Result</button>
+        <button type="button" data-jump="top"><span aria-hidden="true">↑</span>Top</button>
+    </nav>
 
     <footer class="footer">
         <div class="footer-inner">

@@ -686,6 +686,27 @@
         renderExamples();
         if (!keepInput) validateInput();
         saveSession();
+        updateModeToggle();
+    }
+
+    // ---- phones: collapsible tool list + bottom jump bar ----
+    const isPhone = () => window.matchMedia && window.matchMedia('(max-width: 720px)').matches;
+    function setToolsOpen(open) { const g = $('modeGrid'), t = $('modeToggle'); if (!g || !t) return; g.classList.toggle('collapsed', !open); t.setAttribute('aria-expanded', String(open)); }
+    function updateModeToggle() { const n = $('modeToggleName'); if (n && MODES[state.mode]) n.textContent = MODES[state.mode].label; }
+    function initPhoneLayout() {
+        const t = $('modeToggle'); if (!t) return;
+        t.addEventListener('click', () => setToolsOpen($('modeGrid').classList.contains('collapsed')));
+        $('modeGrid').addEventListener('click', e => { if (e.target.closest('.mode-btn') && isPhone()) setToolsOpen(false); });
+        const apply = () => { if (isPhone()) { if (!state._phoneInit) { setToolsOpen(false); state._phoneInit = true; } } else { setToolsOpen(true); state._phoneInit = false; } };
+        apply(); window.addEventListener('resize', apply); updateModeToggle();
+        $('bottomNav').addEventListener('click', e => {
+            const b = e.target.closest('[data-jump]'); if (!b) return; const w = b.dataset.jump;
+            const smooth = !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+            if (w === 'tools') { setToolsOpen(true); $('modeToggle').scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' }); $('modeToggle').focus({ preventScroll: true }); }
+            else if (w === 'input') { $('functionInput').scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' }); $('functionInput').focus({ preventScroll: true }); }
+            else if (w === 'result') { document.querySelector('.workspace').scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' }); }
+            else window.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' });
+        });
     }
 
     function renderModeGrid() {
@@ -1939,6 +1960,7 @@
 
     function init() {
         initEmbed();
+        initPhoneLayout();
         initNotebook();
         initPractice();
         initScan();
