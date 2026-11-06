@@ -87,3 +87,8 @@ test('vector theorems: both sides agree and match known values', () => {
   const sph = { sx: 'sin(u)*cos(v)', sy: 'sin(u)*sin(v)', sz: 'cos(u)', ua: '0', ub: 'pi', va: '0', vb: '2*pi' };
   close(num(E.run.vector('1', Object.assign({ op: 'surface' }, sph)).main.text), 4 * Math.PI); close(num(E.run.vector('x ; y ; z', Object.assign({ op: 'flux' }, sph)).main.text), 4 * Math.PI);
 });
+test('power-series ODE solutions match known series and verify against RK4', () => {
+  const r = E.run.ode('y', { odeType: 'first', x0: '0', y0: '1', terms: '6', series: 'yes' }); assert.match(r.main.text, /^1 \+ x \+ 1\/2\*x\^2 \+ 1\/6\*x\^3/); assert.ok(r.meta.some(m => /Verified/.test(m)));
+  const c = E.run.ode('-y', { odeType: 'second', x0: '0', y0: '1', v0: '0', terms: '8', series: 'yes' }); assert.match(c.main.text, /^1 − 1\/2\*x\^2 \+ 1\/24\*x\^4/); assert.ok(c.meta.some(m => /Verified/.test(m)));
+  assert.throws(() => E.run.ode('1/x', { odeType: 'first', x0: '0', y0: '1', series: 'yes' }), /singular|cannot|finite/i);
+});

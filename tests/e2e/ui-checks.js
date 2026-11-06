@@ -88,7 +88,7 @@ const check = (name, ok, extra) => { if (!ok) failed++; console.log((ok ? 'ok   
     const m = await browser.newPage({ viewport: { width: 375, height: 800 } }); await m.goto(BASE + '/index.html'); await m.waitForFunction(() => window.__calc); await m.waitForTimeout(500);
     const modes = await m.evaluate(() => [...document.querySelectorAll('.mode-btn')].map(b => b.dataset.mode));
     const overflowing = [];
-    for (const md of modes) { await m.click(`.mode-btn[data-mode="${md}"]`); await m.selectOption('#examples', '0'); await m.waitForFunction(() => !document.querySelector('#computeBtn').classList.contains('loading'), null, { timeout: 40000 }); await m.waitForTimeout(350);
+    for (const md of modes) { if (await m.locator('#modeGrid.collapsed').count()) await m.click('#modeToggle'); await m.click(`.mode-btn[data-mode="${md}"]`); await m.selectOption('#examples', '0'); await m.waitForFunction(() => !document.querySelector('#computeBtn').classList.contains('loading'), null, { timeout: 40000 }); await m.waitForTimeout(350);
         const o = await m.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); if (o > 1) overflowing.push(md + ':' + o); }
     check('no horizontal page overflow on a 375px phone in any tool', overflowing.length === 0, overflowing);
 

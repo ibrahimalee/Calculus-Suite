@@ -41,3 +41,7 @@ npm run e2e          # browser tests (Playwright)
 ## Reporting problems
 
 Please include the exact input, the options you chose, what you expected and what you saw. For wrong maths, a second source (another CAS or a hand calculation) helps enormously.
+
+## Translations
+
+Interface strings live in `js/i18n.js` as `'English text': [es, fr, ar, ur, hi]`. Add or correct a row and run `npm test` (it checks that every row has all five columns and keeps digits). The text must match the English in `index.html` / `js/app.js` exactly. Native-speaker review of the existing translations is especially welcome.

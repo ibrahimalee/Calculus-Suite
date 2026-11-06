@@ -1205,6 +1205,57 @@
     }
     register({ complex: runComplex });
 
+
+    // ======================================================================
+    // Power-series solutions of ODEs (Picard–Taylor iteration), checked against RK4
+    // ======================================================================
+    function runSeriesODE(src, opt) {
+        const second = opt.odeType === 'second';
+        const node = engine.parse(src);
+        const allowed = second ? ['x', 'y', 'yp'] : ['x', 'y']; engine.freeVars(node).forEach(q => { if (!allowed.includes(q)) throw new CalcError(`Unknown symbol “${q}”. Use ${allowed.join(', ')}.`); });
+        const x0 = I.parseLimit(opt.x0 === undefined || opt.x0 === '' ? '0' : opt.x0, 'x₀').value, y0 = I.parseLimit(opt.y0 === undefined || opt.y0 === '' ? '1' : opt.y0, 'y(x₀)').value, v0 = second ? I.parseLimit(opt.v0 === undefined || opt.v0 === '' ? '0' : opt.v0, "y′(x₀)").value : 0;
+        const N = Math.max(2, Math.min(14, parseInt(opt.terms, 10) || 8)); if (![x0, y0, v0].every(Number.isFinite)) throw new CalcError('Initial values must be finite.');
+        const polyNode = c => engine.parse(c.map((v, i) => `(${v.toPrecision(17)})*(x - (${x0}))^${i}`).join(' + ') || '0');
+        const dpoly = c => c.slice(1).map((v, i) => v * (i + 1));
+        let c = [y0].concat(second ? [v0] : []).concat(new Array(N + 1).fill(0)).slice(0, N + 1);
+        for (let it = 0; it <= N + 1; it++) {
+            const P = polyNode(c), map = { y: P }; if (second) map.yp = polyNode(dpoly(c).length ? dpoly(c) : [0]);
+            let g; try { g = I.taylorCoeffs(subst(node, map), 'x', x0, N); } catch (e) { throw new CalcError('This equation cannot be expanded in a power series about that point (it is singular there).'); }
+            const nc = c.slice();
+            if (second) for (let n = 0; n + 2 <= N; n++) nc[n + 2] = g[n] / ((n + 1) * (n + 2)); else for (let n = 0; n + 1 <= N; n++) nc[n + 1] = g[n] / (n + 1);
+            if (nc.every((v, i) => Math.abs(v - c[i]) < 1e-15 * (1 + Math.abs(v)))) { c = nc; break; } c = nc;
+        }
+        if (!c.every(Number.isFinite)) throw new CalcError('The series coefficients are not finite.');
+        const T = x => nice(x, 10, 1e-9);
+        const base = x0 ? `(x ${x0 < 0 ? '+' : '-'} ${T(Math.abs(x0)).text})` : 'x';
+        const termStr = (v, i) => { if (i === 0) return T(v).text; const coef = Math.abs(v - 1) < 1e-12 ? '' : (Math.abs(v + 1) < 1e-12 ? '-' : `${T(v).text}*`); return `${coef}${base}${i > 1 ? '^' + i : ''}`; };
+        const pieces = c.map((v, i) => (Math.abs(v) < 1e-14 ? null : termStr(v, i))).filter(Boolean);
+        const r = I.makeResult('ode', 'Power-series solution');
+        r.items.push({ label: 'Equation:', text: `${second ? "y″" : "y′"} = ${engine.strOf(node)}`, tex: '' });
+        r.items.push({ label: 'Initial values:', text: second ? `y(${T(x0).text}) = ${T(y0).text}, y′(${T(x0).text}) = ${T(v0).text}` : `y(${T(x0).text}) = ${T(y0).text}`, tex: '' });
+        const polyText = pieces.join(' + ').replace(/\+ -/g, '− ');
+        r.main = { label: `y ≈`, text: `${polyText} + O(${x0 ? `(x − ${T(x0).text})` : 'x'}^${N + 1})`, tex: '' };
+        r.items.push({ label: 'Coefficients aₙ:', text: c.map((v, i) => `a${i} = ${T(v).text}`).join(',  '), tex: '' });
+        // check against a classical RK4 integration
+        const f = engine.compile(node, second ? ['x', 'y', 'yp'] : ['x', 'y']);
+        const rk = (xe) => { const h = (xe - x0) / 2000; let x = x0, y = y0, v = v0; for (let i = 0; i < 2000; i++) { if (second) { const k1y = v, k1v = f(x, y, v), k2y = v + h / 2 * k1v, k2v = f(x + h / 2, y + h / 2 * k1y, v + h / 2 * k1v), k3y = v + h / 2 * k2v, k3v = f(x + h / 2, y + h / 2 * k2y, v + h / 2 * k2v), k4y = v + h * k3v, k4v = f(x + h, y + h * k3y, v + h * k3v); y += h / 6 * (k1y + 2 * k2y + 2 * k3y + k4y); v += h / 6 * (k1v + 2 * k2v + 2 * k3v + k4v); } else { const k1 = f(x, y), k2 = f(x + h / 2, y + h / 2 * k1), k3 = f(x + h / 2, y + h / 2 * k2), k4 = f(x + h, y + h * k3); y += h / 6 * (k1 + 2 * k2 + 2 * k3 + k4); } x += h; } return y; };
+        const ev = x => c.reduceRight((a, k) => a * (x - x0) + k, 0);
+        const radius = Math.min(0.3, 0.9 * Math.pow(1e-9 / (Math.abs(c[N]) + 1e-300), 1 / N)); let worst = 0;
+        if (Number.isFinite(radius) && radius > 1e-3) for (const d of [radius / 2, -radius / 2, radius, -radius]) { const num = rk(x0 + d), ser = ev(x0 + d); worst = Math.max(worst, Math.abs(num - ser) / Math.max(1, Math.abs(num))); }
+        if (Number.isFinite(worst) && worst < 1e-6) r.meta.push(`Verified: the polynomial agrees with an independent RK4 integration within ${worst.toExponential(1)} for |x − x₀| ≤ ${engine.fmt(radius, 3)}.`);
+        else r.warnings.push('The numerical comparison was not conclusive; the series may converge only very near x₀.');
+        r.meta.push('Method: Picard–Taylor iteration – substitute the current polynomial into the right-hand side, expand it in a power series, integrate, repeat');
+        const span = 1.2, xs = [], series = [], numeric = []; for (let i = 0; i <= 120; i++) { const x = x0 - span + 2 * span * i / 120; xs.push(x); series.push(ev(x)); }
+        for (let i = 0; i <= 24; i++) { const x = x0 - span + 2 * span * i / 24; numeric.push(Math.abs(x - x0) < 1e-12 ? y0 : (x < x0 ? NaN : rk(x))); }
+        const nx = [], ny = []; for (let i = 0; i <= 24; i++) { const x = x0 + span * i / 24; nx.push(x); ny.push(i === 0 ? y0 : rk(x)); }
+        r.plot = { generic: { title: `Series of degree ${N} vs numerical solution`, xTitle: 'x', yTitle: 'y', traces: [{ x: xs, y: series.map(y => (Math.abs(y) < 1e6 ? y : null)), mode: 'lines', type: 'scatter', name: `degree-${N} polynomial` }, { x: nx, y: ny, mode: 'markers', type: 'scatter', name: 'RK4 (x ≥ x₀)' }] } };
+        r.steps.push({ title: 'Assume a power series', text: `y = Σ aₙ (x − ${T(x0).text})ⁿ with a₀ = y(${T(x0).text})${second ? ' and a₁ = y′' : ''}.`, tex: '' });
+        r.steps.push({ title: 'Substitute and match coefficients', text: 'Put the current polynomial into the right-hand side, expand it as a series, and read off the next coefficient from the left-hand side.', tex: '' });
+        r.steps.push({ title: 'Repeat', text: `Iterating ${N + 1} times fixes every coefficient up to degree ${N}.`, tex: '' });
+        r.warnings.push('A truncated series is only accurate near x₀; the plot shows how far it can be trusted.');
+        return I.finalizeText(r);
+    }
+    { const oBase = engine.run.ode; engine.run.ode = (src, opt) => { opt = opt || {}; return opt.series === 'yes' && opt.odeType !== 'system' ? runSeriesODE(src, opt) : oBase(src, opt); }; }
     { const mBase = engine.run.matrix; engine.run.matrix = (src, opt) => { opt = opt || {}; return LA_OPS.has(opt.op) ? runLinalg(src, opt) : mBase(src, opt); }; }
 
 

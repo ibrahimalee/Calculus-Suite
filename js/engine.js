@@ -3416,7 +3416,7 @@
     return {
         CalcError, parse, inspect, clean, freeVars, compile, diff, fmt, nice, strOf, texOf,
         serialize, hydrate, intersections, antiderivative, integrateNumeric, integrateRobust, tanhSinhFinite, rk45, checkAntiderivative,
-        internals: { gl, runAlgebrite, toAlgebrite, fromAlgebrite, dependsOn, toRational, polyDivMod, polyMul, polyAdd, polyTrim, makeResult, finalizeText, wrapRuns, matTex, matTxt, parseMatrix, rref, polyRoots, polyRootsMult, polyGcd, charPolyCoeffs, nullSpace, parseLimit, curveOf, rangeFor, recogniseConst, validate, simplifyNode, foldConstants },
+        internals: { taylorCoeffs, gl, runAlgebrite, toAlgebrite, fromAlgebrite, dependsOn, toRational, polyDivMod, polyMul, polyAdd, polyTrim, makeResult, finalizeText, wrapRuns, matTex, matTxt, parseMatrix, rref, polyRoots, polyRootsMult, polyGcd, charPolyCoeffs, nullSpace, parseLimit, curveOf, rangeFor, recogniseConst, validate, simplifyNode, foldConstants },
         run: wrapRuns({
             derivative: runDerivative, integral: runIntegral, series: runSeries, limit: runLimit,
             analysis: runAnalysis, ode: runODE, multivariable: runMultivariable,

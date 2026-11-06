@@ -20,11 +20,13 @@ A calculus workstation that runs entirely in the browser – no backend, no buil
 | **Matrices** | det, exact inverse, eigen-decomposition, rank/RREF, charpoly, solve Ax=b, powers |
 | **Calculator** | Variables across lines, `ans`, exact fractions / π / e recognition, complex numbers, prime factorisation, binary & hex |
 | **Equation solver** | All real and complex roots of polynomials, numerical roots for anything else, inequalities → interval notation |
+| **Sums & series** (closed forms) | Symbolic upper limits: Σk^p (Faulhaber), polynomial·rᵏ terms such as k·2^k – each closed form is verified against direct summation |
+| **ODEs** (series) | Power-series solutions of first- and second-order equations about x₀, checked against RK4 |
 | **Sums & series** | Finite sums (exact when possible); infinite series with nth-term / ratio / p-series / alternating tests and accurate values |
 | **Multivariable** | Gradient (+ tangent plane, directional derivative), partials, Hessian, Laplacian, critical-point classification, double integrals with variable limits, divergence, curl |
 | **Matrices** (extended) | LU, QR, Cholesky, SVD, pseudoinverse, condition number, null/column space, diagonalisation, least squares – each decomposition checks itself (A − LU, QᵀQ − I, …) |
-| **Transforms** | Laplace and inverse Laplace (complex and repeated poles, verified by numerical integration), Fourier transform with standard-pair recognition and spectrum plot |
-| **Vector calculus** | Jacobian & determinant, line integrals ∫ f ds, work/circulation ∫ F·dr, triple integrals (exact when possible) |
+| **Transforms** | Laplace (including u(t−a) and δ(t−a)) and inverse Laplace (complex and repeated poles, verified by numerical integration), ODEs solved by Laplace with substitution check, Fourier transform with standard-pair recognition and spectrum plot |
+| **Vector calculus** | Jacobian & determinant, line integrals ∫ f ds, work/circulation ∫ F·dr, triple integrals (exact when possible), Green's and divergence theorems checked on both sides, surface integrals and flux through r(u, v) |
 | **Statistics** | Descriptive statistics, regression (linear … exponential, power, log) with R², probability distributions (normal, t, χ², binomial, Poisson …) via exact special functions, one- and two-sample t-tests |
 | **Number theory** | Prime factorisation (Pollard rho), Miller–Rabin, gcd with Bézout, modular inverse/power, totient, C(n,k), Fibonacci, sieve, base conversion, Chinese remainder theorem |
 | **Units** | Dimension-checked conversions (`72 degF to degC`) through a sandboxed parser |
@@ -35,6 +37,11 @@ A calculus workstation that runs entirely in the browser – no backend, no buil
 * **Plain-English input** – “integrate x squared from 0 to 3”, “limit of sin x over x as x goes to 0”, “5 km/h to m/s”. A rule-based parser (`js/nlp.js`): no AI, no network; it says plainly when it cannot parse something.
 * **Worked solutions** – row operations for matrices, cofactor expansion, L'Hôpital rounds for limits, linear/quadratic equation walk-throughs, and the integration technique (by parts, substitution, partial fractions) behind CAS results.
 * **Scan an expression** – the *Scan* button reads printed text from a photo with Tesseract.js, entirely on the device. The ~11 MB recogniser (`vendor/tesseract/`) is fetched only when someone taps Scan, then cached for offline use. Accuracy on superscripts and fractions is limited, so the text is always shown for correction first. Handwriting is not supported.
+* **Practice & teaching mode** – the ✦ button opens generated practice problems (derivatives, integrals, limits, equations, matrices, number theory, statistics) with three levels. Answers are checked numerically, so any equivalent form is accepted; hints reveal the engine's worked steps one at a time. *Teaching mode* (Appearance panel) hides answers and steps until you ask.
+* **How was this checked?** – every result lists the independent check that was run; **Embed** gives an `<iframe>` code (`?embed=1`) for blogs and LMS pages; **Listen** reads the result aloud; plots carry a text description for screen readers.
+* **Languages** – interface in English, Español, Français, العربية, اردو and हिन्दी (right-to-left layout included). Maths results and step explanations stay in English, and the plain-English parser understands English only. The translations have not been reviewed by native speakers – please help improve `js/i18n.js`.
+* **Phones** – collapsible tool picker and a bottom jump bar; 44-px touch targets.
+* **Library** – the engine also runs in Node: see `LIBRARY.md`.
 * **Notebook** – named projects of saved results with pins and notes, stored on the device; export a notebook as Markdown, back up or import everything as JSON.
 
 Plus: command palette (`Ctrl+K`), installable offline PWA, Markdown report export, PNG plot export, LaTeX rendering, 2D/3D/contour plots, history, shareable links (`#s=…`), copy as text/LaTeX, dark mode, keyboard shortcuts, example gallery, background worker with timeout.

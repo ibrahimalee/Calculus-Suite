@@ -125,6 +125,8 @@
                 { key: 'xEnd', label: 'End', type: 'text', def: '10' },
                 { key: 'y0', label: 'Initial y(x₀)', type: 'text', def: '1', show: v => v.odeType !== 'system' },
                 { key: 'v0', label: "Initial y′(x₀)", type: 'text', def: '0', show: v => v.odeType === 'second' },
+                { key: 'series', label: 'Solution method', type: 'select', def: 'no', options: [['no', 'Closed form / numerical (RK45)'], ['yes', 'Power series about x₀']], show: v => v.odeType !== 'system' },
+                { key: 'terms', label: 'Series degree (2–14)', type: 'number', def: '8', min: 2, max: 14, show: v => v.odeType !== 'system' && v.series === 'yes' },
                 { key: 'initial', label: 'Initial values (x, y, z)', type: 'text', def: '1, 0', show: v => v.odeType === 'system', placeholder: '1, 0' }
             ],
             examples: [
@@ -135,6 +137,8 @@
                 { label: 'Spring: y″ = −y', fn: '-y', opts: { odeType: 'second', x0: '0', xEnd: '12', y0: '1', v0: '0' } },
                 { label: 'Damped oscillator', fn: '-0.4*yp-4*y', opts: { odeType: 'second', x0: '0', xEnd: '15', y0: '1', v0: '0' } },
                 { label: 'Rotation system', fn: 'y ; -x', opts: { odeType: 'system', x0: '0', xEnd: '12', initial: '1, 0' } },
+                { label: 'Power series: y′ = x + y', fn: 'x+y', opts: { odeType: 'first', x0: '0', xEnd: '2', y0: '1', series: 'yes', terms: '8' } },
+                { label: 'Power series: y″ = x·y (Airy-type)', fn: 'x*y', opts: { odeType: 'second', x0: '0', xEnd: '2', y0: '1', v0: '0', series: 'yes', terms: '10' } },
                 { label: 'Predator–prey (Lotka–Volterra)', fn: 'x*(1-0.5*y) ; y*(0.5*x-1)', opts: { odeType: 'system', x0: '0', xEnd: '30', initial: '3, 1' } }
             ]
         },
