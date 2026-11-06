@@ -71,3 +71,19 @@ test('regression: Laplace of a three-pole-group sum keeps its leading numerator 
   assert.ok(r.meta.some(m => /Verified/.test(m)), r.warnings.join());
 });
 test('complex arithmetic rejects unknown symbols cleanly', () => { assert.throws(() => E.run.complex('s+1', { op: 'arith' }), /Unknown symbol/); });
+test('symbolic sums give verified closed forms', () => {
+  const r = E.run.sums('k^2', { lower: '1', upper: 'n' }); assert.ok(r.meta.some(m => /Verified/.test(m)));
+  assert.equal(E.run.sums('2^k', { lower: '0', upper: 'n' }).main.text, '2 ^ (n + 1) - 1');
+  assert.throws(() => E.run.sums('sin(k)/k', { lower: '1', upper: 'n' }), /closed form/);
+});
+test('Laplace with steps and impulses; ODE by Laplace verifies by substitution', () => {
+  assert.ok(E.run.laplace('u(t-2)*(t-2)', {}).meta.some(m => /Verified/.test(m)));
+  assert.match(E.run.laplace('2*dirac(t-2)', {}).main.text, /exp\(-2\*s\)/);
+  for (const o of [{ order: '2', a: '3', b: '2', y0: '1', v0: '0', f: '0' }, { order: '2', a: '0', b: '4', y0: '0', v0: '0', f: 'cos(2t)' }, { order: '1', a: '2', y0: '3', f: '1' }]) { const r = E.run.laplace(o.f, Object.assign({ op: 'ode' }, o)); assert.ok(r.meta.some(m => /Verified/.test(m)), o.f); }
+});
+test('vector theorems: both sides agree and match known values', () => {
+  assert.ok(E.run.vector('-y ; x', { op: 'green', xLow: '0', xHigh: '2', yLow: 'x^2/4', yHigh: 'x' }).meta.some(m => /Verified/.test(m)));
+  assert.ok(E.run.vector('x*y ; y*z ; z*x', { op: 'divergence', xLow: '0', xHigh: '2', yLow: '-1', yHigh: '1', zLow: '1', zHigh: '3' }).meta.some(m => /Verified/.test(m)));
+  const sph = { sx: 'sin(u)*cos(v)', sy: 'sin(u)*sin(v)', sz: 'cos(u)', ua: '0', ub: 'pi', va: '0', vb: '2*pi' };
+  close(num(E.run.vector('1', Object.assign({ op: 'surface' }, sph)).main.text), 4 * Math.PI); close(num(E.run.vector('x ; y ; z', Object.assign({ op: 'flux' }, sph)).main.text), 4 * Math.PI);
+});

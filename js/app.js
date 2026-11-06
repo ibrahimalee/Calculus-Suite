@@ -311,7 +311,7 @@
         input: () => ({ label: 'Term  tₖ  (variable k or n)', placeholder: 'e.g. 1/k^2', hint: 'Finite sums are exact when possible. Infinite series are tested for convergence (nth-term, ratio, p-series, alternating) and summed accurately.' }),
         fields: [
             { key: 'lower', label: 'Start index', type: 'text', def: '1' },
-            { key: 'upper', label: 'End index (inf = infinite)', type: 'text', def: 'inf' }
+            { key: 'upper', label: 'End index (inf = infinite, or n for a closed form)', type: 'text', def: 'inf' }
         ],
         examples: [
             { label: 'Basel problem: Σ 1/k²', fn: '1/k^2', opts: { lower: '1', upper: 'inf' } },
@@ -321,15 +321,25 @@
             { label: 'Telescoping: Σ 1/(k(k+1))', fn: '1/(k*(k+1))', opts: { lower: '1', upper: 'inf' } },
             { label: 'Σ 1/k! = e', fn: '1/factorial(k)', opts: { lower: '0', upper: 'inf' } },
             { label: 'Finite: Σ k² from 1 to 100', fn: 'k^2', opts: { lower: '1', upper: '100' } },
-            { label: 'Ratio test: Σ k/2^k', fn: 'k/2^k', opts: { lower: '1', upper: 'inf' } }
+            { label: 'Ratio test: Σ k/2^k', fn: 'k/2^k', opts: { lower: '1', upper: 'inf' } },
+            { label: 'Closed form: Σ k² from 1 to n', fn: 'k^2', opts: { lower: '1', upper: 'n' } },
+            { label: 'Closed form: Σ k·2^k', fn: 'k*2^k', opts: { lower: '1', upper: 'n' } },
+            { label: 'Closed form: Σ (2k−1) from 1 to 2n', fn: '2*k-1', opts: { lower: '1', upper: '2*n' } }
         ]
     };
 
 
     MODES.laplace = {
         label: 'Transforms', icon: 'ℒ',
-        input: v => ({ laplace: { label: 'f(t)', placeholder: 'e.g. t^2*exp(-3t)*cos(2t)', hint: 'Laplace transform of sums and products of polynomials, exponentials, sin, cos, sinh and cosh.' }, inverse: { label: 'F(s)', placeholder: 'e.g. (s+3)/(s^2+2s+5)', hint: 'A proper rational function of s: partial fractions with complex and repeated poles.' }, fourier: { label: 'f(t)', placeholder: 'e.g. exp(-abs(t))', hint: 'Fourier transform F(ω) = ∫ f(t)e^(−iωt) dt of an absolutely integrable function.' } }[v.op || 'laplace']),
-        fields: [{ key: 'op', label: 'Transform', type: 'select', def: 'laplace', options: [['laplace', 'Laplace  ℒ{f(t)}'], ['inverse', 'Inverse Laplace  ℒ⁻¹{F(s)}'], ['fourier', 'Fourier transform']] }],
+        input: v => ({ laplace: { label: 'f(t)', placeholder: 'e.g. t^2*exp(-3t)*cos(2t)', hint: 'Laplace transform of sums and products of polynomials, exponentials, sin, cos, sinh and cosh.' }, inverse: { label: 'F(s)', placeholder: 'e.g. (s+3)/(s^2+2s+5)', hint: 'A proper rational function of s: partial fractions with complex and repeated poles.' }, fourier: { label: 'f(t)', placeholder: 'e.g. exp(-abs(t))', hint: 'Fourier transform F(ω) = ∫ f(t)e^(−iωt) dt of an absolutely integrable function.' }, ode: { label: 'Forcing function f(t)', placeholder: 'e.g. exp(-t)   (0 for a homogeneous equation)', hint: 'Solves y″ + a·y′ + b·y = f(t) (or y′ + a·y = f(t)) with initial values, using the Laplace transform.' } }[v.op || 'laplace']),
+        fields: [
+            { key: 'op', label: 'Transform', type: 'select', def: 'laplace', options: [['laplace', 'Laplace  ℒ{f(t)}  (u(t−a) and dirac(t−a) allowed)'], ['inverse', 'Inverse Laplace  ℒ⁻¹{F(s)}'], ['fourier', 'Fourier transform'], ['ode', 'Solve an ODE with Laplace']] },
+            { key: 'order', label: 'Order of the ODE', type: 'select', def: '2', options: [['2', 'Second order  y″ + a y′ + b y = f'], ['1', 'First order  y′ + a y = f']], show: v => v.op === 'ode' },
+            { key: 'a', label: 'a (coefficient of y′)', type: 'text', def: '3', show: v => v.op === 'ode' },
+            { key: 'b', label: 'b (coefficient of y)', type: 'text', def: '2', show: v => v.op === 'ode' && v.order !== '1' },
+            { key: 'y0', label: 'y(0)', type: 'text', def: '1', show: v => v.op === 'ode' },
+            { key: 'v0', label: 'y′(0)', type: 'text', def: '0', show: v => v.op === 'ode' && v.order !== '1' }
+        ],
         examples: [
             { label: 'ℒ{t²·e^(−3t)}', fn: 't^2*exp(-3t)', opts: { op: 'laplace' } },
             { label: 'ℒ{e^(−t)·cos 2t + 3}', fn: 'exp(-t)*cos(2t)+3', opts: { op: 'laplace' } },
@@ -338,14 +348,20 @@
             { label: 'ℒ⁻¹{1/(s(s+1)²)} (repeated pole)', fn: '1/(s*(s+1)^2)', opts: { op: 'inverse' } },
             { label: 'Fourier: e^(−|t|)', fn: 'exp(-abs(t))', opts: { op: 'fourier' } },
             { label: 'Fourier: Gaussian e^(−t²/2)', fn: 'exp(-t^2/2)', opts: { op: 'fourier' } },
-            { label: 'Fourier: 1/(1+t²)', fn: '1/(1+t^2)', opts: { op: 'fourier' } }
+            { label: 'Fourier: 1/(1+t²)', fn: '1/(1+t^2)', opts: { op: 'fourier' } },
+            { label: 'ℒ{(t−2)·u(t−2)} (delayed ramp)', fn: 'u(t-2)*(t-2)', opts: { op: 'laplace' } },
+            { label: 'ℒ{1 − u(t−3)} (a pulse)', fn: '1 - u(t-3)', opts: { op: 'laplace' } },
+            { label: 'ℒ{t·u(t−1) + 2δ(t−2)}', fn: 't*u(t-1) + 2*dirac(t-2)', opts: { op: 'laplace' } },
+            { label: 'ODE: y″ + 3y′ + 2y = 0, y(0)=1', fn: '0', opts: { op: 'ode', order: '2', a: '3', b: '2', y0: '1', v0: '0' } },
+            { label: 'ODE: resonance y″ + 4y = cos 2t', fn: 'cos(2t)', opts: { op: 'ode', order: '2', a: '0', b: '4', y0: '0', v0: '0' } },
+            { label: 'ODE: y′ + 2y = 1, y(0)=3', fn: '1', opts: { op: 'ode', order: '1', a: '2', b: '0', y0: '3', v0: '0' } }
         ]
     };
     MODES.vector = {
         label: 'Vector calculus', icon: '∮',
-        input: v => ({ jacobian: { label: 'F = (F₁ ; F₂ ; …)', placeholder: 'e.g. x^2*y ; sin(x)+z', hint: 'Components separated by ;  The Jacobian holds every partial derivative ∂Fᵢ/∂xⱼ.' }, line: { label: 'Scalar field f(x, y, z)', placeholder: 'e.g. x^2 + y^2', hint: 'Integrates f along the path with ds = |r′(t)| dt.' }, work: { label: 'Vector field F = (P ; Q ; R)', placeholder: 'e.g. -y ; x', hint: 'Work / circulation ∫ F·dr along the path r(t).' }, triple: { label: 'f(x, y, z)', placeholder: 'e.g. x*y*z', hint: 'Iterated triple integral: z is innermost, then y, then x.' } }[v.op || 'jacobian']),
+        input: v => ({ jacobian: { label: 'F = (F₁ ; F₂ ; …)', placeholder: 'e.g. x^2*y ; sin(x)+z', hint: 'Components separated by ;  The Jacobian holds every partial derivative ∂Fᵢ/∂xⱼ.' }, line: { label: 'Scalar field f(x, y, z)', placeholder: 'e.g. x^2 + y^2', hint: 'Integrates f along the path with ds = |r′(t)| dt.' }, work: { label: 'Vector field F = (P ; Q ; R)', placeholder: 'e.g. -y ; x', hint: 'Work / circulation ∫ F·dr along the path r(t).' }, triple: { label: 'f(x, y, z)', placeholder: 'e.g. x*y*z', hint: 'Iterated triple integral: z is innermost, then y, then x.' }, green: { label: 'F = (P ; Q)', placeholder: 'e.g. -y ; x', hint: "Compares ∮ P dx + Q dy with ∬ (Qₓ − Pᵧ) dA over the region between two curves y = g₁(x) and y = g₂(x)." }, divergence: { label: 'F = (P ; Q ; R)', placeholder: 'e.g. x ; y ; z', hint: 'Compares ∭ div F dV with the outward flux through the six faces of a box.' }, surface: { label: 'Scalar field f(x, y, z)', placeholder: 'e.g. 1  (area)   or   z^2', hint: 'Integrates f over the parametrised surface r(u, v). Use f = 1 for surface area.' }, flux: { label: 'F = (P ; Q ; R)', placeholder: 'e.g. x ; y ; z', hint: 'Flux through r(u, v) with normal rᵤ × rᵥ.' } }[v.op || 'jacobian']),
         fields: [
-            { key: 'op', label: 'Operation', type: 'select', def: 'jacobian', options: [['jacobian', 'Jacobian matrix & determinant'], ['line', 'Line integral of a scalar field ∫ f ds'], ['work', 'Work / circulation ∫ F·dr'], ['triple', 'Triple integral ∭ f dV']] },
+            { key: 'op', label: 'Operation', type: 'select', def: 'jacobian', options: [['jacobian', 'Jacobian matrix & determinant'], ['line', 'Line integral of a scalar field ∫ f ds'], ['work', 'Work / circulation ∫ F·dr'], ['triple', 'Triple integral ∭ f dV'], ['green', "Green's theorem (both sides)"], ['divergence', 'Divergence theorem on a box (both sides)'], ['surface', 'Surface integral ∬ f dS'], ['flux', 'Flux ∬ F·n dS through r(u, v)']] },
             { key: 'vars', label: 'Variables (comma-separated, blank = auto)', type: 'text', def: '', placeholder: 'x, y, z', show: v => v.op === 'jacobian' || v.op === 'triple' },
             { key: 'point', label: 'Evaluate at point (optional)', type: 'text', def: '', placeholder: 'e.g. 1, 2', show: v => v.op === 'jacobian' },
             { key: 'px', label: 'x(t) =', type: 'text', def: 'cos(t)', show: v => v.op === 'line' || v.op === 'work' },
@@ -353,9 +369,11 @@
             { key: 'pz', label: 'z(t) = (optional)', type: 'text', def: '', show: v => v.op === 'line' || v.op === 'work' },
             { key: 'ta', label: 't from', type: 'text', def: '0', show: v => v.op === 'line' || v.op === 'work' },
             { key: 'tb', label: 't to', type: 'text', def: '2*pi', show: v => v.op === 'line' || v.op === 'work' },
-            { key: 'xLow', label: 'x from', type: 'text', def: '0', show: v => v.op === 'triple' }, { key: 'xHigh', label: 'x to', type: 'text', def: '1', show: v => v.op === 'triple' },
-            { key: 'yLow', label: 'y from (may use x)', type: 'text', def: '0', show: v => v.op === 'triple' }, { key: 'yHigh', label: 'y to (may use x)', type: 'text', def: 'x', show: v => v.op === 'triple' },
-            { key: 'zLow', label: 'z from (may use x, y)', type: 'text', def: '0', show: v => v.op === 'triple' }, { key: 'zHigh', label: 'z to (may use x, y)', type: 'text', def: 'x+y', show: v => v.op === 'triple' }
+            { key: 'xLow', label: 'x from', type: 'text', def: '0', show: v => ['triple', 'green', 'divergence'].includes(v.op) }, { key: 'xHigh', label: 'x to', type: 'text', def: '1', show: v => ['triple', 'green', 'divergence'].includes(v.op) },
+            { key: 'yLow', label: 'y from (may use x)', type: 'text', def: '0', show: v => ['triple', 'green', 'divergence'].includes(v.op) }, { key: 'yHigh', label: 'y to (may use x)', type: 'text', def: 'x', show: v => ['triple', 'green', 'divergence'].includes(v.op) },
+            { key: 'zLow', label: 'z from (may use x, y)', type: 'text', def: '0', show: v => ['triple', 'divergence'].includes(v.op) }, { key: 'zHigh', label: 'z to (may use x, y)', type: 'text', def: 'x+y', show: v => ['triple', 'divergence'].includes(v.op) },
+            { key: 'sx', label: 'x(u, v) =', type: 'text', def: 'sin(u)*cos(v)', show: v => v.op === 'surface' || v.op === 'flux' }, { key: 'sy', label: 'y(u, v) =', type: 'text', def: 'sin(u)*sin(v)', show: v => v.op === 'surface' || v.op === 'flux' }, { key: 'sz', label: 'z(u, v) =', type: 'text', def: 'cos(u)', show: v => v.op === 'surface' || v.op === 'flux' },
+            { key: 'ua', label: 'u from', type: 'text', def: '0', show: v => v.op === 'surface' || v.op === 'flux' }, { key: 'ub', label: 'u to', type: 'text', def: 'pi', show: v => v.op === 'surface' || v.op === 'flux' }, { key: 'va', label: 'v from', type: 'text', def: '0', show: v => v.op === 'surface' || v.op === 'flux' }, { key: 'vb', label: 'v to', type: 'text', def: '2*pi', show: v => v.op === 'surface' || v.op === 'flux' }
         ],
         examples: [
             { label: 'Jacobian of polar → Cartesian', fn: 'r*cos(t) ; r*sin(t)', opts: { op: 'jacobian', vars: 'r, t', point: '' } },
@@ -365,6 +383,11 @@
             { label: 'Work of (xy, x+y) along y = x²', fn: 'x*y ; x+y', opts: { op: 'work', px: 't', py: 't^2', pz: '', ta: '0', tb: '1' } },
             { label: 'Line integral along a helix', fn: 'z', opts: { op: 'line', px: 'cos(t)', py: 'sin(t)', pz: 't', ta: '0', tb: 'pi' } },
             { label: '∭ xyz over a tetrahedron-like region', fn: 'x*y*z', opts: { op: 'triple', vars: 'x, y, z', xLow: '0', xHigh: '1', yLow: '0', yHigh: 'x', zLow: '0', zHigh: 'x+y' } },
+            { label: "Green's theorem: circulation of (−y, x)", fn: '-y ; x', opts: { op: 'green', xLow: '0', xHigh: '2', yLow: 'x^2/4', yHigh: 'x' } },
+            { label: 'Divergence theorem on a box', fn: 'x*y ; y*z ; z*x', opts: { op: 'divergence', xLow: '0', xHigh: '2', yLow: '-1', yHigh: '1', zLow: '1', zHigh: '3' } },
+            { label: 'Surface area of the unit sphere', fn: '1', opts: { op: 'surface', sx: 'sin(u)*cos(v)', sy: 'sin(u)*sin(v)', sz: 'cos(u)', ua: '0', ub: 'pi', va: '0', vb: '2*pi' } },
+            { label: 'Flux of (x, y, z) through the unit sphere', fn: 'x ; y ; z', opts: { op: 'flux', sx: 'sin(u)*cos(v)', sy: 'sin(u)*sin(v)', sz: 'cos(u)', ua: '0', ub: 'pi', va: '0', vb: '2*pi' } },
+            { label: 'Area of a paraboloid patch', fn: '1', opts: { op: 'surface', sx: 'u', sy: 'v', sz: 'u^2+v^2', ua: '-1', ub: '1', va: '-1', vb: '1' } },
             { label: 'Volume of the unit ball', fn: '1', opts: { op: 'triple', vars: 'x, y, z', xLow: '-1', xHigh: '1', yLow: '-sqrt(1-x^2)', yHigh: 'sqrt(1-x^2)', zLow: '-sqrt(1-x^2-y^2)', zHigh: 'sqrt(1-x^2-y^2)' } }
         ]
     };
@@ -730,7 +753,7 @@
                 preview.innerHTML = `<span class="preview-tex plain">${esc(lines[0] || '')}</span><span class="preview-meta">${lines.length} line${lines.length === 1 ? '' : 's'}</span>`;
                 return true;
             }
-            if (['number', 'units', 'stats', 'vector'].includes(state.mode)) {
+            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'laplace' && /\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src))) {
                 preview.className = 'preview-box valid';
                 const n = src.split(/[\n;]+/).filter(x => x.trim()).length;
                 preview.innerHTML = `<span class="preview-tex plain">${esc(src.length > 160 ? src.slice(0, 160) + '…' : src)}</span><span class="preview-meta">${state.mode === 'stats' ? (src.split(/[\s,;]+/).filter(Boolean).length + ' values') : state.mode === 'vector' ? (n + ' component' + (n === 1 ? '' : 's')) : 'ready'}</span>`;

@@ -309,6 +309,8 @@
 
     function runLaplace(src, opt) {
         const op = opt.op || 'laplace';
+        if (op === 'ode') return runLaplaceODE(src, opt);
+        if (op === 'laplace' && DIST_RE.test(src)) return laplaceDistribution(src);
         if (op === 'inverse') return runInverseLaplace(src, opt);
         if (op === 'fourier') return runFourierTransform(src, opt);
         const node = engine.parse(src);
@@ -448,6 +450,143 @@
         r.steps.push({ title: 'Decay check', text: `|f| < 10⁻⁹ beyond |t| = ${L}, so the integral can be truncated there.`, tex: '' });
         return I.finalizeText(r);
     }
+
+    // ======================================================================
+    // Symbolic sums  Σ_{k=a}^{n} f(k)  – closed forms in n (polynomial and polynomial·rʲ terms)
+    // ======================================================================
+    function symbolicSum(src, opt) {
+        const node = engine.parse(src); const vars = engine.freeVars(node);
+        const kv = opt.variable || (vars.includes('k') ? 'k' : vars[0] || 'k');
+        const up = engine.parse(opt.upper); const uv = engine.freeVars(up);
+        if (uv.length !== 1) throw new CalcError('The upper limit may contain one symbol, e.g. n or 2n+1.');
+        if (uv[0] === kv) throw new CalcError(`The upper limit must not use the summation index ${kv}.`);
+        if (vars.some(q => q !== kv)) throw new CalcError(`With a symbolic upper limit the term may only contain ${kv}.`);
+        const a = I.parseLimit(opt.lower === undefined || opt.lower === '' ? '1' : opt.lower, 'Start').value;
+        if (!Number.isInteger(a) || Math.abs(a) > 1000) throw new CalcError('The start index must be a small integer.');
+        const f = engine.compile(node, [kv]); const nv = uv[0];
+        const S = m => { let t = 0; for (let k = a; k <= m; k++) t += f(k); return t; };
+        const pts = Array.from({ length: 16 }, (_, i) => f(a + i)); if (pts.some(x => !Number.isFinite(x))) throw new CalcError('The term is undefined at some index in the sum.');
+        const degOf = seq => { let d = seq.slice(); for (let deg = 0; deg < 10; deg++) { if (d.every(x => Math.abs(x) < 1e-9 * (1 + Math.max(...seq.map(Math.abs))))) return deg - 1 < 0 ? 0 : deg - 1 + (deg === 0 ? 1 : 0); d = d.slice(1).map((x, i) => x - d[i]); } return -1; };
+        const degPoly = seq => { let d = seq.slice(); const scale = 1 + Math.max(...seq.map(Math.abs)); for (let deg = 0; deg <= 9; deg++) { if (d.length > 1 && d.every(x => Math.abs(x) < 1e-8 * scale)) return Math.max(0, deg - 1); d = d.slice(1).map((x, i) => x - d[i]); } return -1; };
+        const T = x => nice(x, 10, 1e-9);
+        let kind, expr, coeffs, rr = 1;
+        const dp = degPoly(pts);
+        if (dp >= 0 && dp <= 8) {
+            kind = 'polynomial'; const m0 = a - 1, nn = dp + 2;
+            const V = Array.from({ length: nn }, (_, i) => Array.from({ length: nn }, (_, j) => Math.pow(m0 + i, j))), y = Array.from({ length: nn }, (_, i) => [S(m0 + i)]);
+            coeffs = math.lusolve(V, y).map(r => r[0]);
+            expr = coeffs.map((c, j) => (Math.abs(c) < 1e-11 ? '' : `(${T(c).text})*${nv}^${j}`)).filter(Boolean).join(' + ') || '0';
+        } else {
+            rr = pts[1] / pts[0]; if (!Number.isFinite(rr) || Math.abs(rr) < 1e-12) rr = NaN;
+            // f(k) = p(k)·r^k with r constant?  try r from the ratio of far-apart terms
+            const cand = []; for (let i = 0; i < 6; i++) { const q = pts[i + 6] / pts[i]; if (Number.isFinite(q) && q !== 0) cand.push(Math.pow(Math.abs(q), 1 / 6) * Math.sign(q) ** (1)); }
+            const r0 = cand.length ? cand[cand.length - 1] : NaN; let found = null;
+            for (const rc of [rr, r0, 2, 3, 0.5, -1, -2, 1 / 3, 10].filter(Number.isFinite)) { for (const rs of [rc, Math.round(rc), (() => { const q = nice(rc, 6, 1e-6); try { return math.evaluate(q.text); } catch (e) { return NaN; } })()]) { if (!Number.isFinite(rs) || rs === 0 || rs === 1) continue; const g = pts.map((x, i) => x / Math.pow(rs, a + i)); const d = degPoly(g); if (d >= 0 && d <= 6) { found = { r: rs, d }; break; } } if (found) break; }
+            if (!found) throw new CalcError('No closed form found. Supported: polynomials in k (Faulhaber sums) and polynomial·rᵏ terms such as 2^k, k·3^k, 1/2^k.');
+            kind = 'geometric'; rr = found.r; const d = found.d, nn = d + 2, m0 = a - 1;
+            const V = Array.from({ length: nn }, (_, i) => Array.from({ length: nn }, (_, j) => (j < nn - 1 ? Math.pow(rr, m0 + i) * Math.pow(m0 + i, j) : 1))), y = Array.from({ length: nn }, (_, i) => [S(m0 + i)]);
+            coeffs = math.lusolve(V, y).map(r => r[0]);
+            const q = coeffs.slice(0, nn - 1).map((c, j) => (Math.abs(c) < 1e-11 ? '' : `(${T(c).text})*${nv}^${j}`)).filter(Boolean).join(' + ') || '0';
+            const rs = nice(rr, 8, 1e-9).text; expr = `(${q})*(${rs})^${nv} + (${T(coeffs[nn - 1]).text})`;
+        }
+        // exact verification against direct summation for many n
+        let worst = 0; const g = engine.compile(engine.parse(expr), [nv]);
+        for (let m = a - 1; m <= a + 14; m++) { const ex = S(m), got = g(m); worst = Math.max(worst, Math.abs(ex - got) / Math.max(1, Math.abs(ex))); }
+        if (!(worst < 1e-8)) throw new CalcError('No closed form found for this term (the fit did not verify).');
+        let closed = engine.parse(expr); try { closed = I.simplifyNode(I.foldConstants(closed)); } catch (e) { /* keep */ }
+        const shown = (uv.length === 1 && up.type === 'SymbolNode') ? closed : subst(closed, { [nv]: up });
+        const shownS = (() => { try { return I.simplifyNode(I.foldConstants(shown)); } catch (e) { return shown; } })();
+        const r = I.makeResult('sum', 'Finite sum (closed form)');
+        r.items.push({ label: 'Sum:', text: `Σ ${kv}=${a}…${engine.strOf(up)} of ${engine.strOf(node)}`, tex: `\\sum_{${kv}=${a}}^{${engine.texOf(up)}} ${engine.texOf(node)}` });
+        r.main = { label: 'Closed form =', text: engine.strOf(shownS), tex: `\\sum_{${kv}=${a}}^{${engine.texOf(up)}} ${engine.texOf(node)}=${engine.texOf(shownS)}` };
+        r.meta.push(`Verified: the closed form equals the direct sum for ${16} consecutive values of the upper limit (max relative gap ${worst.toExponential(1)}).`);
+        r.meta.push(kind === 'polynomial' ? `Method: the sum of a degree-${dp} polynomial is a degree-${dp + 1} polynomial in n (Faulhaber); its coefficients are found by exact interpolation` : `Method: for p(k)·r^k with r = ${nice(rr, 6, 1e-9).text} the sum has the form r^n·q(n) + C; q and C are found by solving a linear system`);
+        r.steps.push({ title: 'Recognise the type', text: kind === 'polynomial' ? `The term is a polynomial of degree ${dp} in ${kv}, so its partial sums form a polynomial of degree ${dp + 1} in n.` : `The term is a polynomial times ${nice(rr, 6, 1e-9).text}^${kv}.`, tex: '' });
+        r.steps.push({ title: 'Solve for the coefficients', text: 'Evaluate the first partial sums S(a−1) = 0, S(a), S(a+1), … and solve for the unknown coefficients.', tex: '' });
+        r.steps.push({ title: 'Verify', text: 'The formula is compared with the direct sum for many values of n.', tex: '' });
+        return I.finalizeText(r);
+    }
+    { const sBase = engine.run.sums; engine.run.sums = (src, opt) => { opt = opt || {}; const up = opt.upper; if (up && String(up).trim() && !/^[-+]?(\d+(\.\d+)?|inf(inity)?|pi|e|[\d.\s+*/^()\-]*)$/i.test(String(up).trim()) && /[a-zA-Z]/.test(String(up).replace(/\b(inf|infinity|pi|e|sqrt|exp|ln|log|sin|cos|tan)\b/gi, ''))) return symbolicSum(src, opt); return sBase(src, opt); }; }
+
+    // ---- Laplace with step and impulse functions (second shifting theorem) -------------------------
+    const DIST_RE = /\b(heaviside|dirac|delta|step|unitstep|H|u)\s*\(/;
+    function laplaceDistribution(src) {
+        let node; try { node = math.parse(engine.clean(src)); } catch (e) { throw new CalcError('Could not read that expression.'); }
+        const v = 't', isD = f => f.type === 'FunctionNode' && /^(heaviside|dirac|delta|step|unitstep|H|u)$/.test(f.fn.name);
+        const strip = n => { while (n.type === 'ParenthesisNode') n = n.content; return n; };
+        const flat = (n, sign, out) => { n = strip(n); if (n.type === 'OperatorNode' && n.fn === 'add') { flat(n.args[0], sign, out); flat(n.args[1], sign, out); } else if (n.type === 'OperatorNode' && n.fn === 'subtract') { flat(n.args[0], sign, out); flat(n.args[1], -sign, out); } else if (n.type === 'OperatorNode' && n.fn === 'unaryMinus') flat(n.args[0], -sign, out); else out.push({ n, sign }); return out; };
+        const factors = (n, out) => { n = strip(n); if (n.type === 'OperatorNode' && n.fn === 'multiply') { factors(n.args[0], out); factors(n.args[1], out); } else out.push(n); return out; };
+        const shiftOf = arg => { const g = engine.compile(arg, [v]); const c0 = g(0), c1 = g(1) - c0; if (Math.abs(c1 - 1) > 1e-9 || !Number.isFinite(c0)) throw new CalcError('Step and impulse arguments must look like t − a.'); return -c0; };
+        const groups = new Map(), deltas = [];
+        flat(node, 1, []).forEach(({ n, sign }) => {
+            const fs = factors(n, []), ds = fs.filter(isD); if (ds.length > 1) throw new CalcError('Use at most one step or impulse factor per term.');
+            const rest = fs.filter(f => !isD(f)); const restNode = rest.length ? rest.reduce((a, b) => new math.OperatorNode('*', 'multiply', [a, b])) : new math.ConstantNode(1);
+            if (!ds.length) { (groups.get('0') || groups.set('0', { a: 0, parts: [] }).get('0')).parts.push({ node: restNode, sign }); return; }
+            const a = shiftOf(ds[0].args[0]); if (a < -1e-12) throw new CalcError('Shifts must be zero or positive: use u(t − a) with a ≥ 0.');
+            if (/^(dirac|delta)$/.test(ds[0].fn.name)) { const val = engine.compile(restNode, [v])(Math.max(a, 0)); if (!Number.isFinite(val)) throw new CalcError('The factor multiplying the impulse is undefined there.'); deltas.push({ a: Math.max(a, 0), c: sign * val }); return; }
+            const key = String(+a.toFixed(9)); (groups.get(key) || groups.set(key, { a: Math.max(a, 0), parts: [] }).get(key)).parts.push({ node: restNode, sign });
+        });
+        const r = I.makeResult('laplace', 'Laplace transform (steps and impulses)');
+        r.items.push({ label: 'f(t) =', text: src.trim(), tex: '' });
+        const pieces = [], pieceTex = [], evalAt = [];
+        groups.forEach(g => {
+            const sum = new Map();
+            g.parts.forEach(part => { const shifted = g.a ? subst(part.node, { [v]: new math.OperatorNode('+', 'add', [new math.SymbolNode(v), new math.ConstantNode(g.a)]) }) : part.node; toExpPoly(shifted, v).forEach((t, k) => { const o = sum.get(k), c = cmul(t.c, Cx(part.sign)); sum.set(k, o ? { n: o.n, z: o.z, c: cadd(o.c, c) } : { n: t.n, z: t.z, c }); }); });
+            const terms = Array.from(sum.values()).filter(t => cabs(t.c) > 1e-11); if (!terms.length) return;
+            const L = laplaceOfTerms(terms), a = g.a, at = nice(a, 8, 1e-9);
+            pieces.push(`${a ? `exp(-${at.text}*s)*` : ''}(${polyStr(L.num, 's')}) / (${facStr(L.fac, 's')})`);
+            pieceTex.push(`${a ? `e^{-${at.tex}s}` : ''}\\dfrac{${polyStr(L.num, 's', true)}}{${facStr(L.fac, 's', true)}}`);
+            evalAt.push(s0 => Math.exp(-a * s0) * polyEval(L.num, s0) / polyEval(L.den, s0));
+            r.steps.push({ title: a ? `Terms switched on at t = ${at.text}` : 'Terms without a step', text: a ? `ℒ{u(t − a)·g(t − a)} = e^(−as)·G(s): rewrite the factor in τ = t − ${at.text}, transform it, multiply by e^(−${at.text}s).` : 'Ordinary table transform.', tex: a ? '\\mathcal L\\{u(t-a)\\,g(t-a)\\}=e^{-as}G(s)' : '' });
+        });
+        deltas.forEach(d => { const c = nice(d.c, 8, 1e-9), at = nice(d.a, 8, 1e-9); pieces.push(`${Math.abs(d.c - 1) < 1e-12 ? '' : `(${c.text})*`}${d.a ? `exp(-${at.text}*s)` : '1'}`); pieceTex.push(`${Math.abs(d.c - 1) < 1e-12 ? '' : c.tex}${d.a ? `e^{-${at.tex}s}` : '1'}`); evalAt.push(s0 => d.c * Math.exp(-d.a * s0)); r.steps.push({ title: `Impulse at t = ${at.text}`, text: 'ℒ{δ(t − a)·g(t)} = g(a)·e^(−as)  (sifting property).', tex: '\\mathcal L\\{\\delta(t-a)\\}=e^{-as}' }); });
+        if (!pieces.length) { r.main = { label: 'F(s) =', text: '0', tex: 'F(s)=0' }; r.meta.push('Verified: every term cancels.'); return I.finalizeText(r); }
+        r.main = { label: 'F(s) =', text: pieces.join('  +  '), tex: `F(s)=${pieceTex.join('+')}` };
+        if (!deltas.length) {
+            try {
+                const code = node.compile(), H = x => (x >= 0 ? 1 : 0), f = t => { const y = code.evaluate({ t, heaviside: H, u: H, H, step: H, unitstep: H }); return typeof y === 'number' ? y : NaN; };
+                const s0 = 3.1, T = 40 / s0, cuts = Array.from(groups.values()).map(g => g.a).filter(a => a > 0 && a < T);
+                const num = engine.integrateRobust(t => f(t) * Math.exp(-s0 * t), 0, T, cuts).value, ex = evalAt.reduce((a, g) => a + g(s0), 0);
+                if (Math.abs(num - ex) <= 1e-5 * Math.max(1, Math.abs(ex))) r.meta.push(`Verified: ∫₀^∞ f(t)e^(−st) dt = ${engine.fmt(num, 8)} at s = ${s0} matches F(s).`); else r.warnings.push('The numerical check at s = 3.1 did not agree.');
+            } catch (e) { /* skip */ }
+        } else r.meta.push('Impulse terms cannot be checked by ordinary integration; the sifting property is exact.');
+        r.meta.push('Method: second shifting theorem ℒ{u(t − a)g(t − a)} = e^(−as)G(s) and the sifting property of δ');
+        return I.finalizeText(r);
+    }
+
+    // ---- ODEs by Laplace transform: y'' + a y' + b y = f(t) with initial values ------------------------
+    function runLaplaceODE(src, opt) {
+        const order = String(opt.order || '2') === '1' ? 1 : 2;
+        const a = I.parseLimit(String(opt.a || '0'), 'a').value, b = order === 2 ? I.parseLimit(String(opt.b || '0'), 'b').value : 0;
+        const y0 = I.parseLimit(String(opt.y0 === undefined || opt.y0 === '' ? '0' : opt.y0), 'y(0)').value, v0 = order === 2 ? I.parseLimit(String(opt.v0 === undefined || opt.v0 === '' ? '0' : opt.v0), "y′(0)").value : 0;
+        if (![a, b, y0, v0].every(Number.isFinite)) throw new CalcError('Coefficients and initial values must be finite numbers.');
+        const node = engine.parse(src); const fv = engine.freeVars(node); if (fv.some(q => q !== 't')) throw new CalcError('The forcing function may only use t.');
+        const terms = Array.from(toExpPoly(node, 't').values()); const Lf = terms.length ? laplaceOfTerms(terms) : { num: [0], den: [1] };
+        const pm = I.polyMul, pa = I.polyAdd;
+        const charP = order === 2 ? [b, a, 1] : [a, 1], init = order === 2 ? [y0 * a + v0, y0] : [y0];
+        const numY = pa(Lf.num.slice(), pm(init, Lf.den.slice())), denY = pm(Lf.den.slice(), charP);
+        const gcdN = Math.max(...numY.map(Math.abs)) || 1;
+        const sol = runInverseLaplace(`(${polyStr(numY.map(x => x / gcdN), 's')}) / (${polyStr(denY.map(x => x / gcdN), 's')})`, {});
+        const yText = sol.main.text, yNode = engine.parse(yText);
+        const r = I.makeResult('laplace', 'ODE solved by Laplace transform');
+        const odeTxt = order === 2 ? `y″ + ${nice(a, 6, 1e-9).text}·y′ + ${nice(b, 6, 1e-9).text}·y = ${engine.strOf(node)}` : `y′ + ${nice(a, 6, 1e-9).text}·y = ${engine.strOf(node)}`;
+        r.items.push({ label: 'Equation:', text: odeTxt, tex: '' }); r.items.push({ label: 'Initial values:', text: order === 2 ? `y(0) = ${nice(y0, 6, 1e-9).text}, y′(0) = ${nice(v0, 6, 1e-9).text}` : `y(0) = ${nice(y0, 6, 1e-9).text}`, tex: '' });
+        r.main = { label: 'y(t) =', text: yText, tex: `y(t)=${engine.texOf(yNode)}` };
+        // independent check: substitute back
+        try {
+            const y1 = engine.diff(yNode, 't'), y2 = order === 2 ? engine.diff(yNode, 't', 2) : null; const fy = engine.compile(yNode, ['t']), f1 = engine.compile(y1, ['t']), f2 = y2 ? engine.compile(y2, ['t']) : null, ff = engine.compile(node, ['t']);
+            let worst = Math.max(Math.abs(fy(0) - y0), order === 2 ? Math.abs(f1(0) - v0) : 0);
+            for (const t of [0.2, 0.7, 1.3, 2.1, 3.4]) { const lhs = order === 2 ? f2(t) + a * f1(t) + b * fy(t) : f1(t) + a * fy(t); worst = Math.max(worst, Math.abs(lhs - ff(t)) / Math.max(1, Math.abs(ff(t)))); }
+            if (worst < 1e-7) r.meta.push(`Verified: substituting y(t) back satisfies the equation and the initial values (max residual ${worst.toExponential(1)}).`); else r.warnings.push('Substituting the solution back left a residual – please double-check.');
+            const ts = [], ys = []; const Tend = 10; for (let i = 0; i <= 400; i++) { const t = Tend * i / 400; ts.push(t); const y = fy(t); ys.push(Number.isFinite(y) ? y : null); }
+            r.plot = { generic: { title: 'Solution y(t)', xTitle: 't', yTitle: 'y', traces: [{ x: ts, y: ys, mode: 'lines', type: 'scatter', name: 'y(t)' }] } };
+        } catch (e) { /* skip */ }
+        r.meta.push('Method: transform the equation, solve algebraically for Y(s), invert by partial fractions');
+        r.steps.push({ title: 'Transform the equation', text: order === 2 ? 'ℒ{y″} = s²Y − s·y(0) − y′(0),  ℒ{y′} = sY − y(0).' : 'ℒ{y′} = sY − y(0).', tex: order === 2 ? '\\mathcal L\\{y\'\'\\}=s^2Y-sy(0)-y\'(0)' : '\\mathcal L\\{y\'\\}=sY-y(0)' });
+        r.steps.push({ title: 'Solve for Y(s)', text: `Y(s) = (${polyStr(numY.map(x => x / gcdN), 's')}) / (${polyStr(denY.map(x => x / gcdN), 's')})`, tex: '' });
+        sol.steps.slice(1).forEach(st => r.steps.push(st));
+        return I.finalizeText(r);
+    }
     register({ laplace: runLaplace });
     Object.assign(engine.extras, { toExpPoly, laplaceOfTerms });
 
@@ -564,7 +703,78 @@
         }
         throw new CalcError('Unknown vector-calculus operation.');
     }
-    register({ vector: runVector });
+
+    // ======================================================================
+    // Green's theorem, divergence theorem, surface integrals and flux
+    // ======================================================================
+    function runVector2(src, opt) {
+        const op = opt.op; const gl = I.gl, F8 = x => engine.fmt(x, 10);
+        const lim = (k, d) => I.parseLimit(opt[k] === undefined || opt[k] === '' ? d : opt[k], k);
+        if (op === 'green') {
+            const comps = splitComps(src); if (comps.length !== 2) throw new CalcError('Give F = (P ; Q) with two components.');
+            const Pn = engine.parse(comps[0]), Qn = engine.parse(comps[1]);
+            [Pn, Qn].forEach(n => engine.freeVars(n).forEach(q => { if (q !== 'x' && q !== 'y') throw new CalcError('Use only x and y.'); }));
+            const xa = lim('xLow', '0').value, xb = lim('xHigh', '1').value; if (!(xb > xa)) throw new CalcError('Need x from < x to.');
+            const g1n = engine.parse(opt.yLow || '0'), g2n = engine.parse(opt.yHigh || '1');
+            [g1n, g2n].forEach(n => engine.freeVars(n).forEach(q => { if (q !== 'x') throw new CalcError('The y limits may only use x.'); }));
+            const P = engine.compile(Pn, ['x', 'y']), Q = engine.compile(Qn, ['x', 'y']), g1 = engine.compile(g1n, ['x']), g2 = engine.compile(g2n, ['x']), dg1 = engine.compile(engine.diff(g1n, 'x'), ['x']), dg2 = engine.compile(engine.diff(g2n, 'x'), ['x']);
+            if (!(g2(xa) >= g1(xa) - 1e-12) || !(g2((xa + xb) / 2) >= g1((xa + xb) / 2))) throw new CalcError('The upper curve must lie above the lower curve on [x from, x to].');
+            const curl = engine.compile(engine.parse(`(${engine.strOf(engine.diff(Qn, 'x'))}) - (${engine.strOf(engine.diff(Pn, 'y'))})`), ['x', 'y']);
+            const area = gl(x => gl(y => curl(x, y), g1(x), g2(x), 4), xa, xb, 4);
+            const bottom = gl(t => P(t, g1(t)) + Q(t, g1(t)) * dg1(t), xa, xb, 6), right = gl(y => Q(xb, y), g1(xb), g2(xb), 4), top = -gl(t => P(t, g2(t)) + Q(t, g2(t)) * dg2(t), xa, xb, 6), left = -gl(y => Q(xa, y), g1(xa), g2(xa), 4);
+            const line = bottom + right + top + left;
+            const r = I.makeResult('vector', "Green's theorem check");
+            r.main = { label: '∮ F·dr = ∬ (∂Q/∂x − ∂P/∂y) dA =', text: F8(area), tex: `\\oint_C P\\,dx+Q\\,dy=\\iint_D\\left(\\frac{\\partial Q}{\\partial x}-\\frac{\\partial P}{\\partial y}\\right)dA=${F8(area)}` };
+            r.items.push({ label: 'Region D:', text: `${F8(xa)} ≤ x ≤ ${F8(xb)},  ${engine.strOf(g1n)} ≤ y ≤ ${engine.strOf(g2n)}`, tex: '' });
+            r.items.push({ label: 'Double integral side:', text: F8(area), tex: '' }); r.items.push({ label: 'Line integral side (counter-clockwise):', text: F8(line), tex: '' });
+            r.items.push({ label: 'Boundary pieces:', text: `bottom ${F8(bottom)},  right ${F8(right)},  top ${F8(top)},  left ${F8(left)}`, tex: '' });
+            const gap = Math.abs(area - line); if (gap < 1e-7 * Math.max(1, Math.abs(area))) r.meta.push(`Verified: both sides agree (difference ${gap.toExponential(1)}).`); else r.warnings.push(`The two sides differ by ${gap.toExponential(2)} – check that the region is simple and F is smooth on it.`);
+            r.meta.push('Method: both sides evaluated by Gauss–Legendre quadrature; the boundary is the bottom curve, right edge, top curve (reversed) and left edge');
+            r.steps.push({ title: "Green's theorem", text: 'For a positively oriented simple closed curve C bounding D: ∮ P dx + Q dy = ∬ (Qₓ − Pᵧ) dA.', tex: '\\oint_C P\\,dx+Q\\,dy=\\iint_D\\left(Q_x-P_y\\right)dA' });
+            r.steps.push({ title: 'Double-integral side', text: `∂Q/∂x − ∂P/∂y integrated over D gives ${F8(area)}.`, tex: '' }); r.steps.push({ title: 'Line-integral side', text: 'Add the four boundary pieces counter-clockwise.', tex: '' });
+            return I.finalizeText(r);
+        }
+        if (op === 'divergence') {
+            const comps = splitComps(src); if (comps.length !== 3) throw new CalcError('Give F = (P ; Q ; R) with three components.');
+            const nodes = comps.map(c => engine.parse(c)); nodes.forEach(n => engine.freeVars(n).forEach(q => { if (!['x', 'y', 'z'].includes(q)) throw new CalcError('Use only x, y, z.'); }));
+            const b = ['xLow', 'xHigh', 'yLow', 'yHigh', 'zLow', 'zHigh'].map((k, i) => lim(k, i % 2 ? '1' : '0').value); const [x0, x1, y0, y1, z0, z1] = b;
+            if (!(x1 > x0 && y1 > y0 && z1 > z0)) throw new CalcError('Each upper bound must exceed its lower bound (a box region).');
+            const [P, Q, R] = nodes.map(n => engine.compile(n, ['x', 'y', 'z']));
+            const div = engine.compile(engine.parse(`(${engine.strOf(engine.diff(nodes[0], 'x'))}) + (${engine.strOf(engine.diff(nodes[1], 'y'))}) + (${engine.strOf(engine.diff(nodes[2], 'z'))})`), ['x', 'y', 'z']);
+            const vol = gl(x => gl(y => gl(z => div(x, y, z), z0, z1, 3), y0, y1, 3), x0, x1, 3);
+            const fx = gl(y => gl(z => P(x1, y, z) - P(x0, y, z), z0, z1, 4), y0, y1, 4), fy = gl(x => gl(z => Q(x, y1, z) - Q(x, y0, z), z0, z1, 4), x0, x1, 4), fz = gl(x => gl(y => R(x, y, z1) - R(x, y, z0), y0, y1, 4), x0, x1, 4);
+            const flux = fx + fy + fz;
+            const r = I.makeResult('vector', 'Divergence theorem check');
+            r.main = { label: '∭ ∇·F dV = ∯ F·n dS =', text: F8(vol), tex: `\\iiint_V\\nabla\\!\\cdot\\!\\mathbf F\\,dV=\\oiint_S\\mathbf F\\cdot\\mathbf n\\,dS=${F8(vol)}`.replace('\\oiint', '\\oint\\!\\!\\oint') };
+            r.items.push({ label: 'Box:', text: `x∈[${F8(x0)}, ${F8(x1)}], y∈[${F8(y0)}, ${F8(y1)}], z∈[${F8(z0)}, ${F8(z1)}]`, tex: '' });
+            r.items.push({ label: 'Volume side ∭ div F:', text: F8(vol), tex: '' }); r.items.push({ label: 'Surface side (outward flux):', text: F8(flux), tex: '' }); r.items.push({ label: 'Flux through x-faces, y-faces, z-faces:', text: `${F8(fx)},  ${F8(fy)},  ${F8(fz)}`, tex: '' });
+            const gap = Math.abs(vol - flux); if (gap < 1e-7 * Math.max(1, Math.abs(vol))) r.meta.push(`Verified: both sides agree (difference ${gap.toExponential(1)}).`); else r.warnings.push(`The sides differ by ${gap.toExponential(2)}.`);
+            r.meta.push('Method: Gauss–Legendre quadrature on the volume and on each of the six faces with outward normals');
+            r.steps.push({ title: 'Divergence theorem', text: 'The outward flux of F through a closed surface equals the integral of div F over the enclosed volume.', tex: '\\iint_{\\partial V}\\mathbf F\\cdot d\\mathbf S=\\iiint_V\\nabla\\cdot\\mathbf F\\,dV' });
+            r.steps.push({ title: 'Volume side', text: `∇·F = ${engine.strOf(engine.parse(`(${engine.strOf(engine.diff(nodes[0], 'x'))}) + (${engine.strOf(engine.diff(nodes[1], 'y'))}) + (${engine.strOf(engine.diff(nodes[2], 'z'))})`))}`, tex: '' }); r.steps.push({ title: 'Surface side', text: 'Sum F·n over the six faces: +P at x₁, −P at x₀, and likewise for y and z.', tex: '' });
+            return I.finalizeText(r);
+        }
+        if (op === 'surface' || op === 'flux') {
+            const sx = engine.parse(opt.sx || 'u'), sy = engine.parse(opt.sy || 'v'), sz = engine.parse(opt.sz || '0'); const S = [sx, sy, sz];
+            S.forEach(n => engine.freeVars(n).forEach(q => { if (q !== 'u' && q !== 'v') throw new CalcError('The surface r(u, v) may only use u and v.'); }));
+            const ua = opt.ua === undefined || opt.ua === '' ? '0' : opt.ua, ub = opt.ub === undefined || opt.ub === '' ? '1' : opt.ub, va = opt.va === undefined || opt.va === '' ? '0' : opt.va, vb = opt.vb === undefined || opt.vb === '' ? '1' : opt.vb;
+            const du = S.map(n => engine.strOf(engine.diff(n, 'u'))), dv = S.map(n => engine.strOf(engine.diff(n, 'v')));
+            const cross = [`(${du[1]})*(${dv[2]}) - (${du[2]})*(${dv[1]})`, `(${du[2]})*(${dv[0]}) - (${du[0]})*(${dv[2]})`, `(${du[0]})*(${dv[1]}) - (${du[1]})*(${dv[0]})`];
+            const map = { x: sx, y: sy, z: sz };
+            let integrand, title;
+            if (op === 'surface') { const f = engine.parse(src); engine.freeVars(f).forEach(q => { if (!['x', 'y', 'z'].includes(q)) throw new CalcError('The scalar field may use x, y, z only.'); }); integrand = `(${engine.strOf(subst(f, map))})*sqrt((${cross[0]})^2 + (${cross[1]})^2 + (${cross[2]})^2)`; title = 'Surface integral ∬ f dS'; }
+            else { const comps = splitComps(src); if (comps.length !== 3) throw new CalcError('Give F = (P ; Q ; R).'); integrand = comps.map((c, i) => `(${engine.strOf(subst(engine.parse(c), map))})*(${cross[i]})`).join(' + '); title = 'Flux ∬ F·n dS'; }
+            const res = engine.run.multivariable(integrand, { op: 'double', vars: 'u, v', xLow: ua, xHigh: ub, yLow: va, yHigh: vb, digits: opt.digits });
+            res.title = title; res.kind = 'vector'; res.plot3 = null;
+            res.items.unshift({ label: 'Surface:', text: `r(u, v) = (${S.map(n => engine.strOf(n)).join(', ')}),  ${ua} ≤ u ≤ ${ub},  ${va} ≤ v ≤ ${vb}`, tex: '' });
+            res.steps.unshift({ title: op === 'surface' ? 'dS = |rᵤ × rᵥ| du dv' : 'n dS = (rᵤ × rᵥ) du dv', text: `rᵤ × rᵥ = (${cross.join(',  ')})`, tex: op === 'surface' ? '\\iint_S f\\,dS=\\iint f(\\mathbf r)\\,\\lVert\\mathbf r_u\\times\\mathbf r_v\\rVert\\,du\\,dv' : '\\iint_S\\mathbf F\\cdot\\mathbf n\\,dS=\\iint \\mathbf F(\\mathbf r)\\cdot(\\mathbf r_u\\times\\mathbf r_v)\\,du\\,dv' });
+            if (op === 'flux') res.warnings.push('The sign depends on the orientation: the normal is rᵤ × rᵥ. Swap u and v to flip it.');
+            return res;
+        }
+        return runVector(src, opt);
+    }
+    register({ vector: runVector2 });
+
 
     // ======================================================================
     // Linear algebra extras: LU, QR, Cholesky, SVD, null/column space, least squares, diagonalisation
