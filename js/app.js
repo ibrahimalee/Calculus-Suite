@@ -83,12 +83,17 @@
             label: 'Limits', icon: 'lim',
             input: () => ({ label: 'f(x)', placeholder: 'e.g. sin(x)/x', hint: 'Numerical limit analysis from both sides (also at ±∞).' }),
             fields: [
+                { key: 'task', label: 'Task', type: 'select', def: 'limit', options: [['limit', 'Evaluate the limit'], ['epsdelta', 'Epsilon–delta picture (find δ for a given ε)']] },
+                { key: 'eps', label: 'Tolerance ε', type: 'text', def: '0.1', placeholder: '0.1', show: v => v.task === 'epsdelta' },
                 { key: 'point', label: 'x approaches', type: 'text', def: '0', placeholder: '0, pi, inf, -inf' },
                 { key: 'direction', label: 'Direction', type: 'select', def: 'both', options: [['both', 'Two-sided'], ['left', 'From the left (x → a⁻)'], ['right', 'From the right (x → a⁺)']] },
                 { key: 'variable', label: 'Variable (blank = auto)', type: 'text', def: '', placeholder: 'x' }
             ],
             examples: [
                 { label: 'sin(x)/x as x → 0', fn: 'sin(x)/x', opts: { point: '0', direction: 'both' } },
+                { label: 'ε–δ: 2x + 1 near x = 3', fn: '2*x+1', opts: { task: 'epsdelta', point: '3', eps: '0.01' } },
+                { label: 'ε–δ: x² near x = 2', fn: 'x^2', opts: { task: 'epsdelta', point: '2', eps: '0.1' } },
+                { label: 'ε–δ: sin(x)/x near 0', fn: 'sin(x)/x', opts: { task: 'epsdelta', point: '0', eps: '0.05' } },
                 { label: '(1 + 1/x)ˣ as x → ∞', fn: '(1+1/x)^x', opts: { point: 'inf', direction: 'both' } },
                 { label: '(1 − cos x)/x² as x → 0', fn: '(1-cos(x))/x^2', opts: { point: '0', direction: 'both' } },
                 { label: '1/x as x → 0⁺', fn: '1/x', opts: { point: '0', direction: 'right' } },
@@ -118,16 +123,22 @@
             input: v => ({
                 first: { label: "y′ = f(x, y)", placeholder: 'e.g. x + y   or   x*y   or   y*(1-y)', hint: 'Right-hand side of dy/dx. Linear and separable equations are solved in closed form; all are solved numerically.' },
                 second: { label: "y″ = f(x, y, yp)", placeholder: 'e.g. -y   or   -0.5*yp - 4*y', hint: 'Write y′ as yp. Constant-coefficient homogeneous equations also get a closed form.' },
+                heat: { label: 'Initial temperature u(x, 0)', placeholder: 'e.g. sin(x)   or   x*(pi-x)', hint: 'Heat equation uₜ = α·uₓₓ on [0, L] with both ends held at 0. The profile must be 0 at both ends.' },
+                wave: { label: 'Initial shape u(x, 0)', placeholder: 'e.g. sin(x)   or   x*(pi-x)', hint: 'Wave equation uₜₜ = c²·uₓₓ on [0, L] with both ends fixed at 0 (a plucked string).' },
                 system: { label: 'System  x′, y′, (z′) = …  (separate with ;)', placeholder: 'e.g. y ; -x      or      x*(1-0.5*y) ; y*(0.5*x-1)', hint: 'State variables are x, y, z and time is t.' }
             }[v.odeType || 'first']),
             fields: [
-                { key: 'odeType', label: 'Equation type', type: 'select', def: 'first', options: [['first', 'First order  y′ = f(x, y)'], ['second', 'Second order  y″ = f(x, y, y′)'], ['system', 'System of ODEs (2–3 equations)']] },
-                { key: 'x0', label: 'Start x₀ (or t₀)', type: 'text', def: '0' },
-                { key: 'xEnd', label: 'End', type: 'text', def: '10' },
-                { key: 'y0', label: 'Initial y(x₀)', type: 'text', def: '1', show: v => v.odeType !== 'system' },
+                { key: 'odeType', label: 'Equation type', type: 'select', def: 'first', options: [['first', 'First order  y′ = f(x, y)'], ['second', 'Second order  y″ = f(x, y, y′)'], ['system', 'System of ODEs (2–3 equations)'], ['heat', 'Heat equation  uₜ = α·uₓₓ  (PDE)'], ['wave', 'Wave equation  uₜₜ = c²·uₓₓ  (PDE)']] },
+                { key: 'x0', label: 'Start x₀ (or t₀)', type: 'text', def: '0', show: v => v.odeType !== 'heat' && v.odeType !== 'wave' },
+                { key: 'xEnd', label: 'End', type: 'text', def: '10', show: v => v.odeType !== 'heat' && v.odeType !== 'wave' },
+                { key: 'pdeL', label: 'Length L of the rod / string', type: 'text', def: 'pi', show: v => v.odeType === 'heat' || v.odeType === 'wave' },
+                { key: 'pdeT', label: 'Final time T', type: 'text', def: '1', show: v => v.odeType === 'heat' || v.odeType === 'wave' },
+                { key: 'pdeK', label: 'Diffusivity α (heat) or wave speed c', type: 'text', def: '1', show: v => v.odeType === 'heat' || v.odeType === 'wave' },
+                { key: 'pdeV', label: 'Initial velocity uₜ(x, 0)  (wave only)', type: 'text', def: '0', show: v => v.odeType === 'wave' },
+                { key: 'y0', label: 'Initial y(x₀)', type: 'text', def: '1', show: v => v.odeType === 'first' || v.odeType === 'second' },
                 { key: 'v0', label: "Initial y′(x₀)", type: 'text', def: '0', show: v => v.odeType === 'second' },
-                { key: 'series', label: 'Solution method', type: 'select', def: 'no', options: [['no', 'Closed form / numerical (RK45)'], ['yes', 'Power series about x₀']], show: v => v.odeType !== 'system' },
-                { key: 'terms', label: 'Series degree (2–14)', type: 'number', def: '8', min: 2, max: 14, show: v => v.odeType !== 'system' && v.series === 'yes' },
+                { key: 'series', label: 'Solution method', type: 'select', def: 'no', options: [['no', 'Closed form / numerical (RK45)'], ['yes', 'Power series about x₀']], show: v => v.odeType === 'first' || v.odeType === 'second' },
+                { key: 'terms', label: 'Series degree (2–14)', type: 'number', def: '8', min: 2, max: 14, show: v => (v.odeType === 'first' || v.odeType === 'second') && v.series === 'yes' },
                 { key: 'initial', label: 'Initial values (x, y, z)', type: 'text', def: '1, 0', show: v => v.odeType === 'system', placeholder: '1, 0' }
             ],
             examples: [
@@ -142,6 +153,10 @@
                 { label: '3-D spiral with drift', fn: '-y ; x ; 0.1', opts: { odeType: 'system', x0: '0', xEnd: '14', initial: '1, 0, 0' } },
                 { label: 'Power series: y′ = x + y', fn: 'x+y', opts: { odeType: 'first', x0: '0', xEnd: '2', y0: '1', series: 'yes', terms: '8' } },
                 { label: 'Power series: y″ = x·y (Airy-type)', fn: 'x*y', opts: { odeType: 'second', x0: '0', xEnd: '2', y0: '1', v0: '0', series: 'yes', terms: '10' } },
+                { label: 'Heat: a smoothing rod, u(x,0) = x(π−x)', fn: 'x*(pi-x)', opts: { odeType: 'heat', pdeL: 'pi', pdeT: '0.5', pdeK: '1' } },
+                { label: 'Heat: one sine mode decays', fn: 'sin(x)', opts: { odeType: 'heat', pdeL: 'pi', pdeT: '1', pdeK: '1' } },
+                { label: 'Wave: plucked string, u(x,0) = x(π−x)', fn: 'x*(pi-x)', opts: { odeType: 'wave', pdeL: 'pi', pdeT: '4', pdeK: '1', pdeV: '0' } },
+                { label: 'Wave: standing wave sin x', fn: 'sin(x)', opts: { odeType: 'wave', pdeL: 'pi', pdeT: '6', pdeK: '1', pdeV: '0' } },
                 { label: 'Predator–prey (Lotka–Volterra)', fn: 'x*(1-0.5*y) ; y*(0.5*x-1)', opts: { odeType: 'system', x0: '0', xEnd: '30', initial: '3, 1' } }
             ]
         },
@@ -418,19 +433,24 @@
     };
     MODES.stats = {
         label: 'Statistics', icon: 'x̄',
-        input: v => ({ describe: { label: 'Data', placeholder: 'e.g. 2 4 4 4 5 5 7 9', hint: 'Numbers separated by spaces, commas or new lines.' }, regression: { label: 'Data points (x y pairs)', placeholder: 'e.g. 1 2.1 ; 2 3.9 ; 3 6.2 ; 4 7.8', hint: 'Pairs separated by ;  or a flat list x₁ y₁ x₂ y₂ …' }, dist: { label: 'x  (or  a, b  for an interval)', placeholder: 'e.g. 1.96', hint: 'Value(s) at which to evaluate the distribution; for “inverse” enter a probability.' }, ttest: { label: 'Sample', placeholder: 'e.g. 5.1 4.9 5.6 5.8 6.0', hint: 'One sample against μ₀, or add a second sample below for Welch’s test.' } }[v.op || 'describe']),
+        input: v => ({ chisq: { label: 'Observed counts', placeholder: 'e.g. 18, 22, 20, 40     or a table:  20, 15 ; 10, 25', hint: 'One row = goodness of fit against equal (or given) proportions. Several rows separated by ; = test of independence.' }, anova: { label: 'Groups separated by ;', placeholder: 'e.g. 5.1 4.9 5.3 ; 6.2 6.8 6.5 ; 5.0 5.2 4.8', hint: 'Each group is a list of numbers. Tests whether all group means are equal.' }, describe: { label: 'Data', placeholder: 'e.g. 2 4 4 4 5 5 7 9', hint: 'Numbers separated by spaces, commas or new lines.' }, regression: { label: 'Data points (x y pairs)', placeholder: 'e.g. 1 2.1 ; 2 3.9 ; 3 6.2 ; 4 7.8', hint: 'Pairs separated by ;  or a flat list x₁ y₁ x₂ y₂ …' }, dist: { label: 'x  (or  a, b  for an interval)', placeholder: 'e.g. 1.96', hint: 'Value(s) at which to evaluate the distribution; for “inverse” enter a probability.' }, ttest: { label: 'Sample', placeholder: 'e.g. 5.1 4.9 5.6 5.8 6.0', hint: 'One sample against μ₀, or add a second sample below for Welch’s test.' } }[v.op || 'describe']),
         fields: [
-            { key: 'op', label: 'Tool', type: 'select', def: 'describe', options: [['describe', 'Descriptive statistics'], ['regression', 'Regression & curve fitting'], ['dist', 'Probability distributions'], ['ttest', 't-tests & confidence intervals']] },
+            { key: 'op', label: 'Tool', type: 'select', def: 'describe', options: [['describe', 'Descriptive statistics'], ['regression', 'Regression & curve fitting'], ['dist', 'Probability distributions'], ['ttest', 't-tests & confidence intervals'], ['chisq', 'Chi-square test (fit or independence)'], ['anova', 'One-way ANOVA']] },
             { key: 'model', label: 'Model', type: 'select', def: 'linear', options: [['linear', 'Linear'], ['quadratic', 'Quadratic'], ['cubic', 'Cubic'], ['exponential', 'Exponential  A·e^(Bx)'], ['power', 'Power  A·x^B'], ['logarithmic', 'Logarithmic  a + b·ln x']], show: v => v.op === 'regression' },
             { key: 'predict', label: 'Predict y at x = (optional)', type: 'text', def: '', show: v => v.op === 'regression' },
             { key: 'dist', label: 'Distribution', type: 'select', def: 'normal', options: [['normal', 'Normal (μ, σ)'], ['t', "Student's t (ν)"], ['chisq', 'Chi-square (k)'], ['exponential', 'Exponential (λ)'], ['uniform', 'Uniform (a, b)'], ['binomial', 'Binomial (n, p)'], ['poisson', 'Poisson (λ)']], show: v => v.op === 'dist' },
             { key: 'params', label: 'Parameters (comma-separated)', type: 'text', def: '0, 1', placeholder: 'μ, σ', show: v => v.op === 'dist' },
             { key: 'what', label: 'Calculate', type: 'select', def: 'le', options: [['le', 'P(X ≤ x)'], ['ge', 'P(X ≥ x)'], ['between', 'P(a ≤ X ≤ b)'], ['pdf', 'Density / probability at x'], ['inv', 'Inverse: x for a given probability']], show: v => v.op === 'dist' },
+            { key: 'expected', label: 'Expected proportions (blank = all equal)', type: 'text', def: '', placeholder: 'e.g. 0.5, 0.3, 0.2', show: v => v.op === 'chisq' },
             { key: 'mu0', label: 'Hypothesised mean μ₀', type: 'text', def: '0', show: v => v.op === 'ttest' },
             { key: 'data2', label: 'Second sample (optional – Welch test)', type: 'text', def: '', show: v => v.op === 'ttest' },
-            { key: 'alpha', label: 'Significance level α', type: 'text', def: '0.05', show: v => v.op === 'ttest' }
+            { key: 'alpha', label: 'Significance level α', type: 'text', def: '0.05', show: v => ['ttest', 'chisq', 'anova'].includes(v.op) }
         ],
         examples: [
+            { label: 'Chi-square: is a die fair?', fn: '18, 22, 20, 40', opts: { op: 'chisq', expected: '', alpha: '0.05' } },
+            { label: 'Chi-square: 2×2 independence table', fn: '20, 15 ; 10, 25', opts: { op: 'chisq', alpha: '0.05' } },
+            { label: 'Chi-square against given proportions', fn: '48, 33, 19', opts: { op: 'chisq', expected: '0.5, 0.3, 0.2', alpha: '0.05' } },
+            { label: 'ANOVA: three groups', fn: '5.1 4.9 5.3 ; 6.2 6.8 6.5 ; 5.0 5.2 4.8', opts: { op: 'anova', alpha: '0.05' } },
             { label: 'Summary of a data set', fn: '2 4 4 4 5 5 7 9', opts: { op: 'describe' } },
             { label: 'Linear regression with prediction', fn: '1 2.1 ; 2 3.9 ; 3 6.2 ; 4 7.8 ; 5 10.1', opts: { op: 'regression', model: 'linear', predict: '6' } },
             { label: 'Exponential growth fit', fn: '0 1.1 ; 1 2.7 ; 2 7.4 ; 3 20 ; 4 54.6', opts: { op: 'regression', model: 'exponential', predict: '' } },
@@ -488,7 +508,7 @@
 
     MODES.algebra = {
         label: 'Algebra', icon: 'p(x)',
-        input: v => ({ apart: { label: 'Rational function', placeholder: 'e.g. (x^2+1)/(x^3-x)', hint: 'Splits a fraction into simpler ones, the first step of many integrals and Laplace inversions.' }, div: { label: 'Rational function', placeholder: 'e.g. (x^4+1)/(x^2-3x+2)', hint: 'Divides the numerator by the denominator and gives the quotient and remainder.' }, factor: { label: 'Expression', placeholder: 'e.g. x^4 - 1', hint: 'Factors over the rationals and expands, checking both forms against your input.' }, gcd: { label: 'Two polynomials separated by ;', placeholder: 'e.g. x^2-1 ; x^3-1', hint: 'Greatest common divisor and least common multiple, using Euclid’s algorithm.' }, recur: { label: 'Recurrence', placeholder: 'e.g. a(n) = a(n-1) + a(n-2)', hint: 'Linear, constant-coefficient and homogeneous. Gives the closed form from the initial values.' } }[v.op] || { label: 'Expression', placeholder: '', hint: '' }),
+        input: v => ({ apart: { label: 'Rational function', placeholder: 'e.g. (x^2+1)/(x^3-x)', hint: 'Splits a fraction into simpler ones, the first step of many integrals and Laplace inversions.' }, div: { label: 'Rational function', placeholder: 'e.g. (x^4+1)/(x^2-3x+2)', hint: 'Divides the numerator by the denominator and gives the quotient and remainder.' }, factor: { label: 'Expression', placeholder: 'e.g. x^4 - 1', hint: 'Factors over the rationals and expands, checking both forms against your input.' }, gcd: { label: 'Two polynomials separated by ;', placeholder: 'e.g. x^2-1 ; x^3-1', hint: 'Greatest common divisor and least common multiple, using Euclid’s algorithm.' }, recur: { label: 'Recurrence', placeholder: 'e.g. a(n) = a(n-1) + a(n-2)', hint: 'Linear with constant coefficients. An extra term that is a polynomial in n times rⁿ (3, 2n+1, 5ⁿ, n·2ⁿ) is allowed. Gives the closed form from the initial values.' } }[v.op] || { label: 'Expression', placeholder: '', hint: '' }),
         fields: [
             { key: 'op', label: 'Tool', type: 'select', def: 'apart', options: [['apart', 'Partial fractions'], ['div', 'Polynomial long division'], ['factor', 'Factor and expand'], ['gcd', 'Polynomial gcd and lcm'], ['recur', 'Linear recurrence (closed form)']] },
             { key: 'init', label: 'Initial values a(0), a(1), …', type: 'text', def: '0, 1', placeholder: '0, 1', show: v => v.op === 'recur' }
@@ -504,6 +524,10 @@
             { label: 'gcd of x²−1 and x³−1', fn: 'x^2-1 ; x^3-1', opts: { op: 'gcd' } },
             { label: 'Fibonacci closed form', fn: 'a(n) = a(n-1) + a(n-2)', opts: { op: 'recur', init: '0, 1' } },
             { label: 'Repeated root: aₙ = 4aₙ₋₁ − 4aₙ₋₂', fn: 'a(n) = 4*a(n-1) - 4*a(n-2)', opts: { op: 'recur', init: '1, 3' } },
+            { label: 'With a constant: aₙ = 2aₙ₋₁ + 1  (Mersenne-like)', fn: 'a(n) = 2*a(n-1) + 1', opts: { op: 'recur', init: '0' } },
+            { label: 'Geometric forcing: aₙ = 2aₙ₋₁ + 3ⁿ', fn: 'a(n) = 2*a(n-1) + 3^n', opts: { op: 'recur', init: '1' } },
+            { label: 'Resonance: aₙ = 2aₙ₋₁ + 2ⁿ', fn: 'a(n) = 2*a(n-1) + 2^n', opts: { op: 'recur', init: '1' } },
+            { label: 'Polynomial forcing: aₙ = aₙ₋₁ + n  (triangular numbers)', fn: 'a(n) = a(n-1) + n', opts: { op: 'recur', init: '0' } },
             { label: 'Complex roots: aₙ = 2aₙ₋₁ − 2aₙ₋₂', fn: 'a(n) = 2*a(n-1) - 2*a(n-2)', opts: { op: 'recur', init: '0, 1' } }
         ]
     };
@@ -821,7 +845,7 @@
                 preview.innerHTML = `<span class="preview-tex plain">${esc(lines[0] || '')}</span><span class="preview-meta">${lines.length} line${lines.length === 1 ? '' : 's'}</span>`;
                 return true;
             }
-            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur'].includes(currentValues().op)) || (state.mode === 'laplace' && /\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src))) {
+            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur'].includes(currentValues().op)) || (state.mode === 'applications' && currentValues().op === 'curvature' && src.includes(';')) || (state.mode === 'laplace' && /\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src))) {
                 preview.className = 'preview-box valid';
                 const n = src.split(/[\n;]+/).filter(x => x.trim()).length;
                 preview.innerHTML = `<span class="preview-tex plain">${esc(src.length > 160 ? src.slice(0, 160) + '…' : src)}</span><span class="preview-meta">${state.mode === 'stats' ? (src.split(/[\s,;]+/).filter(Boolean).length + ' values') : state.mode === 'vector' ? (n + ' component' + (n === 1 ? '' : 's')) : 'ready'}</span>`;

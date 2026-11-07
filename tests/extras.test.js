@@ -113,7 +113,7 @@ test('algebra: partial fractions, division, factoring, gcd and recurrences verif
   assert.equal(A('x^2-1 ; x^3-1', { op: 'gcd' }).main.text, 'x − 1');
   const fib = A('a(n) = a(n-1) + a(n-2)', { op: 'recur', init: '0, 1' }); assert.match(fib.items[2].text, /^0, 1, 1, 2, 3, 5, 8, 13/); assert.ok(fib.meta.some(m => /^Verified/.test(m)));
   assert.match(A('a(n) = 4*a(n-1) - 4*a(n-2)', { op: 'recur', init: '1, 3' }).main.text, /2\^n/);
-  assert.throws(() => A('a(n) = a(n-1) + 1', { op: 'recur', init: '0' }), /homogeneous/);
+  assert.throws(() => A('a(n) = a(n-1)*a(n-2)', { op: 'recur', init: '1, 1' }), /linear/);
   assert.throws(() => A('sin(x)/x', { op: 'apart' }), /rational/);
 });
 test('Lagrange multipliers, curvature and radius of convergence verify themselves', () => {
@@ -126,4 +126,20 @@ test('Lagrange multipliers, curvature and radius of convergence verify themselve
   assert.equal(R('(x-2)^k/(k*3^k)', { center: '2' }).main.text, '3'); assert.equal(R('x^k/factorial(k)', { lower: '0' }).main.text, '∞'); assert.equal(R('factorial(k)*x^k', { lower: '0' }).main.text, '0');
   assert.match(R('x^k/k^2').items.map(i => i.text).join('|'), /\[-1, 1\]/); assert.match(R('x^k/k').items[0].text, /conditionally/);
   assert.throws(() => R('sin(k*x)'), /form/);
+});
+test('non-homogeneous recurrences, epsilon-delta, chi-square, ANOVA and PDEs verify themselves', () => {
+  const rec = (s, i) => E.run.algebra(s, { op: 'recur', init: i });
+  assert.equal(rec('a(n) = 2*a(n-1) + 1', '0').main.text, '2^n − 1');
+  assert.match(rec('a(n) = 2*a(n-1) + 2^n', '1').main.text, /2\^n·n/);           // resonance
+  assert.match(rec('a(n) = a(n-1) + n', '0').items.map(i => i.text).join('|'), /0, 1, 3, 6, 10, 15/);
+  assert.throws(() => rec('a(n) = a(n-1) + sin(n)', '0'), /polynomial in n/);
+  const ed = E.run.limit('2*x+1', { task: 'epsdelta', point: '3', eps: '0.01' }); assert.equal(ed.main.text, 'δ = 0.005'); assert.ok(ed.meta.some(m => /^Verified/.test(m)));
+  assert.match(E.run.limit('x^2', { task: 'epsdelta', point: '2', eps: '0.1' }).main.text, /δ = 0\.0248/);
+  assert.throws(() => E.run.limit('abs(x)/x', { task: 'epsdelta', point: '0' }), /does not exist/);
+  const chi = E.run.stats('18, 22, 20, 40', { op: 'chisq' }); assert.match(chi.main.text, /χ² = 12\.32.*df = 3.*p = 0\.0063/); assert.ok(chi.meta.some(m => /^Verified/.test(m)));
+  assert.match(E.run.stats('20, 15 ; 10, 25', { op: 'chisq' }).main.text, /χ² = 5\.83.*df = 1/);
+  assert.match(E.run.stats('5.1 4.9 5.3 ; 6.2 6.8 6.5 ; 5.0 5.2 4.8', { op: 'anova' }).main.text, /F\(2, 6\) = 37\.2/);
+  const heat = E.run.ode('sin(x)', { odeType: 'heat', pdeL: 'pi', pdeT: '1', pdeK: '1' }); assert.match(heat.main.text, /0\.3679/); assert.ok(heat.meta.some(m => /^Verified.*Fourier/.test(m))); assert.equal(heat.plot3.generic.traces[0].type, 'surface');
+  assert.ok(E.run.ode('x*(pi-x)', { odeType: 'wave', pdeL: 'pi', pdeT: '2', pdeK: '1', pdeV: '0' }).meta.some(m => /^Verified/.test(m)));
+  assert.throws(() => E.run.ode('cos(x)', { odeType: 'heat' }), /0 at x = 0/);
 });

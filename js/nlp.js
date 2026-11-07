@@ -142,6 +142,16 @@
         m = s.match(/^(?:does|do) (?:the )?(?:series|sum) (?:of )?(.+?) converge$/);
         if (m) return { mode: 'sums', fn: mathify(m[1]), opts: { lower: '1', upper: 'inf', variable: 'k' }, say: 'Convergence test' };
 
+        // ---- epsilon-delta, chi-square, ANOVA, heat and wave equations ----
+        m = s.match(/^(?:epsilon[- ]?delta|ε[- ]?δ)(?: (?:picture|proof|for|of|limit))* (.+?) (?:as x (?:->|→|approaches|goes to|tends to) |near |at x ?= ?|at )(-?[\w./]+)(?: (?:with|for) (?:epsilon|ε)(?: ?= ?| )([\d.]+))?$/);
+        if (m) return { mode: 'limit', fn: mathify(m[1]), opts: { task: 'epsdelta', point: m[2], eps: m[3] || '0.1', direction: 'both', variable: '' }, say: 'Epsilon–delta' };
+        m = s.match(/^(?:run |do )?(?:a )?chi[- ]?(?:square|squared)(?: test)?(?: (?:of|on|for))? ([\d.,;\s]+?)(?: (?:expected|with expected|against) ([\d.,\s]+))?$/);
+        if (m) return { mode: 'stats', fn: m[1].trim(), opts: { op: 'chisq', expected: (m[2] || '').trim(), alpha: '0.05' }, say: 'Chi-square test' };
+        m = s.match(/^(?:run |do )?(?:a )?(?:one[- ]?way )?anova(?: test)?(?: (?:of|on|for))? ([\d.,;\s-]+)$/);
+        if (m) return { mode: 'stats', fn: m[1].trim(), opts: { op: 'anova', alpha: '0.05' }, say: 'One-way ANOVA' };
+        m = s.match(/^(?:the )?(heat|wave) equation(?: with| for| on)? (?:initial (?:temperature|shape|profile|condition) )?(?:u\(x,? ?0\) ?= ?)?(.+?)(?: (?:until|for|up to|at) t(?:ime)? ?= ?([\d.]+))?$/);
+        if (m) return { mode: 'ode', fn: mathify(m[2]), opts: { odeType: m[1], pdeL: 'pi', pdeT: m[3] || (m[1] === 'heat' ? '1' : '4'), pdeK: '1', pdeV: '0' }, say: m[1] === 'heat' ? 'Heat equation' : 'Wave equation' };
+
         // ---- Lagrange multipliers, curvature, radius of convergence ----
         m = s.match(/^(?:use )?lagrange(?: multipliers?)?(?: to)?(?: (?:maximi[sz]e|minimi[sz]e|optimi[sz]e|find the extrema of|extrema of))? (.+?) (?:subject to|with constraint|given|under the constraint|constrained by|where) (.+)$/) || s.match(/^(?:maximi[sz]e|minimi[sz]e|optimi[sz]e) (.+?) subject to (.+)$/);
         if (m && /=/.test(m[2])) return { mode: 'multivariable', fn: mathify(m[1]), opts: { op: 'lagrange', vars: '', constraint: mathify(m[2]), radius: '5' }, say: 'Lagrange multipliers' };

@@ -1254,35 +1254,50 @@
             let k = 0; const rhs = m[1].replace(/a\(n-(\d+)\)/gi, (_, d) => { k = Math.max(k, +d); return `v${d}`; });
             if (!k || k > 6) throw new CalcError('Use between 1 and 6 previous terms, e.g. a(n-1), a(n-2).');
             let node; try { node = math.parse(rhs); } catch (e) { throw new CalcError('Could not read that recurrence.'); }
-            const code = node.compile(); const ev = vals => { const sc = {}; for (let j = 1; j <= k; j++) sc[`v${j}`] = vals[j] || 0; const v = code.evaluate(sc); if (typeof v !== 'number' || !Number.isFinite(v)) throw new CalcError('Only linear recurrences with constant coefficients are supported.'); return v; };
-            let c0; try { c0 = ev({}); } catch (e) { if (e instanceof CalcError) throw e; throw new CalcError('Only linear recurrences with constant coefficients are supported.'); }
-            if (Math.abs(c0) > 1e-12) throw new CalcError('Only homogeneous recurrences are supported (no constant or n-dependent term).');
-            const co = []; for (let j = 1; j <= k; j++) co.push(ev({ [j]: 1 }));
-            const test = {}; for (let j = 1; j <= k; j++) test[j] = j + 1.5; const lin = co.reduce((acc, c, j) => acc + c * (j + 2.5), 0); if (Math.abs(ev(test) - lin) > 1e-9 * Math.max(1, Math.abs(lin))) throw new CalcError('Only linear recurrences with constant coefficients are supported.');
+            const code = node.compile(); const ev = (vals, n) => { const sc = { n: n || 0 }; for (let j = 1; j <= k; j++) sc[`v${j}`] = vals[j] || 0; let v; try { v = code.evaluate(sc); } catch (e) { throw new CalcError('Only linear recurrences with constant coefficients are supported.'); } if (typeof v !== 'number' || !Number.isFinite(v)) throw new CalcError('Only linear recurrences with constant coefficients are supported.'); return v; };
+            const co = []; for (let j = 1; j <= k; j++) co.push(ev({ [j]: 1 }, 0) - ev({}, 0));
+            for (const n0 of [0, 3, 7]) { const test = {}; for (let j = 1; j <= k; j++) test[j] = j + 1.5; const lin = co.reduce((acc, c, j) => acc + c * (j + 2.5), 0) + ev({}, n0); if (Math.abs(ev(test, n0) - lin) > 1e-9 * Math.max(1, Math.abs(lin))) throw new CalcError('Only linear recurrences with constant coefficients are supported.'); }
+            const g = n => ev({}, n); const gv = Array.from({ length: 14 }, (_, n) => g(n)); const forced = gv.some(x => Math.abs(x) > 1e-12);
             const init = String(opt.init || '').split(/[,;\s]+/).filter(Boolean).map(Number); if (init.length !== k || init.some(x => !Number.isFinite(x))) throw new CalcError(`Give ${k} initial value${k > 1 ? 's' : ''} a(0)…a(${k - 1}), separated by commas.`);
-            const terms = init.slice(); for (let n = k; n < 40; n++) { let v = 0; for (let j = 1; j <= k; j++) v += co[j - 1] * terms[n - j]; terms.push(v); }
+            const terms = init.slice(); for (let n = k; n < 60; n++) { let v = g(n); for (let j = 1; j <= k; j++) v += co[j - 1] * terms[n - j]; terms.push(v); }
             const charP = new Array(k + 1).fill(0); charP[k] = 1; for (let j = 1; j <= k; j++) charP[k - j] = -co[j - 1];
-            const roots = I.polyRootsMult(charP.slice()); const total = roots.reduce((a, z) => a + z.mult, 0); if (total !== k) throw new CalcError('Could not find the characteristic roots reliably.');
+            let forceInfo = null, comb = charP.slice();
+            if (forced) {
+                // g(n) = P(n)·rⁿ  ⇔  (E − r)^(d+1) g = 0; find the smallest d with a real r that works
+                const binom = (n, j) => { let v = 1; for (let i = 1; i <= j; i++) v = v * (n - i + 1) / i; return v; };
+                for (let d = 0; d <= 4 && !forceInfo; d++) {
+                    // (E−r)^(d+1) g at n=0 = Σ_j C(d+1,j)(−r)^(d+1−j) g(j): a polynomial in r
+                    const pr = new Array(d + 2).fill(0); for (let j = 0; j <= d + 1; j++) pr[d + 1 - j] += binom(d + 1, j) * Math.pow(-1, d + 1 - j) * gv[j];
+                    const pp = I.polyTrim(pr); const cands = pp.length > 1 ? I.polyRoots(pp.slice()).filter(z => Math.abs(z.im) < 1e-7).map(z => z.re) : [];
+                    for (const r0 of cands) { let rr = r0; const rn = Math.round(rr * 1e6) / 1e6; if (Math.abs(rn - rr) < 1e-7) rr = rn; let ok = true; for (let n = 0; n + d + 1 < 14 && ok; n++) { let sum = 0; for (let j = 0; j <= d + 1; j++) sum += binom(d + 1, j) * Math.pow(-rr, d + 1 - j) * gv[n + j]; if (Math.abs(sum) > 1e-7 * Math.max(1, ...gv.map(Math.abs))) ok = false; } if (ok && Math.abs(rr) > 1e-9) { forceInfo = { d, r: rr }; break; } }
+                }
+                if (!forceInfo) throw new CalcError('The extra term must be a polynomial in n times rⁿ, for example 3, 2n+1, 5ⁿ or n·2ⁿ.');
+                for (let q = 0; q <= forceInfo.d; q++) comb = I.polyMul(comb, [-forceInfo.r, 1]);
+            }
+            const K = comb.length - 1; if (K > 12) throw new CalcError('The combined order is too high for a reliable closed form.');
+            const roots = I.polyRootsMult(comb.slice()); const total = roots.reduce((a, z) => a + z.mult, 0); if (total !== K) throw new CalcError('Could not find the characteristic roots reliably.');
             const cols = []; roots.forEach(z => { for (let q = 0; q < z.mult; q++) cols.push({ z: math.complex(z.re, z.im), q }); });
             const basis = (c, n) => math.multiply(math.pow(c.z, n), n === 0 && c.q === 0 ? 1 : Math.pow(n, c.q));
-            let C; try { C = math.lusolve(math.matrix(Array.from({ length: k }, (_, n) => cols.map(c => basis(c, n)))), math.matrix(init.map(x => [x]))).toArray().map(row => math.complex(row[0])); } catch (e) { throw new CalcError('The recurrence has a singular structure; closed form not found.'); }
+            let C; try { C = math.lusolve(math.matrix(Array.from({ length: K }, (_, n) => cols.map(c => basis(c, n)))), math.matrix(terms.slice(0, K).map(x => [x]))).toArray().map(row => math.complex(row[0])); } catch (e) { throw new CalcError('The recurrence has a singular structure; closed form not found.'); }
             const closed = n => { let t = math.complex(0, 0); cols.forEach((c, i) => { t = math.add(t, math.multiply(C[i], basis(c, n))); }); return t.re; };
-            let worst = 0; for (let n = 0; n < 30; n++) worst = Math.max(worst, Math.abs(closed(n) - terms[n]) / Math.max(1, Math.abs(terms[n])));
+            let worst = 0; for (let n = 0; n < 40; n++) worst = Math.max(worst, Math.abs(closed(n) - terms[n]) / Math.max(1, Math.abs(terms[n])));
             if (worst > 1e-6) throw new CalcError('The closed form did not reproduce the sequence (numerical trouble); the terms below are still exact.');
             const cx = z => { const re = N_(z.re, 7), im = N_(Math.abs(z.im), 7); if (Math.abs(z.im) < 1e-9) return re.text; return `(${re.text} ${z.im < 0 ? '−' : '+'} ${im.text}i)`; };
             const hasC = cols.some(c => Math.abs(c.z.im) > 1e-9);
-            const parts = cols.map((c, i) => { const co = C[i], real = Math.abs(co.im) < 1e-9, neg = real && co.re < 0; const cc = real ? cx({ re: Math.abs(co.re), im: 0 }) : cx(co); const rr = (Math.abs(c.z.im) < 1e-9 && c.z.re < 0) ? `(${cx(c.z)})` : cx(c.z); return { neg, t: `${cc}·${rr}^n${c.q ? '·n' + (c.q > 1 ? '^' + c.q : '') : ''}`.replace(/^1·/, '') }; });
-            r.title = 'Linear recurrence'; r.main = { label: 'a(n) =', text: parts.map((p, i) => (i ? (p.neg ? ' − ' : ' + ') : (p.neg ? '−' : '')) + p.t).join(''), tex: '' };
-            r.items.push({ label: 'Characteristic equation:', text: polyTxt(charP, 'r') + ' = 0', tex: polyTex(charP, 'r') + '=0' });
-            r.items.push({ label: 'Roots:', text: roots.map(z => cx({ re: z.re, im: z.im }) + (z.mult > 1 ? ` (×${z.mult})` : '')).join(',  '), tex: '' });
+            const parts = cols.filter((c, i) => Math.abs(C[i].re) > 1e-9 || Math.abs(C[i].im) > 1e-9).map(c => { const i = cols.indexOf(c); const co2 = C[i], real = Math.abs(co2.im) < 1e-9, neg = real && co2.re < 0; const cc = real ? cx({ re: Math.abs(co2.re), im: 0 }) : cx(co2); const rr = (Math.abs(c.z.im) < 1e-9 && c.z.re < 0) ? `(${cx(c.z)})` : cx(c.z); const rpow = Math.abs(c.z.im) < 1e-9 && Math.abs(c.z.re - 1) < 1e-9 ? '' : `·${rr}^n`; const npow = c.q ? '·n' + (c.q > 1 ? '^' + c.q : '') : ''; return { neg, t: (`${cc}${rpow}${npow}`).replace(/^1·/, '') || cc }; });
+            r.title = forced ? 'Linear recurrence (non-homogeneous)' : 'Linear recurrence'; r.main = { label: 'a(n) =', text: parts.map((p, i) => (i ? (p.neg ? ' − ' : ' + ') : (p.neg ? '−' : '')) + p.t).join('') || '0', tex: '' };
+            r.items.push({ label: 'Characteristic equation (homogeneous part):', text: polyTxt(charP, 'r') + ' = 0', tex: polyTex(charP, 'r') + '=0' });
+            if (forceInfo) r.items.push({ label: 'Extra term g(n):', text: `a polynomial of degree ${forceInfo.d} times ${N_(forceInfo.r, 6).text}^n`, tex: '' });
+            r.items.push({ label: 'Roots used:', text: roots.map(z => cx({ re: z.re, im: z.im }) + (z.mult > 1 ? ` (×${z.mult})` : '')).join(',  '), tex: '' });
             r.items.push({ label: 'First terms:', text: terms.slice(0, 15).map(x => N_(x, 10).text).join(', ') + ', …', tex: '' });
-            if (Math.abs(terms[k + 8]) > 0 && Math.abs(terms[k + 7]) > 0) r.items.push({ label: 'Growth ratio a(n+1)/a(n):', text: engine.fmt(terms[k + 8] / terms[k + 7], 8), tex: '' });
-            r.meta.push(`Verified: the closed form reproduces the first 30 terms (largest relative error ${worst.toExponential(2)})`);
+            if (Math.abs(terms[K + 8]) > 0 && Math.abs(terms[K + 7]) > 0) r.items.push({ label: 'Growth ratio a(n+1)/a(n):', text: engine.fmt(terms[K + 8] / terms[K + 7], 8), tex: '' });
+            r.meta.push(`Verified: the closed form reproduces the first 40 terms (largest relative error ${worst.toExponential(2)})`);
             if (hasC) r.meta.push('Complex roots appear; the closed form is real once the conjugate terms are added.');
-            r.meta.push('Method: characteristic equation, then solving for the constants from the initial values');
-            r.steps.push({ title: 'Try a(n) = rⁿ', text: 'Substituting rⁿ into the recurrence and dividing by the lowest power gives the characteristic equation.', tex: '' });
+            r.meta.push(forced ? 'Method: the extra term is annihilated by (E − r)^(d+1), so the solution lies in the span of the combined characteristic roots; constants are fitted to the first terms' : 'Method: characteristic equation, then solving for the constants from the initial values');
+            r.steps.push({ title: 'Homogeneous part', text: 'Try a(n) = rⁿ in the recurrence without the extra term; this gives the characteristic equation.', tex: '' });
+            if (forced) r.steps.push({ title: 'Account for the extra term', text: `Because g(n) is a polynomial of degree ${forceInfo.d} times ${N_(forceInfo.r, 6).text}ⁿ, multiplying the characteristic polynomial by (r − ${N_(forceInfo.r, 6).text})^${forceInfo.d + 1} adds the matching particular solution. If ${N_(forceInfo.r, 6).text} is already a root, the powers of n appear automatically (resonance).`, tex: '' });
             r.steps.push({ title: 'Solve for r', text: 'Each root r contributes rⁿ; a root repeated m times contributes rⁿ, n·rⁿ, …, n^(m−1)·rⁿ.', tex: '' });
-            r.steps.push({ title: 'Fit the initial values', text: `The ${k} unknown constants are fixed by a(0)…a(${k - 1}).`, tex: '' });
+            r.steps.push({ title: 'Fit the initial values', text: `The ${K} unknown constants are fixed by the first ${K} terms.`, tex: '' });
             r.plot = { generic: { title: 'The sequence a(n)', xTitle: 'n', yTitle: 'a(n)', traces: [{ x: terms.slice(0, 25).map((_, i) => i), y: terms.slice(0, 25), mode: 'lines+markers', type: 'scatter', name: 'a(n)' }] } };
             return I.finalizeText(r);
         }
@@ -1492,6 +1507,163 @@
         return I.finalizeText(r);
     }
     register({ sums: (src, opt) => opt.task === 'radius' ? runRadius(src, opt) : prevSums(src, opt) });
+
+    // ======================================================================
+    // Epsilon–delta, chi-square and ANOVA, heat and wave equations
+    // ======================================================================
+    const prevLimit = engine.run.limit, prevStats = engine.run.stats, prevOde = engine.run.ode;
+    const simpson = (f, a, b, n) => { n = n % 2 ? n + 1 : n; const h = (b - a) / n; let t = f(a) + f(b); for (let i = 1; i < n; i++) t += (i % 2 ? 4 : 2) * f(a + i * h); return t * h / 3; };
+
+    function runEpsDelta(src, opt) {
+        const node = engine.parse(src); const fv = engine.freeVars(node); if (fv.length > 1) throw new CalcError('Use a single variable.'); const v = fv[0] || 'x';
+        const a = I.parseLimit(opt.point === undefined || opt.point === '' ? '0' : opt.point, 'Point').value; if (!Number.isFinite(a)) throw new CalcError('The ε–δ picture needs a finite point a.');
+        const f = engine.compile(node, [v]);
+        const near = d => [f(a + d), f(a - d)]; const n7 = near(1e-7), n6 = near(1e-6), n8 = near(1e-8);
+        if (![...n7, ...n6, ...n8].every(Number.isFinite)) throw new CalcError('The function is not defined on both sides of a, or the limit is infinite.');
+        const L = (n8[0] + n8[1]) / 2, tolL = 1e-4 * Math.max(1, Math.abs(L)); if (Math.abs(n8[0] - n8[1]) > tolL || Math.abs(n7[0] - n8[0]) > tolL || Math.abs(n6[0] - n7[0]) > 10 * tolL) throw new CalcError('The two-sided limit does not exist here (or is infinite), so there is no ε–δ statement to illustrate.');
+        const Lr = nice(L, 8, 1e-6), Lv = Math.abs(L - Number(Lr.text)) < 1e-9 || Lr.text.includes('/') || /[π√e]/.test(Lr.text) ? (Lr.text.includes('/') || /[π√e]/.test(Lr.text) ? math.evaluate(Lr.text.replace(/π/g, 'pi').replace(/√/g, 'sqrt')) : Number(Lr.text)) : L; const Lx = Number.isFinite(Lv) && Math.abs(Lv - L) < 1e-6 * Math.max(1, Math.abs(L)) ? Lv : L;
+        const dmax = 50, M = 8000, ts = Array.from({ length: M }, (_, i) => dmax * Math.pow((i + 1) / M, 3));
+        const dev = x => { const y = f(x); return Number.isFinite(y) ? Math.abs(y - Lx) : 0; };
+        const deltaFor = eps => {
+            let bad = -1; for (let i = 0; i < M; i++) { if (dev(a + ts[i]) > eps || dev(a - ts[i]) > eps) { bad = i; break; } }
+            if (bad < 0) return { d: dmax, capped: true }; if (bad === 0) return { d: ts[0] * 0.5, capped: false };
+            let lo = ts[bad - 1], hi = ts[bad]; for (let it = 0; it < 60; it++) { const mid = (lo + hi) / 2; if (dev(a + mid) > eps || dev(a - mid) > eps) hi = mid; else lo = mid; } return { d: lo, capped: false };
+        };
+        const eps0 = I.parseLimit(opt.eps === undefined || opt.eps === '' ? '0.1' : opt.eps, 'ε').value; if (!(eps0 > 0) || !Number.isFinite(eps0)) throw new CalcError('ε must be a positive number.');
+        const main = deltaFor(eps0); const delta = main.d;
+        // verification: no violation anywhere inside, and the boundary is sharp
+        let worst = 0; for (let i = 0; i < 20000; i++) { const t = delta * (i + 0.5) / 20000, y1 = dev(a + t), y2 = dev(a - t); worst = Math.max(worst, y1, y2); }
+        if (worst > eps0 * (1 + 1e-9)) throw new CalcError('The δ found failed the check; the function may oscillate too quickly near a.');
+        const sharp = main.capped || Math.max(dev(a + delta * 1.0005), dev(a - delta * 1.0005)) > eps0;
+        const r = I.makeResult('limit', 'Epsilon–delta'); const fmt6 = x => nice(x, 6, 1e-6).text;
+        r.main = { label: `For ε = ${fmt6(eps0)}:`, text: main.capped ? `any δ works (up to the ${dmax} searched)` : `δ = ${fmt6(delta)}`, tex: '' };
+        r.items.push({ label: 'Limit L =', text: nice(Lx, 8, 1e-6).text, tex: '' });
+        r.items.push({ label: 'The statement:', text: `0 < |${v} − ${fmt6(a)}| < δ  ⇒  |f(${v}) − L| < ε`, tex: '' });
+        const table = [1, 0.1, 0.01, 0.001, 0.0001].map(e => ({ e, d: deltaFor(e) }));
+        r.items.push({ label: 'Largest δ for each ε:', text: table.map(q => `ε = ${q.e} → δ = ${q.d.capped ? '≥ ' + dmax : fmt6(q.d.d)}`).join(';   '), tex: '' });
+        const hh = 1e-5 * Math.max(1, Math.abs(a)), slope = (f(a + hh) - f(a - hh)) / (2 * hh); if (Number.isFinite(slope) && Math.abs(slope) > 1e-9 && Math.abs(slope) < 1e9) r.items.push({ label: 'Rule of thumb for small ε:', text: `δ ≈ ε / |f′(${fmt6(a)})| = ε / ${fmt6(Math.abs(slope))}`, tex: '' });
+        r.meta.push(`Verified: 20,000 test points inside (${fmt6(a - delta)}, ${fmt6(a + delta)}) all satisfy |f − L| ≤ ε` + (sharp ? '; just outside that window the condition fails, so δ is the largest possible' : ''));
+        r.meta.push('Method: the largest δ is found numerically by scanning outward from a and bisecting at the first violation. This illustrates the definition; it is not a symbolic proof.');
+        r.steps.push({ title: 'The definition', text: 'lim f(x) = L means: for every ε > 0 there is a δ > 0 such that 0 < |x − a| < δ implies |f(x) − L| < ε.', tex: '' });
+        r.steps.push({ title: 'Pick ε, find δ', text: 'Draw the horizontal band L ± ε. The largest δ is the half-width of the widest window around a whose graph stays inside the band.', tex: '' });
+        r.steps.push({ title: 'Shrink ε', text: 'Repeating for smaller ε shows δ shrinking with it; a limit exists when a δ can always be found.', tex: '' });
+        const span = Math.max(delta * 2.5, 1e-6), xs = [], ys = []; for (let i = 0; i <= 400; i++) { const x = a - span + 2 * span * i / 400; const y = f(x); xs.push(x); ys.push(Number.isFinite(y) ? y : null); }
+        const yl = [Lx - eps0, Lx + eps0];
+        r.plot = { generic: { title: 'The ε-band and the δ-window', xTitle: v, yTitle: 'f', traces: [{ x: xs, y: ys, mode: 'lines', type: 'scatter', name: 'f' }, { x: [a - span, a + span], y: [yl[1], yl[1]], mode: 'lines', type: 'scatter', name: 'L + ε', line: { dash: 'dash' } }, { x: [a - span, a + span], y: [yl[0], yl[0]], mode: 'lines', type: 'scatter', name: 'L − ε', line: { dash: 'dash' } }, { x: [a - delta, a - delta], y: [Math.min(yl[0], ...ys.filter(Number.isFinite)), Math.max(yl[1], ...ys.filter(Number.isFinite))], mode: 'lines', type: 'scatter', name: 'a − δ', line: { dash: 'dot' } }, { x: [a + delta, a + delta], y: [Math.min(yl[0], ...ys.filter(Number.isFinite)), Math.max(yl[1], ...ys.filter(Number.isFinite))], mode: 'lines', type: 'scatter', name: 'a + δ', line: { dash: 'dot' } }, { x: [a], y: [Lx], mode: 'markers', type: 'scatter', name: '(a, L)', marker: { size: 9 } }] } };
+        return I.finalizeText(r);
+    }
+    register({ limit: (src, opt) => opt.task === 'epsdelta' ? runEpsDelta(src, opt) : prevLimit(src, opt) });
+
+    // ---- chi-square and one-way ANOVA ----
+    function runChiAnova(src, opt) {
+        const op = opt.op, alpha = (() => { const q = +opt.alpha; return q > 0 && q < 1 ? q : 0.05; })();
+        const r = I.makeResult('stats', op === 'anova' ? 'One-way ANOVA' : 'Chi-square test');
+        const rows = String(src).split(/[;\n]+/).map(x => x.trim()).filter(Boolean);
+        const tail = (stat, tailFn) => tailFn(stat);
+        if (op === 'anova') {
+            const groups = rows.map(g => numList(g, 'Value')); if (groups.length < 2) throw new CalcError('Give at least two groups, separated by semicolons or new lines.'); if (groups.some(g => g.length < 1)) throw new CalcError('Every group needs at least one value.');
+            const N = groups.reduce((a, g) => a + g.length, 0), k = groups.length; if (N - k < 1) throw new CalcError('Need more observations than groups.');
+            const means = groups.map(g => g.reduce((a, b) => a + b, 0) / g.length), grand = groups.flat().reduce((a, b) => a + b, 0) / N;
+            const ssb = groups.reduce((a, g, i) => a + g.length * (means[i] - grand) ** 2, 0), ssw = groups.reduce((a, g, i) => a + g.reduce((b, x) => b + (x - means[i]) ** 2, 0), 0), sst = groups.flat().reduce((a, x) => a + (x - grand) ** 2, 0);
+            const d1 = k - 1, d2 = N - k, msb = ssb / d1, msw = ssw / d2; if (msw < 1e-300) throw new CalcError('Within-group variation is zero, so F is undefined.');
+            const F = msb / msw, pv = betai(d2 / 2, d1 / 2, d2 / (d2 + d1 * F));
+            const pdf = x => Math.exp(d1 / 2 * Math.log(d1) + d2 / 2 * Math.log(d2) + (d1 / 2 - 1) * Math.log(x) - ((d1 + d2) / 2) * Math.log(d1 * x + d2) - (lgamma(d1 / 2) + lgamma(d2 / 2) - lgamma((d1 + d2) / 2)));
+            const num = 1 - simpson(u => (u === 0 ? 0 : pdf(u * u) * 2 * u), 0, Math.sqrt(F), 40000);
+            if (Math.abs(num - pv) > 2e-4 && pv > 1e-6) throw new CalcError('The p-value failed its numerical check.');
+            const dec = pv < alpha;
+            r.main = { label: 'F-test:', text: `F(${d1}, ${d2}) = ${engine.fmt(F, 6)},  p = ${pv < 1e-4 ? pv.toExponential(3) : engine.fmt(pv, 5)}`, tex: '' };
+            r.items.push({ label: 'Decision:', text: dec ? `Reject H₀ at α = ${alpha}: the group means are not all equal.` : `Do not reject H₀ at α = ${alpha}: no evidence the means differ.`, tex: '' });
+            r.items.push({ label: 'Group means:', text: means.map((m, i) => `group ${i + 1}: ${engine.fmt(m, 6)} (n = ${groups[i].length})`).join(';  '), tex: '' });
+            r.items.push({ label: 'Between / within / total SS:', text: `${engine.fmt(ssb, 6)} / ${engine.fmt(ssw, 6)} / ${engine.fmt(sst, 6)}`, tex: '' });
+            r.items.push({ label: 'Mean squares:', text: `MSB = ${engine.fmt(msb, 6)},  MSW = ${engine.fmt(msw, 6)}`, tex: '' });
+            r.items.push({ label: 'Effect size η² =', text: engine.fmt(ssb / sst, 5), tex: '' });
+            r.meta.push(`Verified: SS between + SS within = SS total (difference ${Math.abs(ssb + ssw - sst).toExponential(1)}); the p-value matches direct numerical integration of the F density`);
+            r.meta.push('Assumes independent samples, roughly normal groups and similar variances. A significant F says some means differ, not which ones.');
+            r.steps.push({ title: 'Split the variation', text: 'Total variation = variation between group means + variation within groups.', tex: '' }); r.steps.push({ title: 'Compare mean squares', text: 'F = (SS between / (k − 1)) ÷ (SS within / (N − k)). Under H₀ it follows an F distribution.', tex: '' });
+            r.plot = { generic: { title: 'Groups and their means', xTitle: 'group', yTitle: 'value', traces: groups.map((g, i) => ({ y: g, type: 'box', name: `group ${i + 1}`, boxpoints: 'all', jitter: 0.4 })) } };
+            return I.finalizeText(r);
+        }
+        // chi-square
+        const table = rows.map(rw => numList(rw, 'Count')); if (!table.length) throw new CalcError('Enter observed counts, e.g. 18, 22, 20, 40.');
+        if (table.flat().some(x => x < 0)) throw new CalcError('Counts cannot be negative.');
+        let stat = 0, df, n, V, kind, expectedMin;
+        if (table.length === 1) {
+            const O = table[0]; if (O.length < 2) throw new CalcError('Need at least two categories.'); n = O.reduce((a, b) => a + b, 0); if (n <= 0) throw new CalcError('The counts sum to zero.');
+            let P; const ex = String(opt.expected || '').trim(); if (!ex) P = O.map(() => 1 / O.length); else { P = numList(ex, 'Expected'); if (P.length !== O.length) throw new CalcError(`Give ${O.length} expected values, or leave blank for equal proportions.`); const sp = P.reduce((a, b) => a + b, 0); if (sp <= 0) throw new CalcError('Expected values must be positive.'); P = P.map(x => x / sp); }
+            const E = P.map(q => q * n); expectedMin = Math.min(...E); if (E.some(x => x <= 0)) throw new CalcError('Expected proportions must be positive.'); stat = O.reduce((a, o, i) => a + (o - E[i]) ** 2 / E[i], 0); df = O.length - 1; V = Math.sqrt(stat / n); kind = 'goodness of fit';
+            r.items.push({ label: 'Observed:', text: O.join(', '), tex: '' }); r.items.push({ label: 'Expected:', text: E.map(x => engine.fmt(x, 5)).join(', '), tex: '' }); r.items.push({ label: 'Contributions (O−E)²/E:', text: O.map((o, i) => engine.fmt((o - E[i]) ** 2 / E[i], 4)).join(', '), tex: '' });
+            if (Math.abs(E.reduce((a, b) => a + b, 0) - n) > 1e-9 * n) throw new CalcError('Internal check failed: expected counts must sum to the observed total.');
+        } else {
+            const c = table[0].length; if (table.some(rw => rw.length !== c)) throw new CalcError('Every row of the table needs the same number of columns.'); if (c < 2) throw new CalcError('Need at least two columns.');
+            const rt = table.map(rw => rw.reduce((a, b) => a + b, 0)), ct = table[0].map((_, j) => table.reduce((a, rw) => a + rw[j], 0)); n = rt.reduce((a, b) => a + b, 0); if (rt.some(x => x === 0) || ct.some(x => x === 0)) throw new CalcError('A row or column totals zero, so expected counts are undefined.');
+            const E = table.map((rw, i) => rw.map((_, j) => rt[i] * ct[j] / n)); expectedMin = Math.min(...E.flat()); stat = table.reduce((a, rw, i) => a + rw.reduce((b, o, j) => b + (o - E[i][j]) ** 2 / E[i][j], 0), 0); df = (table.length - 1) * (c - 1); V = Math.sqrt(stat / (n * Math.min(table.length - 1, c - 1))); kind = 'independence';
+            r.items.push({ label: 'Expected counts:', text: E.map(rw => rw.map(x => engine.fmt(x, 4)).join(', ')).join('  |  '), tex: '' });
+            if (Math.abs(E.flat().reduce((a, b) => a + b, 0) - n) > 1e-9 * n) throw new CalcError('Internal check failed.');
+        }
+        const pv = 1 - gammaP(df / 2, stat / 2);
+        const pdf = x => Math.exp((df / 2 - 1) * Math.log(x) - x / 2 - (df / 2) * Math.log(2) - lgamma(df / 2)); const num = stat > 0 ? 1 - simpson(u => (u === 0 ? 0 : pdf(u * u) * 2 * u), 0, Math.sqrt(stat), 40000) : 1;
+        if (Math.abs(num - pv) > 2e-4 && pv > 1e-6) throw new CalcError('The p-value failed its numerical check.');
+        const dec = pv < alpha;
+        r.main = { label: `χ² (${kind}):`, text: `χ² = ${engine.fmt(stat, 6)},  df = ${df},  p = ${pv < 1e-4 ? pv.toExponential(3) : engine.fmt(pv, 5)}`, tex: '' };
+        r.items.unshift({ label: 'Decision:', text: dec ? `Reject H₀ at α = ${alpha}: ${kind === 'independence' ? 'the variables are associated.' : 'the data do not follow the expected proportions.'}` : `Do not reject H₀ at α = ${alpha}: ${kind === 'independence' ? 'no evidence of association.' : 'the data are consistent with the expected proportions.'}`, tex: '' });
+        r.items.push({ label: kind === 'independence' ? 'Effect size (Cramér’s V) =' : 'Effect size (w) =', text: engine.fmt(V, 4), tex: '' });
+        r.meta.push('Verified: expected counts sum to the observed total, and the p-value matches direct numerical integration of the χ² density');
+        if (expectedMin < 5) r.warnings.push(`Some expected counts are below 5 (smallest ${engine.fmt(expectedMin, 3)}); the χ² approximation may be unreliable. Consider merging categories or an exact test.`);
+        r.steps.push({ title: 'Expected counts', text: kind === 'independence' ? 'Under independence, E = (row total × column total) / grand total.' : 'Under H₀ each category has its expected proportion of the total.', tex: '' }); r.steps.push({ title: 'The statistic', text: 'χ² = Σ (O − E)² / E, compared with a chi-square distribution with ' + df + ' degrees of freedom.', tex: '' });
+        void tail;
+        return I.finalizeText(r);
+    }
+    register({ stats: (src, opt) => (opt.op === 'chisq' || opt.op === 'anova') ? runChiAnova(src, opt) : prevStats(src, opt) });
+
+    // ---- heat and wave equations on [0, L] with fixed ends ----
+    function runPDE(src, opt) {
+        const kind = opt.odeType; const node = engine.parse(src); const fv = engine.freeVars(node); if (fv.some(q => q !== 'x')) throw new CalcError('Write the initial profile in terms of x only, e.g. sin(x) or x*(pi-x).');
+        const L = I.parseLimit(opt.pdeL === undefined || opt.pdeL === '' ? 'pi' : opt.pdeL, 'Length').value, T = I.parseLimit(opt.pdeT === undefined || opt.pdeT === '' ? '1' : opt.pdeT, 'Final time').value, cf = I.parseLimit(opt.pdeK === undefined || opt.pdeK === '' ? '1' : opt.pdeK, kind === 'heat' ? 'Diffusivity' : 'Wave speed').value;
+        if (!(L > 0 && L < 1e4) || !(T > 0 && T < 1e5) || !(cf > 0 && cf < 1e4)) throw new CalcError('Length, final time and the coefficient must be positive numbers.');
+        const u0 = engine.compile(node, ['x']); const vNode = kind === 'wave' ? engine.parse(opt.pdeV === undefined || String(opt.pdeV).trim() === '' ? '0' : opt.pdeV) : null; if (vNode && engine.freeVars(vNode).some(q => q !== 'x')) throw new CalcError('The initial velocity must depend on x only.'); const v0 = vNode ? engine.compile(vNode, ['x']) : null;
+        const sc = Math.max(1e-12, ...Array.from({ length: 2001 }, (_, i) => Math.abs(u0(L * i / 2000)))); if (!Number.isFinite(sc)) throw new CalcError('The initial profile is not defined on the whole interval.');
+        if (Math.abs(u0(0)) > 1e-6 * sc || Math.abs(u0(L)) > 1e-6 * sc) throw new CalcError('Both ends are held at 0, so the initial profile must be 0 at x = 0 and x = L (for example sin(x) on [0, π], or x*(pi−x)).');
+        const Nx = kind === 'heat' ? 120 : 240, dx = L / Nx, xs = Array.from({ length: Nx + 1 }, (_, i) => i * dx);
+        let u = xs.map(x => u0(x)); u[0] = 0; u[Nx] = 0; const frames = [{ t: 0, u: u.slice() }]; const keep = 60; const rec = []; // snapshots for the surface
+        const snap = (t, uu) => rec.push({ t, u: uu.slice() }); snap(0, u);
+        if (kind === 'heat') {
+            const steps = 800, dt = T / steps, r = cf * dt / (2 * dx * dx), n = Nx - 1; const a = new Array(n).fill(-r), b = new Array(n).fill(1 + 2 * r), c = new Array(n).fill(-r);
+            for (let st = 1; st <= steps; st++) {
+                const d = []; for (let i = 1; i < Nx; i++) d.push((1 - 2 * r) * u[i] + r * (u[i - 1] + u[i + 1]));
+                const cp = new Array(n), dp = new Array(n); cp[0] = c[0] / b[0]; dp[0] = d[0] / b[0]; for (let i = 1; i < n; i++) { const m = b[i] - a[i] * cp[i - 1]; cp[i] = c[i] / m; dp[i] = (d[i] - a[i] * dp[i - 1]) / m; }
+                const nu = new Array(Nx + 1).fill(0); nu[n] = dp[n - 1]; for (let i = n - 2; i >= 0; i--) nu[i + 1] = dp[i] - cp[i] * nu[i + 2]; u = nu;
+                if (st % (steps / keep) === 0) snap(st * dt, u);
+            }
+        } else {
+            let dt = 0.5 * dx / cf; const steps = Math.max(2, Math.ceil(T / dt)); if (steps > 40000) throw new CalcError('That would need too many time steps; shorten the time or the length.'); dt = T / steps; const lam2 = (cf * dt / dx) ** 2; if (lam2 > 1) throw new CalcError('Internal stability check failed.');
+            const vel = xs.map(x => (v0 ? v0(x) : 0)); let prev = u.slice(), cur = new Array(Nx + 1).fill(0); for (let i = 1; i < Nx; i++) cur[i] = u[i] + dt * vel[i] + 0.5 * lam2 * (u[i + 1] - 2 * u[i] + u[i - 1]); const every = Math.max(1, Math.floor(steps / keep)); if (every === 1 || steps >= 1) { /* record first */ }
+            for (let st = 2; st <= steps; st++) { const nxt = new Array(Nx + 1).fill(0); for (let i = 1; i < Nx; i++) nxt[i] = 2 * cur[i] - prev[i] + lam2 * (cur[i + 1] - 2 * cur[i] + cur[i - 1]); prev = cur; cur = nxt; if (st % every === 0) snap(st * dt, cur); }
+            u = cur; if (rec[rec.length - 1].t < T - 1e-12) snap(T, u);
+        }
+        // independent check: Fourier sine series
+        const NM = 80, lam = n => n * Math.PI / L; const coef = fn => Array.from({ length: NM }, (_, i) => { const n = i + 1; return 2 / L * simpson(x => fn(x) * Math.sin(lam(n) * x), 0, L, 4000); });
+        const bn = coef(u0), dn = kind === 'wave' ? coef(v0) : null;
+        const exact = x => { let s = 0; for (let i = 0; i < NM; i++) { const n = i + 1, k = lam(n); s += kind === 'heat' ? bn[i] * Math.exp(-cf * k * k * T) * Math.sin(k * x) : (bn[i] * Math.cos(cf * k * T) + dn[i] / (cf * k) * Math.sin(cf * k * T)) * Math.sin(k * x); } return s; };
+        let diff = 0; xs.forEach((x, i) => { diff = Math.max(diff, Math.abs(exact(x) - u[i])); }); const rel = diff / sc;
+        const r = I.makeResult('ode', kind === 'heat' ? 'Heat equation' : 'Wave equation');
+        const peak = Math.max(...u.map(Math.abs));
+        r.main = { label: kind === 'heat' ? 'uₜ = α·uₓₓ  on [0, L]:' : 'uₜₜ = c²·uₓₓ  on [0, L]:', text: `max |u(x, ${engine.fmt(T, 5)})| = ${engine.fmt(peak, 6)}  (initially ${engine.fmt(sc, 6)})`, tex: '' };
+        const lead = bn.map((b, i) => ({ n: i + 1, b })).filter(q => Math.abs(q.b) > 1e-6 * sc).slice(0, 4);
+        r.items.push({ label: 'Setup:', text: `L = ${engine.fmt(L, 6)}, ${kind === 'heat' ? 'α' : 'c'} = ${engine.fmt(cf, 6)}, ends fixed at 0, final time T = ${engine.fmt(T, 6)}`, tex: '' });
+        r.items.push({ label: 'Leading sine modes of u(x, 0):', text: lead.map(q => `b${q.n} = ${engine.fmt(q.b, 5)}`).join(',  ') || 'none', tex: '' });
+        r.items.push({ label: kind === 'heat' ? 'Mode decay rates:' : 'Mode frequencies:', text: lead.map(q => kind === 'heat' ? `mode ${q.n}: e^(−${engine.fmt(cf * lam(q.n) ** 2, 5)}·t)` : `mode ${q.n}: ω = ${engine.fmt(cf * lam(q.n), 5)}`).join(',  ') || '–', tex: '' });
+        if (kind === 'heat') r.items.push({ label: 'Heat remaining ∫u dx:', text: `${engine.fmt(u.reduce((a, q) => a + q * dx, 0), 6)} (from ${engine.fmt(xs.map((x, i) => frames[0].u[i]).reduce((a, q) => a + q * dx, 0), 6)})`, tex: '' });
+        if (rel < 0.02) r.meta.push(`Verified: the finite-difference solution matches the exact Fourier sine-series solution at the final time (largest difference ${engine.fmt(diff, 3)}, ${(rel * 100).toFixed(2)}% of the initial maximum)`); else r.warnings.push(`The numerical and series solutions differ by ${(rel * 100).toFixed(1)}% of the initial maximum; the initial data may be too rough for this grid.`);
+        r.meta.push(kind === 'heat' ? `Method: Crank–Nicolson finite differences (${Nx} cells, 800 steps), unconditionally stable and second-order accurate` : `Method: explicit leapfrog finite differences (${Nx} cells, CFL number 0.5)`);
+        r.steps.push({ title: 'Separate variables', text: 'Write u = X(x)·T(t). With fixed ends the spatial modes are sin(nπx/L).', tex: '' });
+        r.steps.push({ title: kind === 'heat' ? 'Each mode decays' : 'Each mode oscillates', text: kind === 'heat' ? 'Mode n evolves as e^(−α(nπ/L)²t): high modes die fastest, so the profile smooths out.' : 'Mode n oscillates at frequency c·nπ/L: the shape travels and reflects at the ends instead of dying away.', tex: '' });
+        r.steps.push({ title: 'Sum the modes', text: 'The solution is the sum of the modes, with weights from the sine-series coefficients of the initial data.', tex: '' });
+        const pick = [0, 0.1, 0.25, 0.5, 1].map(fr => rec.reduce((best, q) => (Math.abs(q.t - fr * T) < Math.abs(best.t - fr * T) ? q : best), rec[0]));
+        r.plot = { generic: { title: 'u(x, t) at several times', xTitle: 'x', yTitle: 'u', traces: [...new Set(pick)].map(q => ({ x: xs, y: q.u, mode: 'lines', type: 'scatter', name: `t = ${engine.fmt(q.t, 4)}` })) } };
+        const sx = Math.max(1, Math.floor(Nx / 60)); const gx = xs.filter((_, i) => i % sx === 0); r.plot3 = { generic: { title: 'u(x, t) as a surface', axes: ['x', 't', 'u'], traces: [{ type: 'surface', x: gx, y: rec.map(q => q.t), z: rec.map(q => q.u.filter((_, i) => i % sx === 0)), showscale: false }] } };
+        return I.finalizeText(r);
+    }
+    register({ ode: (src, opt) => (opt.odeType === 'heat' || opt.odeType === 'wave') ? runPDE(src, opt) : prevOde(src, opt) });
 
 
     // ======================================================================

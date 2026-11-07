@@ -1,6 +1,10 @@
 const test = require('node:test'), assert = require('node:assert');
 const NL = require('../js/nlp.js');
 const cases = [
+  ['epsilon delta for x^2 near 2 with epsilon 0.05', { mode: 'limit', opts: { task: 'epsdelta', point: '2', eps: '0.05' } }],
+  ['chi square test 18,22,20,40', { mode: 'stats', opts: { op: 'chisq' } }],
+  ['anova 5,6,7;8,9,10', { mode: 'stats', opts: { op: 'anova' } }],
+  ['heat equation with initial temperature sin(x)', { mode: 'ode', opts: { odeType: 'heat' } }],
   ['sum of 1/k! from k=0 to infinity', { mode: 'sums', fn: '1/factorial(k)' }],
   ['radius of convergence of x^k/k!', { mode: 'sums', fn: 'x^k/factorial(k)', opts: { task: 'radius' } }],
   ['curvature of x^2 at x=1', { mode: 'applications', opts: { op: 'curvature', at: '1' } }],
