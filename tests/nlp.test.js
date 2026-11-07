@@ -1,6 +1,10 @@
 const test = require('node:test'), assert = require('node:assert');
 const NL = require('../js/nlp.js');
 const cases = [
+  ['sum of 1/k! from k=0 to infinity', { mode: 'sums', fn: '1/factorial(k)' }],
+  ['radius of convergence of x^k/k!', { mode: 'sums', fn: 'x^k/factorial(k)', opts: { task: 'radius' } }],
+  ['curvature of x^2 at x=1', { mode: 'applications', opts: { op: 'curvature', at: '1' } }],
+  ['maximize x*y subject to x^2+y^2=1', { mode: 'multivariable', opts: { op: 'lagrange' } }],
   ['partial fractions of (x^2+1)/(x^3-x)', { mode: 'algebra', opts: { op: 'apart' } }],
   ['factor x^4-1', { mode: 'algebra', opts: { op: 'factor' } }],
   ['factor 360', { mode: 'number', opts: { op: 'factor' } }],

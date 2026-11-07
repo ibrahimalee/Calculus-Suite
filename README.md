@@ -22,6 +22,9 @@ A calculus workstation that runs entirely in the browser – no backend, no buil
 | **Matrices** | det, exact inverse, eigen-decomposition, rank/RREF, charpoly, solve Ax=b, powers |
 | **Calculator** | Variables across lines, `ans`, exact fractions / π / e recognition, complex numbers, prime factorisation, binary & hex |
 | **Equation solver** | All real and complex roots of polynomials, numerical roots for anything else, inequalities → interval notation |
+| **Lagrange multipliers** (in Multivariable) | Constrained maxima and minima with λ, level curves and the constraint plotted, every candidate checked against ∇f = λ∇g |
+| **Curvature** (in Area & volume) | κ, radius and the osculating circle for y = f(x) or a parametric curve, checked against a circle through three nearby points |
+| **Radius of convergence** (in Sums & series) | Ratio-test radius for power series and endpoint-by-endpoint verdicts |
 | **Algebra** | Partial fractions (with a check at 40 points), polynomial long division, factor and expand, polynomial gcd/lcm, closed forms for linear recurrences such as Fibonacci |
 | **Sums & series** (closed forms) | Symbolic upper limits: Σk^p (Faulhaber), polynomial·rᵏ terms such as k·2^k, telescoping sums (1/(k(k+1)), ln(1+1/k), √(k+1)−√k, …) – each closed form is verified against direct summation |
 | **ODEs** (3-D) | Systems of three equations get a 3-D direction field (cones) with the solution trajectory, e.g. the Lorenz attractor |

@@ -16,7 +16,7 @@
 
     /** Turn a phrase such as "sin x times e to the x squared" into "sin(x)*e^(x^2)". */
     function mathify(s) {
-        let t = ' ' + String(s).toLowerCase().replace(/[?!]/g, ' ').replace(/\s+/g, ' ') + ' ';
+        let t = ' ' + String(s).toLowerCase().replace(/(\([^()]*\)|[a-z0-9.]+)!(?!=)/g, 'factorial($1)').replace(/[?!]/g, ' ').replace(/\s+/g, ' ') + ' ';
         t = t.replace(/\b(arcsin|arccos|arctan|arcsinh|arccosh|arctanh|sine|cosine|tangent)\b/g, (m, a) => ALIAS[a]);
         t = t.replace(/\bnatural (log|logarithm)\b/g, 'ln').replace(/\blogarithm\b/g, 'log');
         t = t.replace(/\b(square root|root) of\b/g, 'sqrt of').replace(/\bcube root of\b/g, 'cbrt of');
@@ -57,7 +57,7 @@
     function parse(raw) {
         if (!raw || !String(raw).trim()) return null;
         let t = String(raw).trim().replace(/’|’/g, "'");
-        const lower = t.toLowerCase().replace(/[.?!]+$/g, '');
+        const lower = t.toLowerCase().replace(/(\([^()]*\)|[a-z0-9]+)!/g, 'factorial($1)').replace(/[.?!]+$/g, '');
         const strip = s => s.replace(/^(please |hey |hi )?(can|could|would) you (please )?/, '').replace(/^(please )?(find|calculate|compute|evaluate|determine|work out|give me|tell me|show me|what is|what's|whats|what are|how (do|would) (i|you)|how to)\s+/, '').replace(/^(the )/, '');
         let s = strip(lower);
 
@@ -141,6 +141,14 @@
         if (m) return { mode: 'sums', fn: mathify(m[1]), opts: { lower: m[3], upper: limitWord(m[4]), variable: m[2] }, say: 'Series sum' };
         m = s.match(/^(?:does|do) (?:the )?(?:series|sum) (?:of )?(.+?) converge$/);
         if (m) return { mode: 'sums', fn: mathify(m[1]), opts: { lower: '1', upper: 'inf', variable: 'k' }, say: 'Convergence test' };
+
+        // ---- Lagrange multipliers, curvature, radius of convergence ----
+        m = s.match(/^(?:use )?lagrange(?: multipliers?)?(?: to)?(?: (?:maximi[sz]e|minimi[sz]e|optimi[sz]e|find the extrema of|extrema of))? (.+?) (?:subject to|with constraint|given|under the constraint|constrained by|where) (.+)$/) || s.match(/^(?:maximi[sz]e|minimi[sz]e|optimi[sz]e) (.+?) subject to (.+)$/);
+        if (m && /=/.test(m[2])) return { mode: 'multivariable', fn: mathify(m[1]), opts: { op: 'lagrange', vars: '', constraint: mathify(m[2]), radius: '5' }, say: 'Lagrange multipliers' };
+        m = s.match(/^(?:the )?(?:curvature|radius of curvature) of (.+?)(?: (?:at|when) (?:x|t) ?= ?(.+))?$/);
+        if (m) return { mode: 'applications', fn: mathify(m[1]).replace(/\s*,\s*/, ' ; '), opts: { op: 'curvature', at: m[2] ? mathify(m[2]) : '0' }, say: 'Curvature' };
+        m = s.match(/^(?:the )?(?:radius|interval) of convergence of (?:the )?(?:power )?(?:series )?(.+?)(?: (?:about|around|centred at|centered at) (?:x ?= ?)?(.+))?$/);
+        if (m) return { mode: 'sums', fn: mathify(m[1]).replace(/\bn\b/g, 'k'), opts: { task: 'radius', center: m[2] ? mathify(m[2]) : '0', lower: '0' }, say: 'Radius of convergence' };
 
         // ---- algebra: partial fractions, division, factoring, polynomial gcd, recurrences ----
         m = s.match(/^(?:decompose |split |write )?(?:the )?(?:into )?partial fractions? (?:of|for) (.+)$/) || s.match(/^(?:decompose|split) (.+) into partial fractions?$/);

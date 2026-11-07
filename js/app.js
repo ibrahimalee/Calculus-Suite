@@ -22,7 +22,8 @@
         ['critical', 'Critical points (max / min / saddle)'],
         ['double', 'Double integral ∬ f dy dx'],
         ['divergence', 'Divergence ∇·F (vector field)'],
-        ['curl', 'Curl ∇×F (vector field)']
+        ['curl', 'Curl ∇×F (vector field)'],
+        ['lagrange', 'Lagrange multipliers (constrained extrema)']
     ];
     const VECTOR_OPS = ['divergence', 'curl'];
 
@@ -153,12 +154,13 @@
                 { key: 'op', label: 'Operation', type: 'select', def: 'gradient', options: OPS_MULTI },
                 { key: 'vars', label: 'Variables (comma-separated, blank = auto)', type: 'text', def: '', placeholder: 'x, y' },
                 { key: 'point', label: 'Evaluate at point (optional)', type: 'text', def: '', placeholder: 'e.g. 1, 2', show: v => ['gradient', 'divergence'].includes(v.op) },
+                { key: 'constraint', label: 'Constraint  g(x, y, …) = c', type: 'text', def: '', placeholder: 'e.g. x^2 + y^2 = 1', show: v => v.op === 'lagrange' },
                 { key: 'direction', label: 'Direction vector (optional)', type: 'text', def: '', placeholder: 'e.g. 1, 1', show: v => v.op === 'gradient' },
                 { key: 'xLow', label: 'x from', type: 'text', def: '0', show: v => v.op === 'double' },
                 { key: 'xHigh', label: 'x to', type: 'text', def: '1', show: v => v.op === 'double' },
                 { key: 'yLow', label: 'y from (may depend on x)', type: 'text', def: '0', show: v => v.op === 'double' },
                 { key: 'yHigh', label: 'y to (may depend on x)', type: 'text', def: 'x', show: v => v.op === 'double' },
-                { key: 'radius', label: 'Search / plot radius', type: 'number', def: '5', show: v => ['critical', 'gradient', 'partial', 'hessian', 'laplacian'].includes(v.op) }
+                { key: 'radius', label: 'Search / plot radius', type: 'number', def: '5', show: v => ['critical', 'gradient', 'partial', 'hessian', 'laplacian', 'lagrange'].includes(v.op) }
             ],
             examples: [
                 { label: 'Gradient of x²y + sin y at (1, 0)', fn: 'x^2*y+sin(y)', opts: { op: 'gradient', vars: '', point: '1, 0', direction: '1, 1' } },
@@ -169,7 +171,10 @@
                 { label: 'Area of the unit disc', fn: '1', opts: { op: 'double', vars: 'x, y', xLow: '-1', xHigh: '1', yLow: '-sqrt(1-x^2)', yHigh: 'sqrt(1-x^2)' } },
                 { label: 'Laplacian of x² − y² (harmonic)', fn: 'x^2-y^2', opts: { op: 'laplacian', vars: '' } },
                 { label: 'Curl of the rotation field (−y, x)', fn: '-y ; x', opts: { op: 'curl', vars: '' } },
-                { label: 'Divergence of (xy, yz, zx)', fn: 'x*y ; y*z ; z*x', opts: { op: 'divergence', vars: '' } }
+                { label: 'Divergence of (xy, yz, zx)', fn: 'x*y ; y*z ; z*x', opts: { op: 'divergence', vars: '' } },
+                { label: 'Lagrange: maximise xy on the unit circle', fn: 'x*y', opts: { op: 'lagrange', vars: '', constraint: 'x^2 + y^2 = 1', radius: '3' } },
+                { label: 'Lagrange: x + 2y + 3z on the unit sphere', fn: 'x + 2*y + 3*z', opts: { op: 'lagrange', vars: '', constraint: 'x^2 + y^2 + z^2 = 1', radius: '2' } },
+                { label: 'Lagrange: closest point on a line', fn: 'x^2 + y^2', opts: { op: 'lagrange', vars: '', constraint: 'x + y = 2', radius: '4' } }
             ]
         }
     };
@@ -192,8 +197,8 @@
         label: 'Riemann sums', icon: 'Δx',
         input: () => ({ label: 'f(x)', placeholder: 'e.g. x^2', hint: 'Visualise how left / right / midpoint / trapezoid / Simpson sums converge to the integral.' }),
         fields: [
-            { key: 'lower', label: 'From a', type: 'text', def: '0' },
-            { key: 'upper', label: 'To b', type: 'text', def: '1' },
+            { key: 'lower', label: 'From a', type: 'text', def: '0', show: v => v.op !== 'curvature' },
+            { key: 'upper', label: 'To b', type: 'text', def: '1', show: v => v.op !== 'curvature' },
             { key: 'n', label: 'Subintervals n', type: 'number', def: '8', min: 1, max: 100000 },
             { key: 'rule', label: 'Rule', type: 'select', def: 'left', options: [['left', 'Left endpoints'], ['right', 'Right endpoints'], ['mid', 'Midpoint'], ['trap', 'Trapezoidal'], ['simpson', "Simpson's"]] }
         ],
@@ -208,7 +213,8 @@
         label: 'Area & volume', icon: 'V',
         input: () => ({ label: 'f(x)', placeholder: 'e.g. sqrt(x)', hint: 'Applications of integration. Add a second curve g(x) for areas between curves and washers.' }),
         fields: [
-            { key: 'op', label: 'Quantity', type: 'select', def: 'area', options: [['area', 'Area between curves'], ['arclength', 'Arc length'], ['volumex', 'Volume – revolve about x-axis (disk/washer)'], ['volumey', 'Volume – revolve about y-axis (shells)'], ['surface', 'Surface area of revolution (x-axis)'], ['average', 'Average value & mean-value point']] },
+            { key: 'op', label: 'Quantity', type: 'select', def: 'area', options: [['area', 'Area between curves'], ['arclength', 'Arc length'], ['volumex', 'Volume – revolve about x-axis (disk/washer)'], ['volumey', 'Volume – revolve about y-axis (shells)'], ['surface', 'Surface area of revolution (x-axis)'], ['average', 'Average value & mean-value point'], ['curvature', 'Curvature & osculating circle']] },
+            { key: 'at', label: 'At x (or t) =', type: 'text', def: '0', placeholder: 'e.g. 1 or pi/2', show: v => v.op === 'curvature' },
             { key: 'g', label: 'Second curve g(x) (blank = 0)', type: 'text', def: '', placeholder: 'e.g. x^2', show: v => ['area', 'volumex', 'volumey'].includes(v.op) },
             { key: 'lower', label: 'From a', type: 'text', def: '0' },
             { key: 'upper', label: 'To b', type: 'text', def: '1' }
@@ -220,7 +226,10 @@
             { label: 'Volume by shells: y = x(1−x)', fn: 'x*(1-x)', opts: { op: 'volumey', g: '', lower: '0', upper: '1' } },
             { label: 'Arc length of y = x²', fn: 'x^2', opts: { op: 'arclength', lower: '0', upper: '1' } },
             { label: 'Surface area: cone y = x', fn: 'x', opts: { op: 'surface', lower: '0', upper: '1' } },
-            { label: 'Average value of x² on [0,3]', fn: 'x^2', opts: { op: 'average', lower: '0', upper: '3' } }
+            { label: 'Average value of x² on [0,3]', fn: 'x^2', opts: { op: 'average', lower: '0', upper: '3' } },
+            { label: 'Curvature of y = x² at the vertex', fn: 'x^2', opts: { op: 'curvature', at: '0' } },
+            { label: 'Curvature of sin x at its peak', fn: 'sin(x)', opts: { op: 'curvature', at: 'pi/2' } },
+            { label: 'Curvature of an ellipse (parametric)', fn: '2*cos(t) ; sin(t)', opts: { op: 'curvature', at: '0' } }
         ]
     };
     MODES.root = {
@@ -316,11 +325,17 @@
         label: 'Sums & series', icon: 'Σk',
         input: () => ({ label: 'Term  tₖ  (variable k or n)', placeholder: 'e.g. 1/k^2', hint: 'Finite sums are exact when possible; with an end index like n you get a closed form (Faulhaber, geometric, telescoping). Infinite series are tested for convergence (nth-term, ratio, p-series, alternating) and summed accurately.' }),
         fields: [
+            { key: 'task', label: 'Task', type: 'select', def: 'sum', options: [['sum', 'Sum or convergence of a series'], ['radius', 'Radius & interval of convergence (power series)']] },
+            { key: 'center', label: 'Centre a of the power series', type: 'text', def: '0', show: v => v.task === 'radius' },
             { key: 'lower', label: 'Start index', type: 'text', def: '1' },
-            { key: 'upper', label: 'End index (inf = infinite, or n for a closed form)', type: 'text', def: 'inf' }
+            { key: 'upper', label: 'End index (inf = infinite, or n for a closed form)', type: 'text', def: 'inf', show: v => v.task !== 'radius' }
         ],
         examples: [
             { label: 'Basel problem: Σ 1/k²', fn: '1/k^2', opts: { lower: '1', upper: 'inf' } },
+            { label: 'Radius: Σ (x−2)ᵏ / (k·3ᵏ)', fn: '(x-2)^k/(k*3^k)', opts: { task: 'radius', center: '2', lower: '1' } },
+            { label: 'Radius: Σ xᵏ / k!  (all x)', fn: 'x^k/factorial(k)', opts: { task: 'radius', center: '0', lower: '0' } },
+            { label: 'Radius: Σ (−1)ᵏ xᵏ / k', fn: '(-1)^k*x^k/k', opts: { task: 'radius', center: '0', lower: '1' } },
+            { label: 'Radius: Σ k! xᵏ  (only x = 0)', fn: 'factorial(k)*x^k', opts: { task: 'radius', center: '0', lower: '0' } },
             { label: 'Geometric: Σ (1/2)^k', fn: '1/2^k', opts: { lower: '0', upper: 'inf' } },
             { label: 'Alternating harmonic', fn: '(-1)^k/k', opts: { lower: '1', upper: 'inf' } },
             { label: 'Harmonic series (diverges)', fn: '1/k', opts: { lower: '1', upper: 'inf' } },

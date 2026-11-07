@@ -116,3 +116,14 @@ test('algebra: partial fractions, division, factoring, gcd and recurrences verif
   assert.throws(() => A('a(n) = a(n-1) + 1', { op: 'recur', init: '0' }), /homogeneous/);
   assert.throws(() => A('sin(x)/x', { op: 'apart' }), /rational/);
 });
+test('Lagrange multipliers, curvature and radius of convergence verify themselves', () => {
+  const L = E.run.multivariable('x*y', { op: 'lagrange', constraint: 'x^2+y^2=1', radius: '3' }); assert.match(L.main.text, /max 1\/2.*min -1\/2/); assert.ok(L.meta.some(m => /^Verified/.test(m)));
+  assert.match(E.run.multivariable('x+2*y+3*z', { op: 'lagrange', constraint: 'x^2+y^2+z^2=1', radius: '2' }).main.text, /max 3\.7416/);
+  assert.throws(() => E.run.multivariable('x*y', { op: 'lagrange', constraint: 'x^2+y^2' }), /equation/);
+  const K = E.run.applications('sin(x)', { op: 'curvature', at: 'pi/2' }); assert.match(K.items[0].text, /κ = 1$/); assert.ok(K.meta.some(m => /^Verified/.test(m)));
+  assert.match(E.run.applications('2*cos(t) ; sin(t)', { op: 'curvature', at: '0' }).items[0].text, /κ = 2$/);
+  const R = (t, o) => E.run.sums(t, Object.assign({ task: 'radius', center: '0', lower: '1' }, o));
+  assert.equal(R('(x-2)^k/(k*3^k)', { center: '2' }).main.text, '3'); assert.equal(R('x^k/factorial(k)', { lower: '0' }).main.text, '∞'); assert.equal(R('factorial(k)*x^k', { lower: '0' }).main.text, '0');
+  assert.match(R('x^k/k^2').items.map(i => i.text).join('|'), /\[-1, 1\]/); assert.match(R('x^k/k').items[0].text, /conditionally/);
+  assert.throws(() => R('sin(k*x)'), /form/);
+});

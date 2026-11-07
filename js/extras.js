@@ -1367,6 +1367,132 @@
     }
     register({ algebra: runAlgebra });
 
+    // ======================================================================
+    // Lagrange multipliers, curvature, radius of convergence
+    // ======================================================================
+    const prevMulti = engine.run.multivariable, prevApps = engine.run.applications, prevSums = engine.run.sums;
+    const N2 = (x, d) => nice(x, d || 8, 1e-9);
+
+    function runLagrange(src, opt) {
+        const mm = /^(.*?)(?:=)(.*)$/s.exec(String(opt.constraint || '')); if (!mm || !mm[2].trim()) throw new CalcError('Give the constraint as an equation, e.g. x^2 + y^2 = 1.');
+        const fN = engine.parse(src), gN = engine.parse(`(${mm[1]})-(${mm[2]})`);
+        const set = new Set(); engine.freeVars(fN).concat(engine.freeVars(gN)).forEach(v => set.add(v)); let vars = [...set].sort(); if (vars.length < 2) throw new CalcError('Use at least two variables, e.g. f = x*y with x + y = 10.'); if (vars.length > 4) throw new CalcError('Up to four variables are supported.');
+        const n = vars.length, f = engine.compile(fN, vars), g = engine.compile(gN, vars);
+        const dF = vars.map(v => engine.compile(engine.diff(fN, v), vars)), dG = vars.map(v => engine.compile(engine.diff(gN, v), vars));
+        const R = Math.max(0.5, Math.min(100, +opt.radius || 5)), res = z => { const p = z.slice(0, n), l = z[n]; return dF.map((d, i) => d(...p) - l * dG[i](...p)).concat([g(...p)]); };
+        const found = []; const per = n === 2 ? 11 : n === 3 ? 6 : 4; const starts = []; const rec = (i, cur) => { if (i === n) { [-1, 0.5, 2].forEach(l => starts.push(cur.concat([l]))); return; } for (let k = 0; k < per; k++) { cur[i] = -R + 2 * R * (k + 0.41) / per; rec(i + 1, cur); } }; rec(0, new Array(n));
+        for (const st of starts) {
+            let z = st.slice(), ok = false;
+            for (let it = 0; it < 60; it++) {
+                const F = res(z); if (!F.every(Number.isFinite)) break; const nr = Math.hypot(...F); if (nr < 1e-12) { ok = true; break; }
+                const J = F.map((_, i) => z.map((_, j) => { const h = 1e-6 * Math.max(1, Math.abs(z[j])); const zp = z.slice(); zp[j] += h; const zm = z.slice(); zm[j] -= h; return (res(zp)[i] - res(zm)[i]) / (2 * h); }));
+                let step; try { step = math.lusolve(J, F.map(x => [-x])).map(w => w[0]); } catch (e) { break; } if (!step.every(Number.isFinite)) break;
+                const mag = Math.hypot(...step), damp = mag > 3 ? 3 / mag : 1; z = z.map((x, i) => x + damp * step[i]); if (z.some(x => Math.abs(x) > 1e5)) break;
+            }
+            if (ok && Math.hypot(...res(z)) < 1e-9 && !found.some(q => Math.hypot(...q.slice(0, n).map((x, i) => x - z[i])) < 1e-6)) found.push(z);
+        }
+        if (!found.length) throw new CalcError('No constrained critical points were found in the search box. Try a larger search radius.');
+        const rows = found.map(z => ({ p: z.slice(0, n), l: z[n], v: f(...z.slice(0, n)) })).sort((a, b) => b.v - a.v);
+        const worst = Math.max(...found.map(z => Math.hypot(...res(z))));
+        const r = I.makeResult('multivariable', 'Lagrange multipliers');
+        const pt = p => '(' + p.map(x => N2(x, 7).text).join(', ') + ')';
+        const hi = rows[0], lo = rows[rows.length - 1];
+        r.main = { label: 'Constrained extrema:', text: rows.length === 1 ? `f = ${N2(hi.v, 8).text} at ${pt(hi.p)}` : `max ${N2(hi.v, 8).text} at ${pt(hi.p)};  min ${N2(lo.v, 8).text} at ${pt(lo.p)}`, tex: '' };
+        r.items.push({ label: 'Method:', text: `∇f = λ∇g with g = ${engine.strOf(gN)} = 0`, tex: `\\nabla f=\\lambda\\,\\nabla g,\\quad ${engine.texOf(gN)}=0` });
+        rows.slice(0, 12).forEach((q, i) => r.items.push({ label: `Candidate ${i + 1}:`, text: `${vars.map((v, k) => `${v} = ${N2(q.p[k], 7).text}`).join(', ')};  λ = ${N2(q.l, 6).text};  f = ${N2(q.v, 8).text}`, tex: '' }));
+        r.meta.push(`Verified: every candidate satisfies ∇f = λ∇g and the constraint (largest residual ${worst.toExponential(2)})`);
+        r.meta.push('These are all the constrained critical points found in the search box. When the constraint set is closed and bounded (a circle, an ellipse, a sphere) the largest and smallest values are the true global extrema; otherwise compare with the behaviour at infinity.');
+        r.meta.push(`Method: Newton iteration on (${vars.join(', ')}, λ) from ${starts.length} starting points`);
+        r.steps.push({ title: 'Set up the Lagrangian conditions', text: 'At a constrained extremum the gradient of f is parallel to the gradient of the constraint: ∇f = λ∇g.', tex: '' });
+        r.steps.push({ title: 'Solve the system', text: `Together with the constraint this is ${n + 1} equations in ${n + 1} unknowns (${vars.join(', ')}, λ).`, tex: '' });
+        r.steps.push({ title: 'Compare the values', text: 'Evaluate f at every solution; the largest and smallest are the candidates for the constrained maximum and minimum.', tex: '' });
+        if (n === 2) {
+            const span = Math.max(1, ...rows.map(q => Math.max(Math.abs(q.p[0]), Math.abs(q.p[1])))) * 1.5, M = 70, xs = [], ys = []; for (let i = 0; i < M; i++) { xs.push(-span + 2 * span * i / (M - 1)); ys.push(-span + 2 * span * i / (M - 1)); }
+            const zf = ys.map(y => xs.map(x => { const v = f(x, y); return Number.isFinite(v) ? v : null; })), zg = ys.map(y => xs.map(x => { const v = g(x, y); return Number.isFinite(v) ? v : null; }));
+            r.plot = { generic: { title: 'Level curves of f and the constraint', xTitle: vars[0], yTitle: vars[1], equal: true, traces: [{ x: xs, y: ys, z: zf, type: 'contour', name: 'f', showscale: false, contours: { coloring: 'none' }, line: { width: 1 } }, { x: xs, y: ys, z: zg, type: 'contour', name: 'constraint', showscale: false, contours: { type: 'constraint', value: 0, operation: '=' }, line: { width: 3 } }, { x: rows.map(q => q.p[0]), y: rows.map(q => q.p[1]), mode: 'markers', type: 'scatter', name: 'candidates', marker: { size: 10 } }] } };
+        }
+        return I.finalizeText(r);
+    }
+    register({ multivariable: (src, opt) => opt.op === 'lagrange' ? runLagrange(src, opt) : prevMulti(src, opt) });
+
+    function runCurvature(src, opt) {
+        const parts = String(src).split(/;/).map(x => x.trim()).filter(Boolean); const param = parts.length === 2;
+        if (parts.length > 2) throw new CalcError('Give y = f(x), or a parametric curve as x(t) ; y(t).');
+        const t0 = I.parseLimit(opt.at === undefined || opt.at === '' ? '0' : opt.at, 'Point').value;
+        let xf, yf, d1x, d1y, d2x, d2y, v, kN;
+        if (param) {
+            const xN = engine.parse(parts[0]), yN = engine.parse(parts[1]); const fv = [...new Set(engine.freeVars(xN).concat(engine.freeVars(yN)))]; if (fv.length > 1 || (fv.length === 1 && fv[0] !== 't')) throw new CalcError('Use the parameter t, e.g. cos(t) ; sin(2*t).'); v = 't';
+            const c = nd => engine.compile(nd, ['t']); xf = c(xN); yf = c(yN); const x1 = engine.diff(xN, 't'), y1 = engine.diff(yN, 't'); d1x = c(x1); d1y = c(y1); d2x = c(engine.diff(x1, 't')); d2y = c(engine.diff(y1, 't'));
+            kN = engine.parse(`abs((${engine.strOf(x1)})*(${engine.strOf(engine.diff(y1, 't'))})-(${engine.strOf(y1)})*(${engine.strOf(engine.diff(x1, 't'))}))/((${engine.strOf(x1)})^2+(${engine.strOf(y1)})^2)^(3/2)`);
+        } else {
+            const fN = engine.parse(parts[0]); const fv = engine.freeVars(fN); if (fv.length > 1) throw new CalcError('Use a single variable x.'); v = fv[0] || 'x';
+            const f1 = engine.diff(fN, v), f2 = engine.diff(f1, v); const c = nd => engine.compile(nd, [v]); const cf = c(fN); xf = t => t; yf = cf; d1x = () => 1; d1y = c(f1); d2x = () => 0; d2y = c(f2);
+            kN = engine.parse(`abs(${engine.strOf(f2)})/(1+(${engine.strOf(f1)})^2)^(3/2)`);
+        }
+        const X = xf(t0), Y = yf(t0), ax = d1x(t0), ay = d1y(t0), bx = d2x(t0), by = d2y(t0), sp = ax * ax + ay * ay;
+        if (![X, Y, ax, ay, bx, by].every(Number.isFinite) || sp < 1e-18) throw new CalcError('The curve is not smooth (or not defined) at that point.');
+        const cross = ax * by - ay * bx, kappa = Math.abs(cross) / Math.pow(sp, 1.5);
+        // independent check: circle through three nearby points
+        const h = 1e-3 * Math.max(1, Math.abs(t0)); const P = [t0 - h, t0, t0 + h].map(tt => [xf(tt), yf(tt)]); const a = Math.hypot(P[0][0] - P[1][0], P[0][1] - P[1][1]), b = Math.hypot(P[1][0] - P[2][0], P[1][1] - P[2][1]), cc = Math.hypot(P[0][0] - P[2][0], P[0][1] - P[2][1]); const area2 = Math.abs((P[1][0] - P[0][0]) * (P[2][1] - P[0][1]) - (P[2][0] - P[0][0]) * (P[1][1] - P[0][1]));
+        const kCheck = 2 * area2 / (a * b * cc); const err = Math.abs(kCheck - kappa) / Math.max(1e-9, kappa, kCheck);
+        if (kappa > 1e-9 && err > 1e-3) throw new CalcError('The curvature check failed; the curve may be too rough here.');
+        const r = I.makeResult('applications', 'Curvature');
+        r.main = { label: `κ(${v}) =`, text: engine.strOf(kN), tex: `\\kappa=${engine.texOf(kN)}` };
+        r.items.push({ label: `At ${v} = ${N2(t0, 6).text}:`, text: `κ = ${N2(kappa, 8).text}`, tex: '' });
+        if (kappa < 1e-9) { r.items.push({ label: 'Radius of curvature:', text: '∞ (a straight direction here)', tex: '' }); }
+        else {
+            const Rr = 1 / kappa, nx = -ay / Math.sqrt(sp) * Math.sign(cross), ny = ax / Math.sqrt(sp) * Math.sign(cross), cx = X + Rr * nx, cy = Y + Rr * ny;
+            r.items.push({ label: 'Radius of curvature:', text: N2(Rr, 8).text, tex: '' }); r.items.push({ label: 'Centre of the osculating circle:', text: `(${N2(cx, 7).text}, ${N2(cy, 7).text})`, tex: '' }); r.items.push({ label: 'Point on the curve:', text: `(${N2(X, 7).text}, ${N2(Y, 7).text})`, tex: '' });
+            const span = param ? Math.PI : 2.5, tx = [], ty = []; for (let i = 0; i <= 240; i++) { const tt = t0 - span + 2 * span * i / 240; const px = xf(tt), py = yf(tt); if (Number.isFinite(px) && Number.isFinite(py) && Math.hypot(px - X, py - Y) < 6 * Math.max(1, Rr)) { tx.push(px); ty.push(py); } else { tx.push(null); ty.push(null); } }
+            const ct = [], cy2 = []; for (let i = 0; i <= 120; i++) { const th = 2 * Math.PI * i / 120; ct.push(cx + Rr * Math.cos(th)); cy2.push(cy + Rr * Math.sin(th)); }
+            r.plot = { generic: { title: 'The curve and its osculating circle', xTitle: 'x', yTitle: 'y', equal: true, traces: [{ x: tx, y: ty, mode: 'lines', type: 'scatter', name: 'curve' }, { x: ct, y: cy2, mode: 'lines', type: 'scatter', name: 'osculating circle', line: { dash: 'dash' } }, { x: [X, cx], y: [Y, cy], mode: 'markers', type: 'scatter', name: 'point and centre', marker: { size: 9 } }] } };
+        }
+        r.meta.push(`Verified: κ agrees with the curvature of the circle through three nearby points (${(err * 100).toExponential(1)}% apart)`);
+        r.meta.push('Method: ' + (param ? 'κ = |x′y″ − y′x″| / (x′² + y′²)^(3/2)' : 'κ = |y″| / (1 + y′²)^(3/2)'));
+        r.steps.push({ title: 'Curvature measures turning', text: 'κ is the rate at which the direction of the tangent rotates per unit of arc length; the radius of curvature is 1/κ.', tex: '' });
+        r.steps.push({ title: 'Osculating circle', text: 'The circle of radius 1/κ, tangent to the curve and centred on the concave side, is the best circular approximation at that point.', tex: '' });
+        return I.finalizeText(r);
+    }
+    register({ applications: (src, opt) => opt.op === 'curvature' ? runCurvature(src, opt) : prevApps(src, opt) });
+
+    function runRadius(src, opt) {
+        const node = engine.parse(src); const fv = engine.freeVars(node).filter(x => x !== 'k' && x !== 'n'); const ind = engine.freeVars(node).includes('n') && !engine.freeVars(node).includes('k') ? 'n' : 'k';
+        if (fv.length !== 1) throw new CalcError(`Write the series term using the index ${ind} and one variable, e.g. (x-2)^k/(k*3^k).`);
+        const xv = fv[0], a = I.parseLimit(opt.center || '0', 'Centre').value, code = engine.compile(node, [ind, xv]); const T = (k, x) => code(k, x);
+        const c = k => T(k, a + 1); const start = Math.max(0, I.parseLimit(opt.lower || '0', 'Start').value | 0);
+        // coefficient check: t_k(a+h) = c_k h^k
+        let shape = 0; for (const k of [start + 3, start + 7, start + 12]) for (const hh of [0.5, 1.7]) { const exp = c(k) * Math.pow(hh, k), got = T(k, a + hh); if (Number.isFinite(exp) && Number.isFinite(got)) shape = Math.max(shape, Math.abs(exp - got) / Math.max(1e-300, Math.abs(exp), Math.abs(got))); else shape = Infinity; }
+        if (shape > 1e-6) throw new CalcError('The term must have the form cₖ·(x − a)^k; check the centre a and the exponent.');
+        const ratio = k => Math.abs(c(k) / c(k + 1));
+        const rs = [20, 40, 80].map(ratio); let Rv;
+        if (rs.some(x => !Number.isFinite(x))) { const q = [20, 40, 80].map(k => Math.abs(c(k + 1) / c(k))); Rv = q.every(x => x === 0) ? Infinity : q.every(x => !Number.isFinite(x)) ? 0 : NaN; }
+        else if (rs[2] < 0.7 * rs[1] && rs[1] < 0.7 * rs[0]) Rv = 0;
+        else if (rs[2] > 1.4 * rs[1] && rs[1] > 1.4 * rs[0]) Rv = Infinity;
+        else Rv = (8 * rs[2] - 6 * rs[1] + rs[0]) / 3; // removes the 1/k and 1/k² corrections of the ratio
+        if (Number.isNaN(Rv) || (Number.isFinite(Rv) && Rv < 0)) throw new CalcError('Could not determine the radius reliably for this series.');
+        if (Rv > 0 && Rv < 1e-9) Rv = 0;
+        const NR = x => nice(x, 6, 1e-4); const Rshow = Rv === Infinity ? '∞' : NR(Rv).text; const r = I.makeResult('sums', 'Radius of convergence');
+        r.main = { label: 'Radius R =', text: Rshow, tex: Rv === Infinity ? 'R=\\infty' : `R=${NR(Rv).tex}` };
+        if (Rv === Infinity) { r.items.push({ label: 'Interval of convergence:', text: 'all real x', tex: '' }); }
+        else if (Rv === 0) { r.items.push({ label: 'Interval of convergence:', text: `only x = ${N2(a, 6).text}`, tex: '' }); }
+        else {
+            Rv = Number(NR(Rv).text.includes('/') || /[a-zπ√]/.test(NR(Rv).text) ? Rv : NR(Rv).text);
+            const endpoint = (xe, sign) => { let KS = [2000, 4000, 8000]; for (const set of [[2000, 4000, 8000], [400, 800, 1600], [100, 200, 400], [30, 60, 120]]) { KS = set; if (set.every(k => Number.isFinite(T(k, xe)) && T(k, xe) !== 0 || Math.abs(T(k, xe)) === 0)) break; } const t = KS.map(k => T(k, xe)); if (!t.every(Number.isFinite)) return { c: 'unknown', why: 'terms not defined' }; const mag = t.map(Math.abs); if (mag[2] > 1e-3 && mag[2] >= 0.5 * mag[0]) return { c: 'diverges', why: 'terms do not tend to 0' }; const slope = Math.log(mag[2] / mag[1]) / Math.log(2); const alt = T(KS[1], xe) * T(KS[1] + 1, xe) < 0; if (mag[2] === 0) return { c: 'unknown', why: 'terms underflow' }; if (slope < -1.15) return { c: 'converges absolutely', why: `|terms| decay like k^${slope.toFixed(2)}` }; if (alt && slope < -0.05 && mag[2] < mag[0]) return { c: 'converges conditionally', why: 'terms alternate and decrease to 0' }; if (Math.abs(slope + 1) < 0.06 && !alt) return { c: 'diverges', why: 'terms behave like 1/k, the harmonic series' }; if (slope > -0.85) return { c: 'diverges', why: `terms decay only like k^${slope.toFixed(2)}` }; return { c: 'borderline', why: 'terms decay like 1/k; test by hand' }; };
+            const L = endpoint(a - Rv, -1), U = endpoint(a + Rv, 1); const inc = e => e.c.startsWith('converges'), bracket = (e, o, cl) => (inc(e) ? cl : o);
+            r.items.push({ label: `Left endpoint x = ${N2(a - Rv, 6).text}:`, text: `${L.c} (${L.why})`, tex: '' }); r.items.push({ label: `Right endpoint x = ${N2(a + Rv, 6).text}:`, text: `${U.c} (${U.why})`, tex: '' });
+            const unsure = [L, U].some(e => e.c === 'borderline' || e.c === 'unknown');
+            r.items.push({ label: 'Interval of convergence:', text: unsure ? 'endpoint behaviour needs a hand check' : `${bracket(L, '(', '[')}${N2(a - Rv, 6).text}, ${N2(a + Rv, 6).text}${bracket(U, ')', ']')}`, tex: '' });
+        }
+        r.items.push({ label: 'Centre a =', text: N2(a, 6).text, tex: '' });
+        // the ratio test behind it, on the actual terms at x within the radius
+        if (Number.isFinite(Rv) && Rv > 0) { const xin = a + 0.5 * Rv, xo = a + 1.5 * Rv; const q = k => Math.abs(T(k + 1, xin) / T(k, xin)); const q2 = k => Math.abs(T(k + 1, xo) / T(k, xo)); const qi = (8 * q(80) - 6 * q(40) + q(20)) / 3, qo = (8 * q2(80) - 6 * q2(40) + q2(20)) / 3; if (Number.isFinite(qi) && Number.isFinite(qo)) if (qi < 1 && qo > 1) r.meta.push(`Verified: the term ratio tends to ${fmt(qi, 4)} (< 1) inside the radius and ${fmt(qo, 4)} (> 1) outside it`); }
+        r.meta.push('Method: ratio test on the coefficients, R = lim |cₖ / cₖ₊₁|, extrapolated from k = 40 and 80. Endpoint verdicts come from numerical behaviour of the terms (decay rate and sign changes), so treat them as strong evidence rather than a proof.');
+        r.steps.push({ title: 'Ratio test', text: 'The series converges where lim |tₖ₊₁/tₖ| < 1. For tₖ = cₖ(x − a)ᵏ this gives |x − a| < R with R = lim |cₖ/cₖ₊₁|.', tex: '' });
+        r.steps.push({ title: 'Endpoints', text: 'At x = a ± R the ratio test is silent, so each endpoint needs its own test (p-series, alternating series, divergence test).', tex: '' });
+        return I.finalizeText(r);
+    }
+    register({ sums: (src, opt) => opt.task === 'radius' ? runRadius(src, opt) : prevSums(src, opt) });
+
 
     // ======================================================================
     // Power-series solutions of ODEs (Picard–Taylor iteration), checked against RK4
