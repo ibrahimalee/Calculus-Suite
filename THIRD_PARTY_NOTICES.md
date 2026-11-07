@@ -10,6 +10,7 @@ Calculus Suite Pro itself is MIT licensed (see `LICENSE`). It bundles these comp
 | [KaTeX](https://katex.org) | 0.19.1 | MIT | `vendor/katex/` |
 | [Tesseract.js](https://github.com/naptha/tesseract.js) and `tesseract.js-core` | 5.1.1 | Apache-2.0 | `vendor/tesseract/` (loaded only when *Scan* is used) |
 | English trained data (`tessdata_best`, via `@tesseract.js-data/eng`) | 4.0.0 | Apache-2.0 (package: MIT) | `vendor/tesseract/lang/` |
+| [Speech Rule Engine](https://github.com/Speech-Rule-Engine/speech-rule-engine) (Nemeth braille rules; bundles xmldom and wicked-good-xpath, both MIT) | 4.1.5 | Apache-2.0 | `vendor/sre/` (loaded only when *Braille* is opened) |
 | [Fraunces](https://github.com/undercasetype/Fraunces) (variable) | via `@fontsource-variable/fraunces` 5.3.0 | SIL OFL 1.1 | `vendor/fonts/` |
 | [IBM Plex Sans / Mono](https://github.com/IBM/plex) | via `@fontsource` 5.3.0 | SIL OFL 1.1 | `vendor/fonts/` |
 

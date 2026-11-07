@@ -213,6 +213,25 @@
         </div>
     </dialog>
 
+    <dialog id="brailleDialog" aria-labelledby="brailleTitle">
+        <div class="sheet braille-sheet">
+            <div class="sheet-head"><h2 id="brailleTitle">Braille</h2><button class="icon-btn" id="brailleClose" type="button" aria-label="Close"><span data-icon="x"></span></button></div>
+            <p class="scan-help">Mathematics is written in <b>Nemeth Code</b> (US); plain words are uncontracted Grade 1. Use it with a refreshable braille display, a screen reader, or download a BRF file for an embosser. The braille engine (about 1.2&nbsp;MB) downloads only the first time you open this.</p>
+            <div class="scan-status" id="brailleStatus" role="status" aria-live="polite"></div>
+            <pre id="brailleOut" class="braille-out" lang="und-Brai" dir="ltr" tabindex="0" aria-label="Braille output"></pre>
+            <details class="check-box"><summary>ASCII braille (BRF) preview</summary><pre id="brailleAscii" class="braille-ascii" dir="ltr"></pre></details>
+            <div class="practice-controls">
+                <label>Line width <select id="brailleWidth"><option value="32">32 cells</option><option value="40" selected>40 cells</option><option value="80">80 cells</option><option value="0">No wrapping</option></select></label>
+            </div>
+            <div class="scan-actions">
+                <button class="btn btn-primary" id="brailleCopy" type="button">Copy braille</button>
+                <button class="btn" id="brailleBrf" type="button">Download .brf</button>
+                <button class="btn" id="brailleTxt" type="button">Download .txt</button>
+            </div>
+            <p class="practice-note">Automatic transcription is a convenience, not a certified braille document: have a transcriber check it before using it for exams or published materials. Nemeth line-breaking rules are not applied; lines break only at spaces.</p>
+        </div>
+    </dialog>
+
     <dialog id="scanDialog" aria-labelledby="scanTitle">
         <div class="sheet scan-sheet">
             <div class="sheet-head"><h2 id="scanTitle">Scan an expression</h2><button class="icon-btn" id="scanClose" type="button" aria-label="Close"><span data-icon="x"></span></button></div>

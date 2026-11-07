@@ -689,3 +689,8 @@ body.rtl .workspace .tab-content, body.rtl .preview-box, body.rtl textarea, body
 body.rtl .mode-toggle-label, body.rtl .field-label, body.rtl .option-label { text-align: right; }
 :root { --font: "IBM Plex Sans", "Noto Sans", "Noto Sans Arabic", "Noto Naskh Arabic", "Noto Nastaliq Urdu", "Noto Sans Devanagari", "Segoe UI", system-ui, -apple-system, sans-serif; }
 .skip-link { left: 8px !important; transform: translateY(-300%); } .skip-link:focus { transform: none; }
+/* braille dialog */
+.braille-sheet { display: grid; gap: 12px; width: min(680px, 94vw); padding: 18px; max-height: 92vh; overflow-y: auto; }
+.braille-sheet .sheet-head { display: flex; align-items: center; justify-content: space-between; } .braille-sheet h2 { margin: 0; font-family: var(--serif); font-weight: 500; font-size: 22px; }
+.braille-out { margin: 0; padding: 14px; min-height: 90px; max-height: 40vh; overflow: auto; white-space: pre; font: 28px/1.5 "Noto Sans Symbols 2", "Segoe UI Symbol", "Apple Braille", "DejaVu Sans", "FreeSerif", sans-serif; letter-spacing: .04em; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface-solid); color: var(--text); }
+.braille-ascii { margin: 0; padding: 10px 14px; white-space: pre; overflow-x: auto; font: 13px/1.5 var(--mono); }

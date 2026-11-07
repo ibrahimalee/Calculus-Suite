@@ -65,6 +65,17 @@ const MODES = ['laplace', 'vector', 'stats', 'number', 'units', 'complex', 'matr
         const good = es === 'Resultados' && dir === 'rtl' && over <= 1 && en === 'Results';
         console.log(`i18n: es=${es} dir=${dir} overflow=${over} back=${en}`); if (good) ok++; else { fail++; console.log('FAIL i18n'); }
     }
+    // braille: engine is fetched only on demand; Nemeth output for a known expression; BRF download works
+    {
+        const reqs = []; p.on('request', r => reqs.push(r.url())); const before = reqs.length;
+        await p.click('[data-mode="derivative"]').catch(() => {}); await p.fill('#functionInput', 'x^2+3x-4'); await p.click('#computeBtn'); await p.waitForTimeout(1500);
+        const lazy = !reqs.some(u => /vendor\/sre/.test(u));
+        await p.click('[data-act=braille]'); await p.waitForFunction(() => /Ready|could not/.test(document.getElementById('brailleStatus').textContent), null, { timeout: 60000 });
+        const outTxt = await p.textContent('#brailleOut'); const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#brailleBrf')]);
+        const good = lazy && /⠭⠘⠆⠐⠬/.test(outTxt) && /\.brf$/.test(dl.suggestedFilename());
+        console.log(`braille: lazy=${lazy}, has Nemeth for x^2+3x: ${/⠭⠘⠆⠐⠬/.test(outTxt)}, file=${dl.suggestedFilename()}`); if (good) ok++; else { fail++; console.log('FAIL braille'); }
+        await p.click('#brailleClose'); void before;
+    }
     console.log(`${ok} examples ok, ${fail} failed`);
     if (errs.length) { console.log('console errors:', errs.slice(0, 5)); fail++; }
     await b.close(); process.exit(fail ? 1 : 0);

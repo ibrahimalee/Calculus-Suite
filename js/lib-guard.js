@@ -15,7 +15,7 @@
         { name: 'Plotly', global: 'Plotly', urls: ['vendor/plotly.min.js', 'https://cdn.jsdelivr.net/npm/plotly.js-dist-min@4.2.0/plotly.min.js'] },
         { name: 'KaTeX', global: 'katex', optional: true, urls: ['vendor/katex/katex.min.js', 'https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/katex.min.js'] }
     ];
-    const APP_SCRIPTS = ['js/engine.js', 'js/extras.js', 'js/nlp.js', 'js/practice.js', 'js/i18n.js', 'js/runner.js', 'js/app.js'];
+    const APP_SCRIPTS = ['js/engine.js', 'js/extras.js', 'js/nlp.js', 'js/practice.js', 'js/i18n.js', 'js/braille.js', 'js/runner.js', 'js/app.js'];
 
     function loadScript(url) {
         return new Promise((resolve, reject) => {

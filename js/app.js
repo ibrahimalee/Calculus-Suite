@@ -914,6 +914,7 @@
                         <button class="mini-btn" data-act="share" title="Copy a link to this calculation">${icon('link', 14)}Share</button>
                         <button class="mini-btn" data-act="embed" title="Copy an embed code for a web page or LMS">${icon('link', 14)}Embed</button>
                         ${'speechSynthesis' in window ? `<button class="mini-btn" data-act="listen" title="Read the result aloud">${icon('sparkle', 14)}Listen</button>` : ''}
+                        <button class="mini-btn" data-act="braille" title="Braille (Nemeth Code) output">${icon('keyboard', 14)}Braille</button>
                         <button class="mini-btn" data-act="export" title="Download a Markdown report">${icon('file', 14)}Export</button>
                     </div>
                 </div>
@@ -934,6 +935,7 @@
         container.querySelector('[data-act="save"]').addEventListener('click', saveToNotebook);
         container.querySelector('[data-act="export"]').addEventListener('click', exportReport);
         container.querySelector('[data-act="embed"]').addEventListener('click', embedCode);
+        container.querySelector('[data-act="braille"]').addEventListener('click', () => openBraille(r));
         const lb = container.querySelector('[data-act="listen"]'); if (lb) lb.addEventListener('click', () => speakResult(r));
         applyPlotDescription(r);
         state.stepsShown = 1;
@@ -1419,6 +1421,58 @@
         const a = document.createElement('a'); a.className = 'embed-link'; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Open in Calculus Suite ↗';
         a.href = location.origin + location.pathname + location.hash; document.body.appendChild(a);
         window.addEventListener('hashchange', () => { a.href = location.origin + location.pathname + location.hash; });
+    }
+
+
+    // ------------------------------------------------------------------
+    // Braille output (Nemeth Code via Speech Rule Engine, loaded on demand)
+    // ------------------------------------------------------------------
+    let sreReady = null;
+    function loadBrailleEngine() {
+        if (sreReady) return sreReady;
+        sreReady = new Promise((resolve, reject) => {
+            const json = new URL('vendor/sre/mathmaps/', location.href).href;
+            const opts = { domain: 'default', style: 'default', locale: 'nemeth', modality: 'braille' };
+            window.SREfeature = Object.assign({ json }, opts);
+            const done = () => { try { const p = window.SRE.setupEngine(opts); Promise.resolve(p).then(() => window.SRE.engineReady()).then(() => { window.Braille.configure({ sre: window.SRE, katex: window.katex }); resolve(); }, reject); } catch (e) { reject(e); } };
+            if (window.SRE) { done(); return; }
+            const sc = document.createElement('script'); sc.src = 'vendor/sre/sre.js'; sc.onload = done; sc.onerror = () => { sreReady = null; reject(new Error('download failed')); };
+            document.head.appendChild(sc);
+        });
+        return sreReady;
+    }
+    /** Turn an item's plain text into TeX only when it really is an expression (not words). */
+    function plainToTex(plain) {
+        const t = String(plain || '').trim(); if (!t || t.length > 120) return null;
+        const words = t.match(/[A-Za-z]{3,}/g) || [];
+        if (words.some(w => !/^(sin|cos|tan|sec|csc|cot|asin|acos|atan|sinh|cosh|tanh|ln|log|exp|sqrt|abs|pi|inf)$/i.test(w))) return null;
+        if (!/[0-9=+\-*/^()]/.test(t)) return null;
+        try { const parts = t.split(/\s*=\s*/); return parts.map(x => engine.inspect(x).tex).join('=') ; } catch (e) { return null; }
+    }
+    function openBraille(r) {
+        const dlg = $('brailleDialog'), out = $('brailleOut'), ascii = $('brailleAscii'), st = $('brailleStatus');
+        let rows = null;
+        const render = () => {
+            if (!rows) return;
+            const w = +$('brailleWidth').value; const txt = window.Braille.layout(rows, w || 1e9);
+            out.textContent = txt; ascii.textContent = window.Braille.toBRF(txt); out.dataset.text = txt;
+        };
+        out.textContent = ''; ascii.textContent = ''; st.textContent = 'Loading the braille engine (first use only, about 1.2 MB)…'; st.classList.remove('bad');
+        if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+        loadBrailleEngine().then(() => {
+            rows = window.Braille.document(r, { toTex: plainToTex }); render();
+            const nMath = rows.filter(x => x.kind === 'math').length;
+            st.textContent = `Ready – ${nMath} line${nMath === 1 ? '' : 's'} in Nemeth Code, the rest as Grade 1 text.`;
+        }).catch(() => { st.textContent = 'The braille engine could not be loaded. It needs to download once (about 1.2 MB) – connect to the internet and try again.'; st.classList.add('bad'); });
+        if (!dlg.__wired) {
+            dlg.__wired = true;
+            $('brailleClose').addEventListener('click', () => dlg.close());
+            $('brailleWidth').addEventListener('change', render);
+            $('brailleCopy').addEventListener('click', () => copyText($('brailleOut').dataset.text || '', 'Braille copied'));
+            const save = (name, text, type) => { const blob = new Blob([text], { type }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); };
+            $('brailleBrf').addEventListener('click', () => { const t = $('brailleOut').dataset.text; if (!t) return; save(`calculus-${(state.result && state.result.kind) || 'result'}.brf`, window.Braille.toBRF(t) + '\n', 'text/plain'); });
+            $('brailleTxt').addEventListener('click', () => { const t = $('brailleOut').dataset.text; if (!t) return; save(`calculus-${(state.result && state.result.kind) || 'result'}-braille.txt`, t + '\n', 'text/plain;charset=utf-8'); });
+        }
     }
 
     // ------------------------------------------------------------------
