@@ -1237,6 +1237,136 @@
     }
     register({ complex: runComplex });
 
+    // ======================================================================
+    // Algebra: partial fractions, long division, factor / expand, polynomial gcd, linear recurrences
+    // ======================================================================
+    function runAlgebra(src, opt) {
+        const op = opt.op || 'apart';
+        const r = I.makeResult('algebra', 'Algebra');
+        const N_ = (x, d) => nice(x, d || 8, 1e-9);
+        const polyTex = (p, v) => { const t = []; for (let i = p.length - 1; i >= 0; i--) { const c = p[i]; if (Math.abs(c) < 1e-12) continue; const a = N_(Math.abs(c)); const mono = i === 0 ? '' : i === 1 ? v : `${v}^{${i}}`; const body = i === 0 ? a.tex : (Math.abs(Math.abs(c) - 1) < 1e-12 ? mono : a.tex + mono); t.push((c < 0 ? '-' : t.length ? '+' : '') + body); } return t.join('') || '0'; };
+        const polyTxt = (p, v) => { const t = []; for (let i = p.length - 1; i >= 0; i--) { const c = p[i]; if (Math.abs(c) < 1e-12) continue; const a = N_(Math.abs(c)); const mono = i === 0 ? '' : i === 1 ? v : `${v}^${i}`; const body = i === 0 ? a.text : (Math.abs(Math.abs(c) - 1) < 1e-12 ? mono : a.text + '·' + mono); t.push((c < 0 ? ' − ' : t.length ? ' + ' : '') + body); } return t.join('').replace(/^ − /, '−') || '0'; };
+        const oneVar = (node) => { const fv = engine.freeVars(node); if (fv.length > 1) throw new CalcError(`Use a single variable (found ${fv.join(', ')}).`); return fv[0] || 'x'; };
+
+        if (op === 'recur') {
+            const m = String(src).replace(/\s+/g, '').match(/^a\(n\)=(.+)$/i);
+            if (!m) throw new CalcError('Write the recurrence as a(n) = a(n-1) + a(n-2).');
+            let k = 0; const rhs = m[1].replace(/a\(n-(\d+)\)/gi, (_, d) => { k = Math.max(k, +d); return `v${d}`; });
+            if (!k || k > 6) throw new CalcError('Use between 1 and 6 previous terms, e.g. a(n-1), a(n-2).');
+            let node; try { node = math.parse(rhs); } catch (e) { throw new CalcError('Could not read that recurrence.'); }
+            const code = node.compile(); const ev = vals => { const sc = {}; for (let j = 1; j <= k; j++) sc[`v${j}`] = vals[j] || 0; const v = code.evaluate(sc); if (typeof v !== 'number' || !Number.isFinite(v)) throw new CalcError('Only linear recurrences with constant coefficients are supported.'); return v; };
+            let c0; try { c0 = ev({}); } catch (e) { if (e instanceof CalcError) throw e; throw new CalcError('Only linear recurrences with constant coefficients are supported.'); }
+            if (Math.abs(c0) > 1e-12) throw new CalcError('Only homogeneous recurrences are supported (no constant or n-dependent term).');
+            const co = []; for (let j = 1; j <= k; j++) co.push(ev({ [j]: 1 }));
+            const test = {}; for (let j = 1; j <= k; j++) test[j] = j + 1.5; const lin = co.reduce((acc, c, j) => acc + c * (j + 2.5), 0); if (Math.abs(ev(test) - lin) > 1e-9 * Math.max(1, Math.abs(lin))) throw new CalcError('Only linear recurrences with constant coefficients are supported.');
+            const init = String(opt.init || '').split(/[,;\s]+/).filter(Boolean).map(Number); if (init.length !== k || init.some(x => !Number.isFinite(x))) throw new CalcError(`Give ${k} initial value${k > 1 ? 's' : ''} a(0)…a(${k - 1}), separated by commas.`);
+            const terms = init.slice(); for (let n = k; n < 40; n++) { let v = 0; for (let j = 1; j <= k; j++) v += co[j - 1] * terms[n - j]; terms.push(v); }
+            const charP = new Array(k + 1).fill(0); charP[k] = 1; for (let j = 1; j <= k; j++) charP[k - j] = -co[j - 1];
+            const roots = I.polyRootsMult(charP.slice()); const total = roots.reduce((a, z) => a + z.mult, 0); if (total !== k) throw new CalcError('Could not find the characteristic roots reliably.');
+            const cols = []; roots.forEach(z => { for (let q = 0; q < z.mult; q++) cols.push({ z: math.complex(z.re, z.im), q }); });
+            const basis = (c, n) => math.multiply(math.pow(c.z, n), n === 0 && c.q === 0 ? 1 : Math.pow(n, c.q));
+            let C; try { C = math.lusolve(math.matrix(Array.from({ length: k }, (_, n) => cols.map(c => basis(c, n)))), math.matrix(init.map(x => [x]))).toArray().map(row => math.complex(row[0])); } catch (e) { throw new CalcError('The recurrence has a singular structure; closed form not found.'); }
+            const closed = n => { let t = math.complex(0, 0); cols.forEach((c, i) => { t = math.add(t, math.multiply(C[i], basis(c, n))); }); return t.re; };
+            let worst = 0; for (let n = 0; n < 30; n++) worst = Math.max(worst, Math.abs(closed(n) - terms[n]) / Math.max(1, Math.abs(terms[n])));
+            if (worst > 1e-6) throw new CalcError('The closed form did not reproduce the sequence (numerical trouble); the terms below are still exact.');
+            const cx = z => { const re = N_(z.re, 7), im = N_(Math.abs(z.im), 7); if (Math.abs(z.im) < 1e-9) return re.text; return `(${re.text} ${z.im < 0 ? '−' : '+'} ${im.text}i)`; };
+            const hasC = cols.some(c => Math.abs(c.z.im) > 1e-9);
+            const parts = cols.map((c, i) => { const co = C[i], real = Math.abs(co.im) < 1e-9, neg = real && co.re < 0; const cc = real ? cx({ re: Math.abs(co.re), im: 0 }) : cx(co); const rr = (Math.abs(c.z.im) < 1e-9 && c.z.re < 0) ? `(${cx(c.z)})` : cx(c.z); return { neg, t: `${cc}·${rr}^n${c.q ? '·n' + (c.q > 1 ? '^' + c.q : '') : ''}`.replace(/^1·/, '') }; });
+            r.title = 'Linear recurrence'; r.main = { label: 'a(n) =', text: parts.map((p, i) => (i ? (p.neg ? ' − ' : ' + ') : (p.neg ? '−' : '')) + p.t).join(''), tex: '' };
+            r.items.push({ label: 'Characteristic equation:', text: polyTxt(charP, 'r') + ' = 0', tex: polyTex(charP, 'r') + '=0' });
+            r.items.push({ label: 'Roots:', text: roots.map(z => cx({ re: z.re, im: z.im }) + (z.mult > 1 ? ` (×${z.mult})` : '')).join(',  '), tex: '' });
+            r.items.push({ label: 'First terms:', text: terms.slice(0, 15).map(x => N_(x, 10).text).join(', ') + ', …', tex: '' });
+            if (Math.abs(terms[k + 8]) > 0 && Math.abs(terms[k + 7]) > 0) r.items.push({ label: 'Growth ratio a(n+1)/a(n):', text: engine.fmt(terms[k + 8] / terms[k + 7], 8), tex: '' });
+            r.meta.push(`Verified: the closed form reproduces the first 30 terms (largest relative error ${worst.toExponential(2)})`);
+            if (hasC) r.meta.push('Complex roots appear; the closed form is real once the conjugate terms are added.');
+            r.meta.push('Method: characteristic equation, then solving for the constants from the initial values');
+            r.steps.push({ title: 'Try a(n) = rⁿ', text: 'Substituting rⁿ into the recurrence and dividing by the lowest power gives the characteristic equation.', tex: '' });
+            r.steps.push({ title: 'Solve for r', text: 'Each root r contributes rⁿ; a root repeated m times contributes rⁿ, n·rⁿ, …, n^(m−1)·rⁿ.', tex: '' });
+            r.steps.push({ title: 'Fit the initial values', text: `The ${k} unknown constants are fixed by a(0)…a(${k - 1}).`, tex: '' });
+            r.plot = { generic: { title: 'The sequence a(n)', xTitle: 'n', yTitle: 'a(n)', traces: [{ x: terms.slice(0, 25).map((_, i) => i), y: terms.slice(0, 25), mode: 'lines+markers', type: 'scatter', name: 'a(n)' }] } };
+            return I.finalizeText(r);
+        }
+
+        if (op === 'gcd') {
+            const parts = String(src).split(/[;,]/).map(x => x.trim()).filter(Boolean); if (parts.length !== 2) throw new CalcError('Give two polynomials separated by a semicolon, e.g. x^2-1 ; x^3-1.');
+            const na = engine.parse(parts[0]), nb = engine.parse(parts[1]); const v = oneVar(engine.parse(`(${parts[0]})+(${parts[1]})`));
+            const A = I.toRational(na, v), B = I.toRational(nb, v); if (!A || !B || A.d.length > 1 || B.d.length > 1) throw new CalcError('Both entries must be polynomials.');
+            const a = A.n.map(c => c / A.d[0]), b = B.n.map(c => c / B.d[0]);
+            let g = I.polyGcd ? I.polyGcd(a.slice(), b.slice()) : null; if (!g) throw new CalcError('Could not compute the gcd.');
+            const lead = g[g.length - 1]; g = g.map(c => c / lead);
+            const ra = I.polyDivMod(a, g)[1], rb = I.polyDivMod(b, g)[1]; const zero = q => q.every(c => Math.abs(c) < 1e-8 * Math.max(1, ...a.map(Math.abs), ...b.map(Math.abs)));
+            if (!zero(ra) || !zero(rb)) throw new CalcError('The numerical gcd check failed; try smaller coefficients.');
+            const lcm = I.polyMul(I.polyDivMod(a, g)[0], b);
+            r.title = 'Polynomial gcd and lcm'; r.main = { label: 'gcd =', text: polyTxt(g, v), tex: polyTex(g, v) };
+            r.items.push({ label: 'lcm =', text: polyTxt(lcm, v), tex: polyTex(lcm, v) }); r.items.push({ label: 'Coprime?', text: g.length === 1 ? 'Yes (gcd is a constant)' : 'No', tex: '' });
+            r.meta.push('Verified: the gcd divides both polynomials with zero remainder'); r.meta.push('Method: Euclid’s algorithm on the coefficient lists');
+            r.steps.push({ title: 'Euclid’s algorithm', text: 'Repeatedly replace (a, b) by (b, a mod b) until the remainder is 0; the last non-zero remainder, made monic, is the gcd.', tex: '' });
+            return I.finalizeText(r);
+        }
+
+        const node = engine.parse(src); const v = oneVar(node);
+        if (op === 'factor') {
+            let fac, exp;
+            try { if (typeof Algebrite.clearall === 'function') Algebrite.clearall(); fac = String(Algebrite.run(`factor(${engine.strOf(node)})`)).trim(); exp = String(Algebrite.run(`expand(${engine.strOf(node)})`)).trim(); } catch (e) { throw new CalcError('Could not factor that expression.'); }
+            if (!fac || /Stop|rror|nil|\?/.test(fac) || !exp || /Stop|rror|nil|\?/.test(exp)) throw new CalcError('Could not factor that expression.');
+            const nf = engine.parse(fac.replace(/\barc(sin|cos|tan)\b/g, 'a$1')), ne = engine.parse(exp.replace(/\barc(sin|cos|tan)\b/g, 'a$1'));
+            const f0 = node.compile(), f1 = nf.compile(), f2 = ne.compile(); let worst = 0, cnt = 0;
+            for (let i = 0; i < 40; i++) { const x = -3.3 + 0.17 * i + 0.013; try { const a = f0.evaluate({ [v]: x }), b = f1.evaluate({ [v]: x }), c = f2.evaluate({ [v]: x }); if (![a, b, c].every(Number.isFinite)) continue; worst = Math.max(worst, Math.abs(a - b) / Math.max(1, Math.abs(a)), Math.abs(a - c) / Math.max(1, Math.abs(a))); cnt++; } catch (e) { /* skip */ } }
+            if (cnt < 10 || worst > 1e-8) throw new CalcError('The factored form did not match the input; the result was discarded.');
+            r.title = 'Factor and expand'; r.main = { label: 'Factored:', text: engine.strOf(nf), tex: engine.texOf(nf) }; r.items.push({ label: 'Expanded:', text: engine.strOf(ne), tex: engine.texOf(ne) });
+            const rat = I.toRational(node, v); if (rat && rat.d.length === 1 && rat.n.length > 1 && rat.n.length < 25) { const rs = I.polyRootsMult(rat.n.slice()); r.items.push({ label: 'Roots:', text: rs.map(z => (Math.abs(z.im) < 1e-9 ? N_(z.re, 7).text : `${N_(z.re, 7).text} ${z.im < 0 ? '−' : '+'} ${N_(Math.abs(z.im), 7).text}i`) + (z.mult > 1 ? ` (×${z.mult})` : '')).join(',  '), tex: '' }); }
+            r.meta.push(`Verified: both forms agree with the input at ${cnt} test points (largest difference ${worst.toExponential(2)})`); r.meta.push('Method: computer-algebra factoring over the rationals');
+            r.steps.push({ title: 'Look for a common factor', text: 'Pull out any factor shared by every term first.', tex: '' }); r.steps.push({ title: 'Special forms and rational roots', text: 'Try differences of squares, sums and differences of cubes, then rational roots p/q (p divides the constant term, q the leading coefficient).', tex: '' });
+            return I.finalizeText(r);
+        }
+
+        // apart / div need a rational function
+        const rat = I.toRational(node, v); if (!rat) throw new CalcError('Enter a rational function (a polynomial divided by a polynomial), e.g. (x^2+1)/(x^3-x).');
+        const lead = rat.d[rat.d.length - 1]; const num = rat.n.map(c => c / lead), den = rat.d.map(c => c / lead);
+        if (den.length < 2) throw new CalcError('The denominator must contain the variable.');
+        const [q, rem] = I.polyDivMod(num, den);
+        const isZero = p => p.every(c => Math.abs(c) < 1e-12);
+        if (op === 'div') {
+            r.title = 'Polynomial long division'; r.main = { label: 'Quotient:', text: polyTxt(q, v), tex: polyTex(q, v) }; r.items.push({ label: 'Remainder:', text: polyTxt(rem, v), tex: polyTex(rem, v) });
+            r.items.push({ label: 'So', text: `(${polyTxt(num, v)})/(${polyTxt(den, v)}) = (${polyTxt(q, v)}) + (${polyTxt(rem, v)})/(${polyTxt(den, v)})`, tex: `\\frac{${polyTex(num, v)}}{${polyTex(den, v)}}=${polyTex(q, v)}${isZero(rem) ? '' : `+\\frac{${polyTex(rem, v)}}{${polyTex(den, v)}}`}` });
+            const chk = I.polyAdd(I.polyMul(q, den), rem); const dif = I.polyAdd(chk, num.map(c => -c)); if (!isZero(dif.map(c => c / Math.max(1, ...num.map(Math.abs))))) throw new CalcError('Division check failed.');
+            r.meta.push('Verified: quotient × divisor + remainder equals the numerator'); r.meta.push('Method: long division, highest power first');
+            r.steps.push({ title: 'Divide the leading terms', text: 'Divide the leading term of the numerator by the leading term of the denominator; that is the next quotient term.', tex: '' }); r.steps.push({ title: 'Multiply and subtract', text: 'Multiply the divisor by that term, subtract, and repeat until the remainder has lower degree than the divisor.', tex: '' });
+            return I.finalizeText(r);
+        }
+        // partial fractions
+        if (den.length > 11) throw new CalcError('Partial fractions are supported for denominators up to degree 10.');
+        const rts = I.polyRootsMult(den.slice()); const evalDen = x => den.reduceRight((a, c) => a * x + c, 0), evalP = (p, x) => p.reduceRight((a, c) => a * x + c, 0);
+        const cols = []; rts.forEach(z => { if (Math.abs(z.im) < 1e-7) { const rr = Math.abs(z.re) < 1e-9 ? 0 : z.re; for (let k = 1; k <= z.mult; k++) cols.push({ kind: 'lin', r: rr, k, f: x => 1 / Math.pow(x - rr, k) }); } else if (z.im > 0) { const a = z.re, b2 = z.im * z.im; for (let k = 1; k <= z.mult; k++) { cols.push({ kind: 'qx', a, b2, k, f: x => x / Math.pow((x - a) * (x - a) + b2, k) }); cols.push({ kind: 'q1', a, b2, k, f: x => 1 / Math.pow((x - a) * (x - a) + b2, k) }); } } });
+        if (cols.length !== den.length - 1) throw new CalcError('Could not factor the denominator reliably.');
+        const nPts = cols.length, xs = Array.from({ length: nPts }, (_, i) => 0.37 + 1.13 * i + (i % 2 ? 0.05 : -0.05) * i);
+        let coef; if (isZero(rem)) coef = cols.map(() => 0); else { try { coef = math.lusolve(math.matrix(xs.map(x => cols.map(c => c.f(x)))), math.matrix(xs.map(x => [evalP(rem, x) / evalDen(x)]))).toArray().map(w => w[0]); } catch (e) { throw new CalcError('The partial-fraction system was singular; the denominator may have nearly repeated roots.'); } }
+        if (coef.some(c => !Number.isFinite(c))) throw new CalcError('Numerical trouble solving for the coefficients.');
+        let worst = 0; for (let i = 0; i < 40; i++) { const x = -4.7 + 0.231 * i + 0.011; const direct = evalP(num, x) / evalDen(x); if (!Number.isFinite(direct) || Math.abs(direct) > 1e6) continue; let sum = evalP(q, x); cols.forEach((c, j) => { sum += coef[j] * c.f(x); }); worst = Math.max(worst, Math.abs(sum - direct) / Math.max(1, Math.abs(direct))); }
+        if (worst > 1e-6) throw new CalcError('The decomposition did not reproduce the function (ill-conditioned input).');
+        const simple = b => /^[a-z]$/i.test(b);
+        const bin = (b, k) => k === 1 ? (simple(b) ? b : `(${b})`) : `(${b})^${k}`, binT = (b, k) => k === 1 ? (simple(b) ? b : `\\left(${b}\\right)`) : `\\left(${b}\\right)^{${k}}`;
+        const T = []; if (!isZero(q)) T.push({ c: 1, tex: polyTex(q, v), txt: polyTxt(q, v), poly: true });
+        cols.forEach((c, j) => {
+            if (Math.abs(coef[j]) < 1e-10) return; const a = N_(Math.abs(coef[j])); const one = Math.abs(Math.abs(coef[j]) - 1) < 1e-9; const wrapT = a.text.includes('/') ? `(${a.text})` : a.text;
+            const numT = c.kind === 'qx' ? (one ? v : a.tex + v) : (one ? '1' : a.tex), numX = c.kind === 'qx' ? (one ? v : wrapT + v) : (one ? '1' : a.text);
+            let baseTex, baseTxt; if (c.kind === 'lin') { const lin = [-c.r, 1]; baseTex = polyTex(lin, v); baseTxt = polyTxt(lin, v); } else { const quad = [c.a * c.a + c.b2, -2 * c.a, 1]; baseTex = polyTex(quad, v); baseTxt = polyTxt(quad, v); }
+            T.push({ c: coef[j], tex: `\\frac{${numT}}{${binT(baseTex, c.k)}}`, txt: (a.text.includes('/') && c.kind !== 'qx' ? `(${a.text})` : numX) + '/' + bin(baseTxt, c.k) });
+        });
+        const join = (key) => T.map((t, i) => { const neg = !t.poly && t.c < 0; return (i === 0 ? (neg ? '-' : '') : (neg ? ' − ' : ' + ')) + t[key]; }).join('');
+        const tex = join('tex') || '0', txt = join('txt') || '0';
+        r.title = 'Partial fractions'; r.main = { label: 'Decomposition:', text: txt, tex: `\\frac{${polyTex(num, v)}}{${polyTex(den, v)}}=${tex}` };
+        r.items.push({ label: 'Denominator roots:', text: rts.filter(z => z.im > -1e-7).map(z => (Math.abs(z.im) < 1e-7 ? N_(z.re, 7).text : `${N_(z.re, 7).text} ± ${N_(Math.abs(z.im), 7).text}i`) + (z.mult > 1 ? ` (×${z.mult})` : '')).join(',  '), tex: '' });
+        if (!isZero(q)) r.items.push({ label: 'Polynomial part:', text: polyTxt(q, v), tex: polyTex(q, v) });
+        r.meta.push(`Verified: the decomposition matches the original function at 40 test points (largest relative error ${worst.toExponential(2)})`);
+        r.meta.push('Method: denominator roots from numerical factoring, then the coefficients from a linear system; shown values are rounded to recognisable numbers');
+        r.steps.push({ title: 'Long division first', text: q.length > 1 || Math.abs(q[0]) > 1e-12 ? 'The numerator has degree at least that of the denominator, so divide first: the quotient is the polynomial part.' : 'The numerator has lower degree than the denominator, so the fraction is already proper.', tex: '' });
+        r.steps.push({ title: 'Factor the denominator', text: 'Each distinct real root r gives terms A/(x−r), A/(x−r)², … up to its multiplicity; each irreducible quadratic gives (Ax+B)/(quadratic)ᵏ.', tex: '' });
+        r.steps.push({ title: 'Solve for the constants', text: 'Match both sides at enough values of x, which gives one linear equation per unknown.', tex: '' });
+        return I.finalizeText(r);
+    }
+    register({ algebra: runAlgebra });
+
 
     // ======================================================================
     // Power-series solutions of ODEs (Picard–Taylor iteration), checked against RK4

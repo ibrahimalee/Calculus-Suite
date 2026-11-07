@@ -103,3 +103,16 @@ test('3-D direction field for a 3-equation ODE system', () => {
   assert.deepEqual(r.plot3.generic.traces.map(t => t.type), ['cone', 'scatter3d', 'scatter3d']); assert.ok(r.plot3.generic.traces[1].x.length > 500);
   assert.equal(E.run.ode('y ; -x', { odeType: 'system', x0: '0', xEnd: '6', initial: '1, 0' }).plot3, null);
 });
+test('algebra: partial fractions, division, factoring, gcd and recurrences verify themselves', () => {
+  const A = (s, o) => E.run.algebra(s, o);
+  const pf = A('(x^2+1)/(x^3-x)', { op: 'apart' }); assert.match(pf.main.text, /1\/\(x − 1\) \+ 1\/\(x \+ 1\) − 1\/x/); assert.ok(pf.meta.some(m => /^Verified/.test(m)));
+  assert.match(A('(3*x+5)/(x^2+2*x+1)', { op: 'apart' }).main.text, /3\/\(x \+ 1\) \+ 2\/\(x \+ 1\)\^2/);
+  assert.match(A('1/(x^3+x)', { op: 'apart' }).main.text, /1\/x − x\/\(x\^2 \+ 1\)/);
+  const dv = A('(x^4+1)/(x^2-3*x+2)', { op: 'div' }); assert.equal(dv.main.text, 'x^2 + 3·x + 7'); assert.match(dv.items[0].text, /15·x − 13/);
+  assert.match(A('x^4-1', { op: 'factor' }).main.text, /\(x - 1\)/);
+  assert.equal(A('x^2-1 ; x^3-1', { op: 'gcd' }).main.text, 'x − 1');
+  const fib = A('a(n) = a(n-1) + a(n-2)', { op: 'recur', init: '0, 1' }); assert.match(fib.items[2].text, /^0, 1, 1, 2, 3, 5, 8, 13/); assert.ok(fib.meta.some(m => /^Verified/.test(m)));
+  assert.match(A('a(n) = 4*a(n-1) - 4*a(n-2)', { op: 'recur', init: '1, 3' }).main.text, /2\^n/);
+  assert.throws(() => A('a(n) = a(n-1) + 1', { op: 'recur', init: '0' }), /homogeneous/);
+  assert.throws(() => A('sin(x)/x', { op: 'apart' }), /rational/);
+});

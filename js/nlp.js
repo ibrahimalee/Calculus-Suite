@@ -142,6 +142,18 @@
         m = s.match(/^(?:does|do) (?:the )?(?:series|sum) (?:of )?(.+?) converge$/);
         if (m) return { mode: 'sums', fn: mathify(m[1]), opts: { lower: '1', upper: 'inf', variable: 'k' }, say: 'Convergence test' };
 
+        // ---- algebra: partial fractions, division, factoring, polynomial gcd, recurrences ----
+        m = s.match(/^(?:decompose |split |write )?(?:the )?(?:into )?partial fractions? (?:of|for) (.+)$/) || s.match(/^(?:decompose|split) (.+) into partial fractions?$/);
+        if (m) return { mode: 'algebra', fn: mathify(m[1]), opts: { op: 'apart' }, say: 'Partial fractions' };
+        m = s.match(/^(?:divide|long division of) (.+?) (?:by|\/|over) (.+)$/);
+        if (m && /[a-z]/.test(m[1] + m[2]) && !/\bdx\b/.test(s)) return { mode: 'algebra', fn: `(${mathify(m[1])})/(${mathify(m[2])})`, opts: { op: 'div' }, say: 'Polynomial long division' };
+        m = s.match(/^(?:factori[sz]e|factor|expand) (?:the )?(?:expression |polynomial )?(.+)$/);
+        if (m && /[a-z]/.test(m[1]) && !/^\d+$/.test(m[1])) return { mode: 'algebra', fn: mathify(m[1]), opts: { op: 'factor' }, say: 'Factor and expand' };
+        m = s.match(/^(?:gcd|greatest common divisor|lcm|least common multiple) (?:of )?(.+?) and (.+)$/);
+        if (m && /[a-z]/.test(m[1] + m[2])) return { mode: 'algebra', fn: `${mathify(m[1])} ; ${mathify(m[2])}`, opts: { op: 'gcd' }, say: 'Polynomial gcd and lcm' };
+        m = s.match(/^(?:solve the )?(?:recurrence|recursion)(?: relation)?:?\s*(a\s*\(\s*n\s*\)\s*=\s*[^,;]+?)(?:\s*(?:,|;|with|where)\s*(?:a\s*\(\s*0\s*\)\s*=\s*[^,;]+(?:\s*,\s*a\s*\(\s*1\s*\)\s*=\s*[^,;]+)*))?$/);
+        if (m) { const init = [...s.matchAll(/a\s*\(\s*(\d)\s*\)\s*=\s*(-?[\d.]+)/g)].sort((a, b) => a[1] - b[1]).map(x => x[2]); return { mode: 'algebra', fn: m[1].replace(/\s+/g, ''), opts: { op: 'recur', init: init.join(', ') || '0, 1' }, say: 'Linear recurrence' }; }
+
         // ---- roots / zeros -------------------------------------------------
         m = s.match(/^(?:the )?(?:roots|zeros|zeroes|solutions|root|zero) of (.+)$/);
         if (m) { const e = mathify(m[1]); return { mode: 'solve', fn: /=|<|>/.test(e) ? e : e + '=0', opts: {}, say: 'Solve f(x) = 0' }; }

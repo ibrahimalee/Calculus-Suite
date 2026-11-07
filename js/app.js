@@ -471,10 +471,32 @@
         ]
     };
 
+    MODES.algebra = {
+        label: 'Algebra', icon: 'p(x)',
+        input: v => ({ apart: { label: 'Rational function', placeholder: 'e.g. (x^2+1)/(x^3-x)', hint: 'Splits a fraction into simpler ones, the first step of many integrals and Laplace inversions.' }, div: { label: 'Rational function', placeholder: 'e.g. (x^4+1)/(x^2-3x+2)', hint: 'Divides the numerator by the denominator and gives the quotient and remainder.' }, factor: { label: 'Expression', placeholder: 'e.g. x^4 - 1', hint: 'Factors over the rationals and expands, checking both forms against your input.' }, gcd: { label: 'Two polynomials separated by ;', placeholder: 'e.g. x^2-1 ; x^3-1', hint: 'Greatest common divisor and least common multiple, using Euclid’s algorithm.' }, recur: { label: 'Recurrence', placeholder: 'e.g. a(n) = a(n-1) + a(n-2)', hint: 'Linear, constant-coefficient and homogeneous. Gives the closed form from the initial values.' } }[v.op] || { label: 'Expression', placeholder: '', hint: '' }),
+        fields: [
+            { key: 'op', label: 'Tool', type: 'select', def: 'apart', options: [['apart', 'Partial fractions'], ['div', 'Polynomial long division'], ['factor', 'Factor and expand'], ['gcd', 'Polynomial gcd and lcm'], ['recur', 'Linear recurrence (closed form)']] },
+            { key: 'init', label: 'Initial values a(0), a(1), …', type: 'text', def: '0, 1', placeholder: '0, 1', show: v => v.op === 'recur' }
+        ],
+        examples: [
+            { label: 'Partial fractions: (x²+1)/(x³−x)', fn: '(x^2+1)/(x^3-x)', opts: { op: 'apart' } },
+            { label: 'Repeated factor: (3x+5)/(x+1)²', fn: '(3*x+5)/(x^2+2*x+1)', opts: { op: 'apart' } },
+            { label: 'Irreducible quadratic: 1/(x³+x)', fn: '1/(x^3+x)', opts: { op: 'apart' } },
+            { label: 'Improper: x³/(x²+1)', fn: 'x^3/(x^2+1)', opts: { op: 'apart' } },
+            { label: 'Long division: (x⁴+1)/(x²−3x+2)', fn: '(x^4+1)/(x^2-3*x+2)', opts: { op: 'div' } },
+            { label: 'Factor x⁴ − 1', fn: 'x^4-1', opts: { op: 'factor' } },
+            { label: 'Factor x³ − 6x² + 11x − 6', fn: 'x^3-6*x^2+11*x-6', opts: { op: 'factor' } },
+            { label: 'gcd of x²−1 and x³−1', fn: 'x^2-1 ; x^3-1', opts: { op: 'gcd' } },
+            { label: 'Fibonacci closed form', fn: 'a(n) = a(n-1) + a(n-2)', opts: { op: 'recur', init: '0, 1' } },
+            { label: 'Repeated root: aₙ = 4aₙ₋₁ − 4aₙ₋₂', fn: 'a(n) = 4*a(n-1) - 4*a(n-2)', opts: { op: 'recur', init: '1, 3' } },
+            { label: 'Complex roots: aₙ = 2aₙ₋₁ − 2aₙ₋₂', fn: 'a(n) = 2*a(n-1) - 2*a(n-2)', opts: { op: 'recur', init: '0, 1' } }
+        ]
+    };
+
     const MODE_GROUPS = [
         ['Core calculus', ['derivative', 'integral', 'limit', 'series', 'analysis']],
         ['Explore & visualise', ['graph', 'riemann', 'applications', 'root', 'fourier']],
-        ['Algebra & sums', ['calc', 'solve', 'sums', 'number', 'units', 'stats']],
+        ['Algebra & sums', ['calc', 'solve', 'algebra', 'sums', 'number', 'units', 'stats']],
         ['Advanced', ['ode', 'multivariable', 'vector', 'matrix', 'laplace', 'complex']]
     ];
     const MODE_ORDER = MODE_GROUPS.flatMap(g => g[1]);
@@ -784,7 +806,7 @@
                 preview.innerHTML = `<span class="preview-tex plain">${esc(lines[0] || '')}</span><span class="preview-meta">${lines.length} line${lines.length === 1 ? '' : 's'}</span>`;
                 return true;
             }
-            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'laplace' && /\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src))) {
+            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur'].includes(currentValues().op)) || (state.mode === 'laplace' && /\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src))) {
                 preview.className = 'preview-box valid';
                 const n = src.split(/[\n;]+/).filter(x => x.trim()).length;
                 preview.innerHTML = `<span class="preview-tex plain">${esc(src.length > 160 ? src.slice(0, 160) + '…' : src)}</span><span class="preview-meta">${state.mode === 'stats' ? (src.split(/[\s,;]+/).filter(Boolean).length + ' values') : state.mode === 'vector' ? (n + ' component' + (n === 1 ? '' : 's')) : 'ready'}</span>`;

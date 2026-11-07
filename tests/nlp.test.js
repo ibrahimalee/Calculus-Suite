@@ -1,6 +1,10 @@
 const test = require('node:test'), assert = require('node:assert');
 const NL = require('../js/nlp.js');
 const cases = [
+  ['partial fractions of (x^2+1)/(x^3-x)', { mode: 'algebra', opts: { op: 'apart' } }],
+  ['factor x^4-1', { mode: 'algebra', opts: { op: 'factor' } }],
+  ['factor 360', { mode: 'number', opts: { op: 'factor' } }],
+  ['gcd of x^2-1 and x^3-1', { mode: 'algebra', opts: { op: 'gcd' } }],
   ['integrate x squared from 0 to 3', { mode: 'integral', fn: 'x^2', opts: { lower: '0', upper: '3' } }],
   ['derivative of sin x times e to the x', { mode: 'derivative', fn: 'sin(x)*e^x' }],
   ['what is the derivative of x^3 + 2x at x = 2', { mode: 'derivative', fn: 'x^3+2x', opts: { point: '2' } }],
