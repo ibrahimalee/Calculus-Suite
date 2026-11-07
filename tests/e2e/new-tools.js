@@ -1,6 +1,6 @@
 // Runs every example of the newer tools through the real UI (worker) and checks results, plots and console errors.
 const { chromium } = require('playwright');
-const BASE = process.env.BASE || 'http://localhost:8099/index.html';
+const BASE = process.env.BASE || 'http://localhost:8099/app.html';
 const MODES = ['laplace', 'vector', 'stats', 'number', 'units', 'complex', 'matrix', 'ode', 'sums'];
 (async () => {
     const b = await chromium.launch(); const p = await (await b.newContext({ viewport: { width: 1300, height: 900 } })).newPage();

@@ -3,295 +3,224 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Calculus Suite Pro – the calculus workstation</title>
-    <meta name="description" content="Free, offline-capable calculus workstation: step-by-step derivatives, integrals, limits, series, ODEs, Riemann sums, Fourier series, matrices, a parametric grapher and 3D plots – all in your browser.">
-    <meta name="theme-color" content="#6366f1">
+    <title>Calculus Suite Pro – calculus that shows its work</title>
+    <meta name="description" content="A free, open-source calculus workstation that runs in your browser: step-by-step derivatives, integrals, limits, ODEs, matrices and more, each answer checked a second way. Works offline. Nothing is uploaded.">
+    <meta name="theme-color" content="#ece6d8">
+    <meta property="og:title" content="Calculus Suite Pro">
+    <meta property="og:description" content="Calculus that shows its work, and checks it. Free, offline, open source.">
+    <meta property="og:type" content="website">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="vendor/katex/katex.min.css">
-    <link rel="stylesheet" href="css/styles.css">
-    <script src="js/lib-guard.js"></script>
+    <link rel="preload" href="vendor/fonts/fraunces-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="css/home.css">
+    <script>
+        /* apply the saved theme before first paint, and forward old share links (#s=…) to the app */
+        (function () {
+            try {
+                if (/^#s=/.test(location.hash)) { location.replace('app.html' + location.search + location.hash); return; }
+                var m = localStorage.getItem('themeMode') || localStorage.getItem('theme') || 'auto';
+                var dark = m === 'dark' || (m === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+                document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+                var a = localStorage.getItem('accent'); if (a) document.documentElement.setAttribute('data-accent', a.replace(/[^a-z]/g, ''));
+            } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
+        })();
+    </script>
 </head>
 <body>
-    <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
-    <a class="skip-link" href="#functionInput">Skip to input</a>
+    <a class="skip" href="#main">Skip to content</a>
 
-    <header class="appbar">
-        <a class="brand" href="./" aria-label="Calculus Suite Pro home">
-            <span class="brand-mark" aria-hidden="true">∫</span>
-            <span class="brand-name">Calculus Suite<small>PRO</small></span>
+    <header class="bar">
+        <a class="wordmark" href="./" aria-label="Calculus Suite Pro, home">
+            <span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite<small>PRO</small></span>
         </a>
-        <div class="appbar-spacer"></div>
-        <button class="cmd-btn" id="paletteBtn" type="button" aria-label="Open command palette">
-            <span data-icon="search" data-size="16"></span><span>Search tools, examples, actions…</span><kbd>Ctrl K</kbd>
-        </button>
-        <button class="icon-btn" id="installBtn" type="button" title="Install as an app" aria-label="Install app" hidden><span data-icon="download"></span></button>
-        <button class="icon-btn" id="practiceBtn" type="button" title="Practice problems" aria-label="Open practice mode"><span data-icon="sparkle"></span></button>
-        <button class="icon-btn" id="helpBtn" type="button" title="Syntax help (?)" aria-label="Open syntax help"><span data-icon="help"></span></button>
-        <div class="pop-wrap">
-            <button class="icon-btn" id="appearBtn" type="button" title="Appearance" aria-label="Appearance settings" aria-expanded="false" aria-controls="appearPop"><span data-icon="palette"></span></button>
-            <div class="popover" id="appearPop" role="dialog" aria-label="Appearance" hidden>
-                <h4>Theme</h4>
-                <div class="seg" id="themeSeg"><button type="button" data-theme="light"><span data-icon="sun" data-size="15"></span>Light</button><button type="button" data-theme="dark"><span data-icon="moon" data-size="15"></span>Dark</button><button type="button" data-theme="auto"><span data-icon="sparkle" data-size="15"></span>Auto</button></div>
-                <h4>Accent colour</h4>
-                <div class="swatches" id="accentSwatches"></div>
-                <h4>Language</h4>
-                <select id="langSelect" aria-label="Language"></select>
-                <h4>Learning</h4>
-                <label class="toggle-row"><input type="checkbox" id="teachToggle"> <span>Teaching mode – hide answers and steps until I ask</span></label>
-                <p class="density-note">Your choices are remembered on this device. Plots follow the theme automatically.</p>
-            </div>
-        </div>
-        <button class="icon-btn" id="themeToggle" type="button" aria-label="Toggle dark mode"><span data-icon="sun"></span></button>
+        <nav class="bar-nav" aria-label="Sections">
+            <a href="#ask">Ask</a>
+            <a href="#checked">Checked</a>
+            <a href="#index">The tools</a>
+            <a href="#open">Open source</a>
+        </nav>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
+        <a class="btn btn-solid bar-cta" href="app.html">Open the app <span aria-hidden="true">→</span></a>
     </header>
 
-    <div class="container" id="app">
-        <noscript><div class="alert alert-error"><span class="alert-icon">⚠</span><span>Calculus Suite Pro needs JavaScript to run.</span></div></noscript>
-
-        <div class="main-grid">
-            <aside class="sidebar" aria-label="Inputs">
-                <section class="panel ask" aria-label="Ask in plain English">
-                    <form id="askForm" autocomplete="off">
-                        <label class="field-label" for="askInput">Ask in plain English</label>
-                        <div class="ask-row">
-                            <input id="askInput" type="text" spellcheck="false" placeholder="e.g. integrate x squared from 0 to 3">
-                            <button class="btn btn-primary ask-go" type="submit" aria-label="Run this question"><span data-icon="play" data-size="16"></span></button>
-                        </div>
-                        <div class="ask-note" id="askNote" aria-live="polite">Try: “derivative of sin x times e to the x”, “limit of sin x over x as x goes to 0”, “5 km/h to m/s”.</div>
-                    </form>
-                </section>
-
-                <section class="panel" aria-label="Choose a tool">
-                    <button class="mode-toggle" id="modeToggle" type="button" aria-expanded="true" aria-controls="modeGrid"><span class="mode-toggle-label"><small>Tool</small><b id="modeToggleName">Derivative</b></span><span class="mode-toggle-chev" aria-hidden="true">▾</span></button>
-                    <div id="modeGrid"></div>
-                </section>
-
-                <section class="panel">
-                    <div class="label-row"><label class="field-label" for="functionInput"><span id="inputLabel">f(x)</span></label>
-                        <button class="mini-btn" id="scanBtn" type="button" title="Read a printed expression from a photo"><span data-icon="camera" data-size="14"></span>Scan</button></div>
-                    <textarea id="functionInput" rows="2" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="e.g. x^2 * sin(x)"></textarea>
-                    <div class="input-hint" id="inputHint"></div>
-                    <div id="preview" class="preview-box" aria-live="polite">Enter a function to begin…</div>
-                    <button class="mini-btn keypad-toggle" id="keypadToggle" type="button" aria-expanded="false"><span data-icon="keyboard" data-size="15"></span>Symbols</button>
-                    <div class="keypad" id="keypad" aria-label="Symbol keypad" hidden></div>
-                    <select id="examples" class="examples-select" aria-label="Load an example"></select>
-                    <div class="templates-grid" id="templates" style="margin-top:10px" aria-label="Quick templates"></div>
-                </section>
-
-                <section class="panel" id="optionsPanel">
-                    <div class="panel-title"><span data-icon="sliders" data-size="15"></span><span>Options</span></div>
-                    <div id="modeOptions" class="mode-options"></div>
-                </section>
-
-                <div class="btn-grid">
-                    <button class="btn btn-primary" id="computeBtn" type="button"><span data-icon="play" data-size="17"></span><span>Compute</span><kbd>Ctrl ↵</kbd></button>
-                    <button class="btn btn-secondary" id="clearBtn" type="button" aria-label="Clear" title="Clear (Ctrl+Shift+K)"><span data-icon="trash" data-size="18"></span></button>
+    <main id="main">
+        <!-- ===== hero ===== -->
+        <section class="hero wrap" aria-labelledby="h1">
+            <div class="hero-copy">
+                <p class="kicker"><span class="dot" aria-hidden="true"></span>Free · Offline · Open source</p>
+                <h1 id="h1">Calculus that <em>shows its work</em> and checks&nbsp;it.</h1>
+                <p class="lede">Type a function, or just ask in plain English. You get the answer, the steps behind it, and a second, independent check that the answer is right. It all runs in your browser, so nothing you type is sent anywhere.</p>
+                <div class="cta-row">
+                    <a class="btn btn-solid btn-lg" href="app.html">Open the workstation <span aria-hidden="true">→</span></a>
+                    <a class="btn btn-line btn-lg" href="#checked">See how it checks itself</a>
                 </div>
-                <div class="shortcut-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> compute · <kbd>Ctrl</kbd>+<kbd>K</kbd> palette · <kbd>?</kbd> help</div>
-
-                <details class="panel">
-                    <summary><span data-icon="sliders" data-size="15"></span>Precision &amp; plots</summary>
-                    <div class="setting-row">
-                        <div class="setting-label"><label for="precision">Precision (digits)</label><span class="setting-value" id="precisionValue">6</span></div>
-                        <input type="range" class="slider" id="precision" min="2" max="12" value="6">
-                    </div>
-                    <div class="setting-row">
-                        <div class="setting-label"><label for="resolution">Plot resolution</label><span class="setting-value" id="resolutionValue">400</span></div>
-                        <input type="range" class="slider" id="resolution" min="100" max="1000" value="400" step="100">
-                    </div>
-                </details>
-
-                <details class="panel" id="projectPanel" open>
-                    <summary><span data-icon="bookmark" data-size="15"></span>Notebook</summary>
-                    <div class="proj-bar">
-                        <select id="projSelect" aria-label="Choose notebook"></select>
-                        <button class="mini-btn" id="projNew" type="button">New</button>
-                        <button class="mini-btn" id="projRename" type="button">Rename</button>
-                        <button class="mini-btn" id="projDelete" type="button">Delete</button>
-                    </div>
-                    <div id="projItems" class="nb-list"></div>
-                    <div class="proj-bar">
-                        <button class="mini-btn" id="projExport" type="button">Export notebook (.md)</button>
-                        <button class="mini-btn" id="projBackup" type="button">Back up all</button>
-                        <button class="mini-btn" id="projImport" type="button">Import</button>
-                        <input type="file" id="projFile" accept="application/json,.json" hidden>
-                    </div>
-                </details>
-
-                <details class="panel" id="historyPanel" open>
-                    <summary><span data-icon="clock" data-size="15"></span>History</summary>
-                    <div style="display:flex;justify-content:flex-end"><button class="mini-btn" id="clearHistory" type="button">Clear history</button></div>
-                    <div id="historyList" class="history-list"></div>
-                </details>
-            </aside>
-
-            <main class="workspace">
-                <div class="tabs" role="tablist" id="tabs"><span class="tab-indicator" id="tabIndicator" aria-hidden="true"></span>
-                    <button class="tab active" id="tab-results" data-tab="results" role="tab" aria-selected="true" type="button"><span data-icon="grid" data-size="16"></span>Results</button>
-                    <button class="tab" id="tab-plot" data-tab="plot" role="tab" aria-selected="false" type="button"><span data-icon="chart" data-size="16"></span>2D Plot</button>
-                    <button class="tab" id="tab-plot3d" data-tab="plot3d" role="tab" aria-selected="false" type="button"><span data-icon="cube" data-size="16"></span>3D Plot</button>
-                    <button class="tab" id="tab-steps" data-tab="steps" role="tab" aria-selected="false" type="button"><span data-icon="list" data-size="16"></span>Steps</button>
-                </div>
-
-                <div class="progress" id="progress" aria-hidden="true"></div>
-
-                <div id="results" class="tab-content active" role="tabpanel" aria-live="polite"></div>
-
-                <div id="plot" class="tab-content" role="tabpanel">
-                    <div class="plot-container">
-                        <div class="plot-controls">
-                            <label>x from <input type="text" id="xMin" placeholder="auto" inputmode="decimal"></label>
-                            <label>to <input type="text" id="xMax" placeholder="auto" inputmode="decimal"></label>
-                            <button class="mini-btn" id="resetRange" type="button">Reset range</button>
-                            <button class="mini-btn" id="downloadPlot" type="button"><span data-icon="camera" data-size="14"></span>Save PNG</button>
-                            <span class="plot-tip">Drag to pan · scroll to zoom · double-click to reset</span>
-                        </div>
-                        <div id="plot2d" class="plot-area"></div>
-                        <div id="paramBar" class="param-bar"></div>
-                        <div id="plotPhase" class="plot-area plot-phase" style="display:none"></div>
-                    </div>
-                </div>
-
-                <div id="plot3d" class="tab-content" role="tabpanel">
-                    <div class="plot-container">
-                        <div class="plot-controls">
-                            <span id="view3dChoices"><label><input type="radio" name="view3d" value="surface" checked> Surface</label>
-                            <label><input type="radio" name="view3d" value="contour"> Contour map</label></span>
-                            <span class="plot-tip">Drag to rotate · scroll to zoom</span>
-                        </div>
-                        <div id="plot3dDiv" class="plot-area plot-3d"></div>
-                    </div>
-                </div>
-
-                <div id="steps" class="tab-content" role="tabpanel"></div>
-
-                <div class="statusbar" role="status"><span><i class="dot" id="engineDot"></i><span id="engineStatus">Starting engine…</span></span><span id="offlineStatus">Checking offline support…</span><span>math.js · Algebrite · Plotly · KaTeX</span></div>
-            </main>
-        </div>
-    </div>
-
-    <nav class="bottom-nav" id="bottomNav" aria-label="Jump to section">
-        <button type="button" data-jump="tools"><span aria-hidden="true">∫</span>Tools</button>
-        <button type="button" data-jump="input"><span aria-hidden="true">✎</span>Input</button>
-        <button type="button" data-jump="result"><span aria-hidden="true">▤</span>Result</button>
-        <button type="button" data-jump="top"><span aria-hidden="true">↑</span>Top</button>
-    </nav>
-
-    <footer class="footer">
-        <div class="footer-inner">
-            <div>Crafted for people who care about every pixel and decimal. Runs 100% in your browser – nothing is uploaded.</div>
-            <div class="footer-contact">
-                <a href="mailto:crankyhydra@gmail.com">crankyhydra@gmail.com</a>
-                <a href="https://github.com/ibrahimalee" target="_blank" rel="noopener">github.com/ibrahimalee</a>
+                <p class="fine">No account, no install, no ads. Add it to your home screen and it works without a connection.</p>
             </div>
+
+            <figure class="fig" aria-labelledby="figcap">
+                <div class="fig-head"><span>Fig. 1</span><span id="figHint">Drag along the curve</span></div>
+                <svg id="fig" viewBox="0 0 640 400" role="group" aria-label="Graph of f of x equals sine x plus 0.35 x, with the tangent line and the shaded area up to the chosen point."></svg>
+                <dl class="readout" aria-live="off">
+                    <div><dt>x</dt><dd id="rX">–</dd></div>
+                    <div><dt>f(x)</dt><dd id="rF">–</dd></div>
+                    <div class="hot"><dt>f′(x), the slope</dt><dd id="rD">–</dd></div>
+                    <div class="hot2"><dt>∫₀ˣ f, the area</dt><dd id="rI">–</dd></div>
+                </dl>
+                <figcaption id="figcap">f(x) = sin x + 0.35x. The red line is the tangent; its slope is the derivative. The hatched region is the integral from 0 to x. Move the point and watch both change.</figcaption>
+            </figure>
+        </section>
+
+        <!-- ===== ledger ===== -->
+        <section class="ledger" aria-label="At a glance">
+            <div class="wrap ledger-grid">
+                <div><b>22</b><span>tools in one place, from limits to Laplace transforms</span></div>
+                <div><b>0</b><span>accounts, servers or tracking scripts</span></div>
+                <div><b>6</b><span>languages, including right-to-left layouts</span></div>
+                <div><b>✓</b><span>every result says how it was checked, or that it couldn’t be</span></div>
+                <div><b>MIT</b><span>licence. Read it, fork it, embed it</span></div>
+            </div>
+        </section>
+
+        <!-- ===== ask ===== -->
+        <section class="sec wrap" id="ask" aria-labelledby="h-ask">
+            <div class="sec-label"><span>01</span> Ask</div>
+            <div class="sec-body split">
+                <div>
+                    <h2 id="h-ask">Say it the way you’d say it out loud.</h2>
+                    <p>There is no query language to learn. The parser is a plain rule-based one that runs on your device, so it is fast, private and never makes anything up. If it can’t understand you, it says so instead of guessing.</p>
+                </div>
+                <div>
+                    <form class="ask" id="askForm" action="app.html" method="get" role="search">
+                        <label for="q">Your question</label>
+                        <div class="ask-row">
+                            <input id="q" name="ask" type="text" autocomplete="off" spellcheck="false" maxlength="300" placeholder="integrate x squared from 0 to 3">
+                            <button class="btn btn-solid" type="submit">Work it out <span aria-hidden="true">→</span></button>
+                        </div>
+                        <p class="ask-note" id="askNote" role="status"></p>
+                    </form>
+                    <p class="chips-label">Or start from one of these</p>
+                    <ul class="chips" id="chips">
+                        <li><button type="button">derivative of x^2 sin x</button></li>
+                        <li><button type="button">integrate 1/(x^2+1) from 0 to 1</button></li>
+                        <li><button type="button">limit of sin(x)/x as x goes to 0</button></li>
+                        <li><button type="button">solve x^2 - 5x + 6 = 0</button></li>
+                        <li><button type="button">taylor series of e^x to degree 5</button></li>
+                        <li><button type="button">inverse of the matrix [[2,1],[5,3]]</button></li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== checked ===== -->
+        <section class="sec wrap" id="checked" aria-labelledby="h-chk">
+            <div class="sec-label"><span>02</span> Checked</div>
+            <div class="sec-body split split-rev">
+                <article class="specimen" aria-label="Specimen of a result">
+                    <div class="spec-head"><span>Specimen</span><span>Integral · by parts</span></div>
+                    <p class="spec-q">∫ x · eˣ dx</p>
+                    <p class="spec-a">= (x − 1) eˣ + C</p>
+                    <ol class="spec-steps">
+                        <li><b>Choose</b> u = x and dv = eˣ dx, so du = dx and v = eˣ.</li>
+                        <li><b>Apply</b> ∫u dv = uv − ∫v du, giving x eˣ − ∫ eˣ dx.</li>
+                        <li><b>Finish</b> the remaining integral: x eˣ − eˣ + C.</li>
+                    </ol>
+                    <p class="spec-ok"><span aria-hidden="true">✓</span> Verified: differentiating the result gives back x · eˣ.</p>
+                </article>
+                <div>
+                    <h2 id="h-chk">An answer you can see is right.</h2>
+                    <p>Most calculators hand you a result and ask for trust. Here, each tool tests its own answer a second way and tells you what it did.</p>
+                    <ul class="plain">
+                        <li><b>Integrals</b> are differentiated back, or integrated numerically, and compared.</li>
+                        <li><b>Equation roots</b> are substituted into the original equation.</li>
+                        <li><b>Matrix decompositions</b> are multiplied back together to rebuild the input.</li>
+                        <li><b>Differential equations</b> are solved a second time by a numerical method.</li>
+                    </ul>
+                    <p>When something can’t be verified, or is only approximate, the result says that too, in plain words next to the answer rather than buried in the manual.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== index of tools ===== -->
+        <section class="sec wrap" id="index" aria-labelledby="h-idx">
+            <div class="sec-label"><span>03</span> The tools</div>
+            <div class="sec-body">
+                <h2 id="h-idx">Twenty-two tools. One page.</h2>
+                <p class="sec-intro">Each entry opens the app on that tool.</p>
+                <ol class="toc" id="toc"></ol>
+            </div>
+        </section>
+
+        <!-- ===== principles ===== -->
+        <section class="sec wrap" id="trust" aria-labelledby="h-trust">
+            <div class="sec-label"><span>04</span> Principles</div>
+            <div class="sec-body">
+                <h2 id="h-trust">Built to be used by anyone, anywhere.</h2>
+                <div class="notes">
+                    <article>
+                        <h3>Private by construction</h3>
+                        <p>All the maths runs in a background worker in your browser. There is no server to send anything to. The photo-of-a-page feature downloads its text-recognition model only when you tap the camera button, and processes the picture on your device.</p>
+                    </article>
+                    <article>
+                        <h3>Works without a connection</h3>
+                        <p>After the first visit the whole app is cached. Install it to a phone or laptop and use it on a train, in an exam hall’s dead zone, or on a bad connection.</p>
+                    </article>
+                    <article>
+                        <h3>Accessible, on purpose</h3>
+                        <p>Keyboard-operable, screen-reader friendly, audited against WCAG&nbsp;2 A and AA. Results can be read aloud, plots can be described in words, and answers export as Nemeth Code braille (Unicode or BRF) for embossers.</p>
+                    </article>
+                    <article>
+                        <h3>Honest about its limits</h3>
+                        <p>It is not a computer-algebra giant, and it says so. Some integrals have no closed form here; the translations still need native-speaker review; braille is an automatic transcription. The README lists what to expect.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== open source ===== -->
+        <section class="sec wrap" id="open" aria-labelledby="h-open">
+            <div class="sec-label"><span>05</span> Open source</div>
+            <div class="sec-body split">
+                <div>
+                    <h2 id="h-open">Made to be shared, not rented.</h2>
+                    <p>The code is MIT-licensed and there is no build step: open the folder and it runs. Teachers can embed a worked example in a course page. Developers can use the engine as a library. Everyone can fix a mistake.</p>
+                </div>
+                <ul class="ways">
+                    <li><b>Teach with it</b><span>Turn on teaching mode to reveal each step one at a time, or generate practice problems with hints.</span></li>
+                    <li><b>Embed it</b><span>Any result has an embed code for a live, interactive copy in your own page.</span></li>
+                    <li><b>Translate it</b><span>Interface strings live in one file. Corrections from native speakers are the most useful contribution right now.</span></li>
+                    <li><b>Improve it</b><span>Bug reports with a failing input are gold. The test suite and contribution guide make a first patch easy.</span></li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- ===== closing call ===== -->
+        <section class="close" aria-labelledby="h-close">
+            <div class="wrap close-in">
+                <h2 id="h-close">Open it. Type something hard.</h2>
+                <div class="cta-row">
+                    <a class="btn btn-paper btn-lg" href="app.html">Open the workstation <span aria-hidden="true">→</span></a>
+                    <a class="btn btn-ghost btn-lg" href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">View the source</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="foot">
+        <div class="wrap foot-in">
+            <span>© Calculus Suite Pro · MIT licence</span>
+            <span class="foot-links">
+                <a href="app.html">App</a>
+                <a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">GitHub</a>
+                <a href="https://github.com/ibrahimalee/calculus-suite/blob/main/CONTRIBUTING.md" rel="noopener">Contribute</a>
+                <a href="mailto:crankyhydra@gmail.com">Contact</a>
+            </span>
         </div>
     </footer>
 
-    <dialog id="practiceDialog" aria-labelledby="practiceTitle">
-        <div class="sheet practice-sheet">
-            <div class="sheet-head"><h2 id="practiceTitle">Practice</h2><button class="icon-btn" id="practiceClose" type="button" aria-label="Close"><span data-icon="x"></span></button></div>
-            <div class="practice-controls">
-                <label>Topic <select id="pracTopic"></select></label>
-                <label>Level <select id="pracLevel"><option value="1">1 · Warm-up</option><option value="2">2 · Standard</option><option value="3">3 · Challenge</option></select></label>
-                <button class="btn" id="pracNew" type="button">New problem</button>
-            </div>
-            <div class="practice-stats" id="pracStats" aria-live="polite"></div>
-            <div class="practice-problem" id="pracProblem" aria-live="polite"></div>
-            <form id="pracForm" class="practice-answer" autocomplete="off">
-                <input id="pracAnswer" type="text" spellcheck="false" autocapitalize="off" aria-label="Your answer" placeholder="Your answer">
-                <button class="btn btn-primary" type="submit">Check</button>
-            </form>
-            <div class="practice-preview" id="pracPreview" aria-hidden="true"></div>
-            <div class="practice-feedback" id="pracFeedback" role="status" aria-live="polite"></div>
-            <div class="practice-actions">
-                <button class="btn" id="pracHint" type="button">Hint</button>
-                <button class="btn" id="pracSolution" type="button">Show solution</button>
-            </div>
-            <ol class="practice-hints" id="pracHints"></ol>
-            <p class="practice-note">Any equivalent form is accepted. Problems come from a seed, so the same problem number always gives the same question. Progress is kept on this device only.</p>
-        </div>
-    </dialog>
-
-    <dialog id="brailleDialog" aria-labelledby="brailleTitle">
-        <div class="sheet braille-sheet">
-            <div class="sheet-head"><h2 id="brailleTitle">Braille</h2><button class="icon-btn" id="brailleClose" type="button" aria-label="Close"><span data-icon="x"></span></button></div>
-            <p class="scan-help">Mathematics is written in <b>Nemeth Code</b> (US); plain words are uncontracted Grade 1. Use it with a refreshable braille display, a screen reader, or download a BRF file for an embosser. The braille engine (about 1.2&nbsp;MB) downloads only the first time you open this.</p>
-            <div class="scan-status" id="brailleStatus" role="status" aria-live="polite"></div>
-            <pre id="brailleOut" class="braille-out" lang="und-Brai" dir="ltr" tabindex="0" aria-label="Braille output"></pre>
-            <details class="check-box"><summary>ASCII braille (BRF) preview</summary><pre id="brailleAscii" class="braille-ascii" dir="ltr"></pre></details>
-            <div class="practice-controls">
-                <label>Line width <select id="brailleWidth"><option value="32">32 cells</option><option value="40" selected>40 cells</option><option value="80">80 cells</option><option value="0">No wrapping</option></select></label>
-            </div>
-            <div class="scan-actions">
-                <button class="btn btn-primary" id="brailleCopy" type="button">Copy braille</button>
-                <button class="btn" id="brailleBrf" type="button">Download .brf</button>
-                <button class="btn" id="brailleTxt" type="button">Download .txt</button>
-            </div>
-            <p class="practice-note">Automatic transcription is a convenience, not a certified braille document: have a transcriber check it before using it for exams or published materials. Nemeth line-breaking rules are not applied; lines break only at spaces.</p>
-        </div>
-    </dialog>
-
-    <dialog id="scanDialog" aria-labelledby="scanTitle">
-        <div class="sheet scan-sheet">
-            <div class="sheet-head"><h2 id="scanTitle">Scan an expression</h2><button class="icon-btn" id="scanClose" type="button" aria-label="Close"><span data-icon="x"></span></button></div>
-            <p class="scan-help">Photograph or upload <b>printed or typed</b> maths on a plain background. Recognition runs on your device and the picture is never uploaded. The recogniser (about 11&nbsp;MB) downloads only the first time you use this.</p>
-            <div class="scan-actions">
-                <label class="btn btn-primary scan-pick"><span data-icon="camera" data-size="16"></span><span>Take photo or choose image</span><input id="scanFile" type="file" accept="image/*" capture="environment" hidden></label>
-            </div>
-            <canvas id="scanPreview" class="scan-preview" width="10" height="10" hidden aria-label="Processed image preview"></canvas>
-            <div class="scan-status" id="scanStatus" role="status" aria-live="polite">No image yet.</div>
-            <div class="scan-bar" id="scanBar" hidden><i id="scanBarFill"></i></div>
-            <label class="field-label" for="scanText">Recognised text – check and correct it</label>
-            <textarea id="scanText" rows="3" spellcheck="false" placeholder="The text read from your image appears here"></textarea>
-            <div class="scan-actions">
-                <button class="btn btn-primary" id="scanUse" type="button">Use as expression</button>
-                <button class="btn" id="scanAsk" type="button">Ask as a question</button>
-            </div>
-        </div>
-    </dialog>
-
-    <dialog id="paletteDialog" aria-label="Command palette">
-        <div class="sheet">
-            <div class="palette-input"><span aria-hidden="true">🔎</span><input id="paletteInput" type="text" placeholder="Type a command, mode or example…" autocomplete="off" spellcheck="false"></div>
-            <div class="palette-list" id="paletteList" role="listbox"></div>
-            <div class="palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>Enter</kbd> run</span><span><kbd>Esc</kbd> close</span></div>
-        </div>
-    </dialog>
-
-    <dialog id="helpDialog" aria-labelledby="helpTitle">
-        <div class="sheet">
-            <div class="help-head"><h2 id="helpTitle">Syntax, shortcuts &amp; tips</h2><button class="mini-btn" id="helpClose" type="button">Close ✕</button></div>
-            <div class="help-body">
-                <table>
-                    <tr><th>You type</th><th>Meaning</th></tr>
-                    <tr><td><code>x^2</code>, <code>x**2</code>, <code>x²</code></td><td>powers</td></tr>
-                    <tr><td><code>2x</code>, <code>2 sin(x)</code>, <code>x(x+1)</code></td><td>implicit multiplication</td></tr>
-                    <tr><td><code>sin cos tan sec csc cot</code>, <code>asin acos atan</code></td><td>trigonometric (radians) and inverses</td></tr>
-                    <tr><td><code>sinh cosh tanh</code></td><td>hyperbolic</td></tr>
-                    <tr><td><code>ln(x)</code>, <code>log(x)</code>, <code>log10</code>, <code>log2</code></td><td>logarithms (<code>log</code> = natural)</td></tr>
-                    <tr><td><code>e^x</code>, <code>exp(x)</code>, <code>pi</code>, <code>π</code></td><td>constants &amp; exponential</td></tr>
-                    <tr><td><code>sqrt(x)</code>, <code>√x</code>, <code>cbrt(x)</code>, <code>abs(x)</code>, <code>|x|</code></td><td>roots &amp; absolute value</td></tr>
-                    <tr><td><code>inf</code>, <code>-inf</code>, <code>∞</code></td><td>infinity (limits &amp; improper integrals)</td></tr>
-                    <tr><td><code>P ; Q ; R</code></td><td>several functions / vector-field components / ODE system</td></tr>
-                    <tr><td><code>1 2 ; 3 4</code></td><td>a matrix (rows separated by <code>;</code>)</td></tr>
-                    <tr><td><code>yp</code></td><td>y′ inside a second-order ODE</td></tr>
-                </table>
-                <h3>Shortcuts</h3>
-                <ul>
-                    <li><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd> command palette · <kbd>Ctrl</kbd> + <kbd>Enter</kbd> compute · <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>K</kbd> clear · <kbd>?</kbd> this help</li>
-                    <li><kbd>Alt</kbd> + <kbd>1</kbd>…<kbd>9</kbd> jump to a tool · <kbd>Alt</kbd> + <kbd>R</kbd> results, <kbd>P</kbd> 2D plot, <kbd>D</kbd> 3D plot, <kbd>S</kbd> steps</li>
-                </ul>
-                <h3>Good to know</h3>
-                <ul>
-                    <li><strong>Symbolic results are verified</strong> by differentiating them numerically before they are shown.</li>
-                    <li><strong>Limits, roots and extrema are numerical</strong> – great for exploring, not formal proofs.</li>
-                    <li>In the <strong>Graph</strong> tool every extra letter (<code>a</code>, <code>b</code>, …) becomes a live slider – press ▶ to animate it.</li>
-                    <li><strong>Share</strong> copies a link that reproduces the entire calculation. <strong>Export</strong> saves a Markdown report.</li>
-                    <li>Install it from your browser menu (or the ⬇ button) to use it offline like a native app.</li>
-                </ul>
-            </div>
-        </div>
-    </dialog>
+    <script src="js/home.js"></script>
+    <script>
+        if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) { navigator.serviceWorker.register('sw.js').catch(function () {}); }
+    </script>
 </body>
 </html>

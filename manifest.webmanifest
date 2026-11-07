@@ -2,11 +2,11 @@
   "name": "Calculus Suite Pro",
   "short_name": "Calculus",
   "description": "Derivatives, integrals, limits, series, ODEs, matrices, Fourier series and a parametric grapher – offline.",
-  "start_url": "./index.html",
+  "start_url": "./app.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#07080e",
-  "theme_color": "#6366f1",
+  "background_color": "#ece6d8",
+  "theme_color": "#ad3516",
   "icons": [
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]

@@ -1,15 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "echo \"static site – nothing to install\"",
-  "buildCommand": "echo \"static site – nothing to build\"",
+  "installCommand": "echo \"static site \u2013 nothing to install\"",
+  "buildCommand": "echo \"static site \u2013 nothing to build\"",
   "outputDirectory": ".",
   "cleanUrls": false,
   "trailingSlash": false,
   "redirects": [
     {
       "source": "/CalculusSuite.html",
-      "destination": "/",
+      "destination": "/app.html",
       "permanent": true
     }
   ],
@@ -63,7 +63,25 @@
       ]
     },
     {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
       "source": "/index.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/app.html",
       "headers": [
         {
           "key": "Cache-Control",

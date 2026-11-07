@@ -2,7 +2,7 @@ const { chromium } = require('playwright');
 (async () => {
   const b = await chromium.launch(); const page = await b.newPage({ viewport: { width: 1300, height: 900 } });
   const errs = []; page.on('pageerror', e => errs.push(e.message)); page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
-  await page.goto('' + (process.env.BASE || 'http://localhost:8099') + '/index.html'); await page.waitForFunction(() => window.__calc); await page.waitForTimeout(500);
+  await page.goto('' + (process.env.BASE || 'http://localhost:8099') + '/app.html'); await page.waitForFunction(() => window.__calc); await page.waitForTimeout(500);
   let bad = 0; const report = (n, ok, x) => { if (!ok) bad++; console.log((ok ? 'ok   ' : 'FAIL ') + n + (ok ? '' : ' → ' + JSON.stringify(x))); };
   const idle = async () => { await page.waitForFunction(() => !document.querySelector('#computeBtn').classList.contains('loading'), null, { timeout: 30000 }); await page.waitForTimeout(500); };
   await page.click('.mode-btn[data-mode="graph"]');

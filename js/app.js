@@ -2063,6 +2063,13 @@
             $('functionInput').value = 'x^2 * sin(x)';
             validateInput();
         }
+        // deep links from the home page: ?tool=integral  or  ?ask=integrate x squared from 0 to 3
+        try {
+            const qp = new URLSearchParams(location.search);
+            const ask = (qp.get('ask') || '').slice(0, 500), tool = qp.get('tool');
+            if (ask.trim() && !shared) { $('askInput').value = ask; askNL(ask); }
+            else if (tool && MODES[tool] && !shared) { setMode(tool, true); }
+        } catch (e) { /* ignore malformed query */ }
         hydrateIcons();
         moveIndicator();
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(moveIndicator);

@@ -28,7 +28,7 @@ npm run e2e          # browser tests (Playwright)
 | Core calculus engine | `js/engine.js` |
 | Transforms, vector calculus, statistics, number theory, units, complex, worked solutions | `js/extras.js` |
 | Plain-English parser | `js/nlp.js` |
-| UI, tools list, notebook, image scan | `js/app.js`, `index.html`, `css/styles.css` |
+| UI, tools list, notebook, image scan | `js/app.js`, `app.html`, `css/styles.css` |
 | Background worker | `js/worker.js`, `js/runner.js` |
 
 ## Adding a tool
@@ -44,4 +44,4 @@ Please include the exact input, the options you chose, what you expected and wha
 
 ## Translations
 
-Interface strings live in `js/i18n.js` as `'English text': [es, fr, ar, ur, hi]`. Add or correct a row and run `npm test` (it checks that every row has all five columns and keeps digits). The text must match the English in `index.html` / `js/app.js` exactly. Native-speaker review of the existing translations is especially welcome.
+Interface strings live in `js/i18n.js` as `'English text': [es, fr, ar, ur, hi]`. Add or correct a row and run `npm test` (it checks that every row has all five columns and keeps digits). The text must match the English in `app.html` / `js/app.js` exactly. Native-speaker review of the existing translations is especially welcome.

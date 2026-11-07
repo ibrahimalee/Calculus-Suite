@@ -2,6 +2,8 @@
 
 A calculus workstation that runs entirely in the browser – no backend, no build step, works offline.
 
+> The home page (`index.html`) introduces the app; the calculator itself is `app.html`. Deep links: `app.html?tool=integral` and `app.html?ask=integrate x squared from 0 to 3`.
+
 ## Features
 
 | Mode | What it does |
@@ -78,7 +80,8 @@ npm run serve   # then, in another shell:  BASE=http://localhost:8080 npm run e2
 ```
 
 ```
-index.html          app shell (CalculusSuite.html redirects here)
+index.html          home page
+app.html            the calculator app (CalculusSuite.html redirects here)
 js/engine.js        all maths – DOM-free, unit-tested
 js/worker.js        runs the engine off the UI thread
 js/runner.js        worker management, timeout, inline fallback

@@ -19,7 +19,7 @@ const check = (name, ok, extra) => { if (!ok) failed++; console.log((ok ? 'ok   
     const idle = async () => { await page.waitForFunction(() => !document.querySelector('#computeBtn').classList.contains('loading'), null, { timeout: 40000 }); await page.waitForTimeout(250); };
     const mode = async m => { await page.click(`.mode-btn[data-mode="${m}"]`); };
 
-    await page.goto(BASE + '/index.html'); await page.evaluate(() => localStorage.clear()); await page.reload(); await ready();
+    await page.goto(BASE + '/app.html'); await page.evaluate(() => localStorage.clear()); await page.reload(); await ready();
 
     // 1. share-link round trip (unicode included)
     await mode('derivative');
@@ -30,7 +30,7 @@ const check = (name, ok, extra) => { if (!ok) failed++; console.log((ok ? 'ok   
     const hash = await page.evaluate(() => location.hash);
     check('share hash is written after compute', /^#s=/.test(hash), hash);
     const p2 = await ctx.newPage(); p2.on('pageerror', e => errors.push('p2:' + e.message));
-    await p2.goto(BASE + '/index.html' + hash); await p2.waitForFunction(() => window.__calc); await p2.waitForFunction(() => document.querySelector('#results .result-content'), null, { timeout: 30000 });
+    await p2.goto(BASE + '/app.html' + hash); await p2.waitForFunction(() => window.__calc); await p2.waitForFunction(() => document.querySelector('#results .result-content'), null, { timeout: 30000 });
     const after = await p2.textContent('#results .result-content');
     check('share link reproduces the exact result', before === after, { before, after });
     check('share link restores the input text', (await p2.inputValue('#functionInput')) === 'π x² + sin(x)');
@@ -85,7 +85,7 @@ const check = (name, ok, extra) => { if (!ok) failed++; console.log((ok ? 'ok   
     check('results report the worker as the engine', (await page.textContent('.result-foot')).includes('background worker'));
 
     // 8. no horizontal overflow at phone width in any mode
-    const m = await browser.newPage({ viewport: { width: 375, height: 800 } }); await m.goto(BASE + '/index.html'); await m.waitForFunction(() => window.__calc); await m.waitForTimeout(500);
+    const m = await browser.newPage({ viewport: { width: 375, height: 800 } }); await m.goto(BASE + '/app.html'); await m.waitForFunction(() => window.__calc); await m.waitForTimeout(500);
     const modes = await m.evaluate(() => [...document.querySelectorAll('.mode-btn')].map(b => b.dataset.mode));
     const overflowing = [];
     for (const md of modes) { if (await m.locator('#modeGrid.collapsed').count()) await m.click('#modeToggle'); await m.click(`.mode-btn[data-mode="${md}"]`); await m.selectOption('#examples', '0'); await m.waitForFunction(() => !document.querySelector('#computeBtn').classList.contains('loading'), null, { timeout: 40000 }); await m.waitForTimeout(350);
@@ -97,13 +97,13 @@ const check = (name, ok, extra) => { if (!ok) failed++; console.log((ok ? 'ok   
     bp.on('pageerror', e => badErrors.push(e.message));
     await bp.addInitScript(() => { try { localStorage.setItem('cs_session', '{not json'); localStorage.setItem('cs_history', '[1,2,'); localStorage.setItem('cs_projects', '{"list":[null,{"id":5}]}'); localStorage.setItem('accent', 'nonsense'); localStorage.setItem('themeMode', 42); } catch (e) { /* ignore */ } });
     for (const hash of ['', '#s=!!!notbase64!!!', '#s=' + Buffer.from('{"m":"nope","f":1}').toString('base64'), '#s=' + Buffer.from('{"m":"integral","f":"<b>x</b>","o":{"lower":{"a":1}}}').toString('base64')]) {
-        await bp.goto(BASE + '/index.html' + hash); await bp.waitForFunction(() => window.__calc, null, { timeout: 15000 }); await bp.waitForTimeout(600);
+        await bp.goto(BASE + '/app.html' + hash); await bp.waitForFunction(() => window.__calc, null, { timeout: 15000 }); await bp.waitForTimeout(600);
     }
     check('app starts with corrupted storage and malformed share links', badErrors.length === 0 && (await bp.$$('.mode-btn')).length === 22, badErrors);
     await bad.close();
 
     // 10. rapid interaction: hammering Compute and switching tools mid-computation must leave the UI usable
-    await page.goto(BASE + '/index.html'); await ready(); await mode('integral'); await page.fill('#functionInput', 'x*e^x');
+    await page.goto(BASE + '/app.html'); await ready(); await mode('integral'); await page.fill('#functionInput', 'x*e^x');
     for (let i = 0; i < 6; i++) { await page.click('#computeBtn', { noWaitAfter: true }); await page.waitForTimeout(30); }
     await mode('derivative'); await mode('limit'); await mode('integral'); await idle();
     await page.fill('#functionInput', 'x^3'); await page.click('#computeBtn'); await idle();
