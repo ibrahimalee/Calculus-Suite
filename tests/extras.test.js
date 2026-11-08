@@ -186,3 +186,47 @@ test('piecewise Laplace and Fourier transforms verify themselves', () => {
   assert.throws(() => L('1 - abs(t) for -1 < t < 1 ; 0 otherwise', 'fourier'), /polynomials, exponentials/);
   assert.throws(() => L('5 for -3 < t < -1', 'laplace'), /t < 0/);
 });
+test('linear programming: optimum, infeasible and unbounded cases are verified independently', () => {
+  const LP = s => E.run.algebra(s, { op: 'lp' });
+  const a = LP('max 3x + 2y ; x + y <= 4 ; x + 3y <= 6'); assert.match(a.main.text, /^12\s+at\s+x = 4, y = 0/); assert.ok(a.meta[0].startsWith('Verified') && /strong duality/.test(a.meta[0])); assert.match(a.items.map(i => i.text).join('|'), /x \+ y <= 4: 3/);
+  assert.match(LP('max 40x + 30y ; x + y <= 12 ; 2x + y <= 16').main.text, /^400\s+at\s+x = 4, y = 8/);
+  const d = LP('min 2x + 3y ; x + y >= 4 ; x + 3y >= 6'); assert.match(d.main.text, /^9\s+at\s+x = 3, y = 1/); assert.match(d.items.map(i => i.text).join('|'), /3\/2/);
+  assert.match(LP('max 3a + 2b + 4c ; a + b + 2c <= 4 ; 2a + 3c <= 5 ; 2a + b + 3c <= 7').main.text, /^21\/2\s+at\s+a = 5\/2, b = 3\/2, c = 0/);
+  assert.match(LP('max x + y ; x - y <= 1').main.text, /^unbounded/); assert.match(LP('max x + y ; x + y <= 2 ; x + y >= 3').main.text, /^infeasible/);
+  assert.match(LP('min x + y ; x + y = 3 ; x <= 2').main.text, /^3\s+at/); assert.match(LP('max 2x + 2y ; x + y <= 4 ; x <= 3').items.map(i => i.label).join('|'), /Several optimal vertices/);
+  assert.throws(() => LP('max x ; x^2 <= 4'), /not linear/); assert.throws(() => LP('min x + y'), /objective first/); assert.throws(() => LP('max x ; x'), /relation/);
+});
+test('residues, contour integrals and real integrals by residues are cross-checked', () => {
+  const Z = (s, op, o) => E.run.complex(s, Object.assign({ op }, o || {}));
+  const r1 = Z('1/(z^2+1)', 'residue'); assert.match(r1.main.text, /Res at i = −i\/2;\s+Res at −i = i\/2/); assert.ok(r1.meta[0].startsWith('Verified'));
+  assert.match(Z('1/(z^2*(z-1))', 'residue').main.text, /Res at 0 = -1/); assert.match(Z('1/(z^2+1)^2', 'residue').main.text, /Res at i = −i\/4/);
+  assert.match(Z('(z-1)/(z-1)/(z+2)', 'residue').items.map(i => i.text).join('|'), /cancelled/);
+  assert.match(Z('1/(z^2+1)', 'contour', { cc: '0, 1', rad: '0.5' }).main.text, /= π$/); assert.match(Z('1/z', 'contour', { cc: '0', rad: '1' }).main.text, /= 2πi$/);
+  assert.match(Z('1/(z^2+1)', 'contour', { cc: '3', rad: '1' }).main.text, /= 0$/); assert.throws(() => Z('1/(z^2+1)', 'contour', { cc: '0', rad: '1' }), /on \(or extremely close/);
+  assert.match(Z('1/(x^2+1)', 'realint').main.text, /^π\s/); assert.match(Z('1/(x^4+1)', 'realint').main.text, /^√\(1\/2\)·π/); assert.match(Z('1/(x^2+4)^3', 'realint').main.text, /^3\/256·π/); assert.ok(Z('x^2/(x^4+5*x^2+4)', 'realint').meta[0].startsWith('Verified'));
+  assert.throws(() => Z('1/(x^2-1)', 'realint'), /real axis/); assert.throws(() => Z('x/(x^2+1)', 'realint'), /degree at least 2/); assert.throws(() => Z('z^2+1', 'residue'), /rational/);
+});
+test('Markov chains, Bayes rule and proportion intervals are cross-checked and match known values', () => {
+  const S = (s, o) => E.run.stats(s, o); const txt = r => r.items.map(i => i.label + ' ' + i.text).join(' | ');
+  const w = S('0.9 0.1 ; 0.5 0.5', { op: 'markov' }); assert.match(w.main.text, /π = \(5\/6, 1\/6\)/); assert.ok(w.meta[0].startsWith('Verified') && /4,096th power/.test(w.meta[0]));
+  assert.match(S('0 1 ; 1 0', { op: 'markov' }).main.text, /periodic/); assert.match(txt(S('0 1 ; 1 0', { op: 'markov' })), /period 2/);
+  const gr = S('1 0 0 0 ; 0.5 0 0.5 0 ; 0 0.5 0 0.5 ; 0 0 0 1', { op: 'markov' }); assert.match(txt(gr), /from S2: \{S1\} 2\/3, \{S4\} 1\/3/); assert.match(txt(gr), /S2: 2/);
+  assert.match(S('0.5 0.5 0 0 ; 0.5 0.5 0 0 ; 0 0 0.3 0.7 ; 0 0 0.6 0.4', { op: 'markov' }).main.text, /2 recurrent classes/);
+  assert.throws(() => S('0.5 0.4 ; 0.5 0.5', { op: 'markov' }), /Row 1 sums to 0\.9/); assert.throws(() => S('0.9 0.1', { op: 'markov' }), /square/);
+  const b = S('0.01, 0.99 ; 0.95, 0.05', { op: 'bayes', names: 'disease, healthy' }); assert.match(b.main.text, /P\(disease \| evidence\) = 19\/118/); assert.match(txt(b), /Bayes factor: 19 in favour/); assert.ok(b.meta[0].startsWith('Verified'));
+  assert.match(S('0.5, 0.5 ; 0.8, 0.3 ; 0.8, 0.3 ; 0.2, 0.7', { op: 'bayes' }).main.text, /128\/191/); assert.throws(() => S('0.5,0.5 ; 0, 0', { op: 'bayes' }), /probability 0/);
+  const ci = S('45, 120', { op: 'propci' }); assert.match(ci.main.text, /^0\.293524 to 0\.46423/); assert.match(txt(ci), /Clopper–Pearson \(exact, conservative\): 0\.288314 to 0\.468012/); assert.ok(/binomial tail/.test(ci.meta[0]));
+  assert.match(txt(S('0, 20', { op: 'propci' })), /Clopper–Pearson \(exact, conservative\): 0 to 0\.168433/); assert.match(S('45, 120 ; 30, 110', { op: 'propci' }).main.text, /^-0\.019009 to 0\.218516/);
+  assert.throws(() => S('13, 10', { op: 'propci' }), /whole numbers/);
+});
+test('gradient descent and Newton find critical points, flag divergence and saddles, and cross-check themselves', () => {
+  const D = (s, o) => E.run.multivariable(s, Object.assign({ op: 'descent' }, o)); const txt = r => r.items.map(i => i.label + ' ' + i.text).join(' | ');
+  const nw = D('x^2 + 3*y^2', { method: 'newton', start: '3, 2' }); assert.match(nw.main.text, /reached \(0, 0\) after 1 step/); assert.match(txt(nw), /local minimum/); assert.ok(nw.meta[0].startsWith('Verified') && /polishing/.test(nw.meta[0]));
+  const ros = D('(1-x)^2 + 100*(y-x^2)^2', { method: 'newton', start: '-1.2, 1' }); assert.match(ros.main.text, /reached \(1, 1\) after 6 steps/); assert.match(txt(ros), /gradient descent \(fixed step\): diverged/);
+  const him = D('(x^2+y-11)^2 + (x+y^2-7)^2', { method: 'newton', start: '0, 0' }); assert.match(txt(him), /local maximum/); assert.ok(him.warnings.some(w => /saddle point or a maximum/.test(w)));
+  assert.match(txt(D('x^2 - y^2', { method: 'newton', start: '1, 1' })), /saddle point/);
+  assert.match(D('x^2 + 3*y^2', { method: 'gd', start: '3, 2', lr: '0.9', iters: '20' }).main.text, /diverged/);
+  const gd = D('x^2 + 3*y^2', { method: 'gd', start: '3, 2', lr: '0.1', iters: '200' }); assert.match(gd.main.text, /^reached/); assert.equal(gd.plot.generic.traces[0].type, 'contour'); assert.ok(gd.plot.generic.traces[1].x.length > 5);
+  const flat = D('x^4 + y^4', { method: 'newton', start: '1, 1' }); assert.ok(flat.warnings.some(w => /very flat/.test(w)));
+  assert.throws(() => D('x^2 + y^2 + z', {}), /exactly two variables/); assert.throws(() => D('x^2 + y^2', { start: '1' }), /two numbers/); assert.throws(() => D('x^2 + y^2', { lr: '-1' }), /positive/);
+});

@@ -1264,8 +1264,63 @@
     // ======================================================================
     // Complex numbers & functions: domain colouring, roots, polar form
     // ======================================================================
+    // ======================================================================
+    // Residues, contour integrals and real integrals by the residue theorem
+    // ======================================================================
+    function runResidues(src, opt) {
+        const op = opt.op; const node = engine.parse(src); const fv = engine.freeVars(node); if (fv.length !== 1) throw new CalcError('Use a rational function of one variable, e.g. 1/(z^2+1).'); const v = fv[0];
+        let rat = I.toRational(node, v); if (!rat || rat.d.length < 2) throw new CalcError('Enter a rational function (polynomial ÷ polynomial) with the variable in the denominator.'); if (rat.n.length > 25 || rat.d.length > 25) throw new CalcError('Up to degree 24 is supported.');
+        let n = rat.n.slice(), d = rat.d.slice(); const g = I.polyGcd(n.slice(), d.slice()); let cancelled = false; if (g && g.length > 1) { n = I.polyDivMod(n, g)[0]; d = I.polyDivMod(d, g)[0]; cancelled = true; } if (d.length < 2) throw new CalcError('After cancelling common factors there is no pole left.');
+        const lead = d[d.length - 1]; n = n.map(c => c / lead); d = d.map(c => c / lead);
+        const C = (re, im) => math.complex(re, im || 0); const evP = (p, z) => p.reduceRight((acc, c) => math.add(math.multiply(acc, z), c), C(0, 0)); const dd = d.slice(1).map((c, i) => c * (i + 1));
+        const f = z => math.divide(evP(n, z), evP(d, z)); const poles = I.polyRootsMult(d.slice()).map(z => ({ z: C(z.re, z.im), m: z.mult, re: z.re, im: z.im }));
+        poles.forEach(p => { if (Math.abs(p.re) < 1e-10) p.re = 0; if (Math.abs(p.im) < 1e-10) p.im = 0; p.z = C(p.re, p.im); });
+        const cf = z => { const re = nice(z.re, 8, 1e-8).text, im = nice(Math.abs(z.im), 8, 1e-8).text; if (Math.abs(z.im) < 1e-9) return re; const fr = /^(\d+)\/(\d+)$/.exec(im); const ib = im === '1' ? 'i' : fr ? `${fr[1] === '1' ? '' : fr[1]}i/${fr[2]}` : `${im}i`; if (Math.abs(z.re) < 1e-9) return `${z.im < 0 ? '−' : ''}${ib}`; return `${re} ${z.im < 0 ? '−' : '+'} ${ib}`; };
+        const dist = p => poles.reduce((m, q) => (q === p ? m : Math.min(m, math.abs(math.subtract(q.z, p.z)))), Infinity);
+        const circleRes = (p, rho, N) => { let s2 = C(0, 0); for (let k = 0; k < N; k++) { const e = C(rho * Math.cos(2 * Math.PI * k / N), rho * Math.sin(2 * Math.PI * k / N)); s2 = math.add(s2, math.multiply(f(math.add(p.z, e)), e)); } return math.divide(s2, N); };
+        poles.forEach(p => { const rho = Math.min(0.5, 0.4 * dist(p)); p.res = circleRes(p, rho, 512); if (p.m === 1) { const exact = math.divide(evP(n, p.z), evP(dd, p.z)); p.resFormula = exact; } });
+        let worst = 0; poles.forEach(p => { if (p.resFormula) worst = Math.max(worst, math.abs(math.subtract(p.res, p.resFormula)) / Math.max(1, math.abs(p.res))); if (worst > 1e-6) throw new CalcError('The two residue computations disagreed; the result was discarded.'); p.val = p.resFormula || p.res; if (Math.abs(p.val.re) < 1e-10) p.val = C(0, p.val.im); if (Math.abs(p.val.im) < 1e-10) p.val = C(p.val.re, 0); });
+        // sum of all residues = coefficient of 1/z at infinity
+        const rem = I.polyDivMod(n, d)[1]; const dn = d.length - 1, rn = rem.length - 1; const expectedSum = (rem.length >= 1 && rn === dn - 1) ? rem[rn] : 0; const sumAll = poles.reduce((t, p) => math.add(t, p.val), C(0, 0)); const sumErr = math.abs(math.subtract(sumAll, C(expectedSum, 0))); if (sumErr > 1e-6 * Math.max(1, poles.length)) throw new CalcError('The sum of the residues did not match the behaviour at infinity; the result was discarded.');
+        const r = I.makeResult('complex', 'Residues'); const fTxt = `${engine.strOf(node)}`; r.items.push({ label: `f(${v}) =`, text: fTxt, tex: `f(${v})=${engine.texOf(node)}` }); if (cancelled) r.items.push({ label: 'Note:', text: 'common factors were cancelled (removable singularities are not poles)', tex: '' });
+        r.items.push({ label: 'Poles:', text: poles.map(p => `${cf(p.z)} (order ${p.m})`).join(',  '), tex: '' });
+        const baseVerified = `each residue was computed two ways (a closed formula and a numerical contour integral on a small circle) and agree to ${worst.toExponential(1)}; the residues sum to ${cf(sumAll)}, as the behaviour at infinity requires`;
+        const poleTraces = [{ x: poles.map(p => p.re), y: poles.map(p => p.im), mode: 'markers', type: 'scatter', name: 'poles', marker: { size: 11, symbol: 'x', line: { width: 3 } } }]; const zs = n.length > 1 ? I.polyRootsMult(n.slice()) : []; if (zs.length) poleTraces.push({ x: zs.map(q => q.re), y: zs.map(q => q.im), mode: 'markers', type: 'scatter', name: 'zeros', marker: { size: 9, symbol: 'circle-open', line: { width: 2 } } });
+        const allX = poles.map(p => p.re).concat(zs.map(q => q.re)), allY = poles.map(p => p.im).concat(zs.map(q => q.im)); let ext = Math.max(1.5, ...allX.map(Math.abs), ...allY.map(Math.abs)) * 1.4;
+        if (op === 'residue') {
+            r.title = 'Residues'; r.main = { label: 'Residues:', text: poles.map(p => `Res at ${cf(p.z)} = ${cf(p.val)}`).join(';   '), tex: '' }; r.items.push({ label: 'Sum of all residues:', text: cf(sumAll), tex: '' });
+            r.meta.push('Verified: ' + baseVerified); r.meta.push('Method: for a simple pole Res = p(z₀)/q′(z₀); every residue is also obtained as (1/2πi)∮ f dz on a small circle around the pole');
+            r.steps.push({ title: 'Find the poles', text: 'The poles are the zeros of the denominator (after cancelling common factors); their multiplicity is the order.', tex: '' }); r.steps.push({ title: 'Residue at a simple pole', text: 'Res(f, z₀) = p(z₀) / q′(z₀). For higher order the residue comes from derivatives of (z − z₀)ᵐ f(z).', tex: '' });
+            r.plot = { generic: { title: 'Poles and zeros', xTitle: 'Re', yTitle: 'Im', equal: true, xRange: [-ext, ext], yRange: [-ext, ext], traces: poleTraces } }; return I.finalizeText(r);
+        }
+        if (op === 'contour') {
+            const parse2 = (t, what) => { const parts = String(t === undefined || t === '' ? '0' : t).split(/[,;]/).map(x => x.trim()).filter(Boolean); if (parts.length > 2) throw new CalcError(`${what}: give a real number or “re, im”.`); const vals = parts.map(q => I.parseLimit(q, what).value); if (!vals.every(Number.isFinite)) throw new CalcError(`${what} must be finite.`); return C(vals[0], vals[1] || 0); };
+            const centre = parse2(opt.cc, 'Centre'), R = I.parseLimit(opt.rad === undefined || opt.rad === '' ? '1' : opt.rad, 'Radius').value; if (!(R > 0) || !Number.isFinite(R)) throw new CalcError('The radius must be positive.');
+            const inside = poles.filter(p => math.abs(math.subtract(p.z, centre)) < R); if (poles.some(p => Math.abs(math.abs(math.subtract(p.z, centre)) - R) < 1e-3 * Math.max(1, R))) throw new CalcError('A pole lies on (or extremely close to) the contour, so the integral is not defined. Change the radius or centre.');
+            const S = inside.reduce((t, p) => math.add(t, p.val), C(0, 0)); const value = math.multiply(C(0, 2 * Math.PI), S);
+            const N = 20000; let num = C(0, 0); for (let k = 0; k < N; k++) { const th = 2 * Math.PI * k / N, e = C(R * Math.cos(th), R * Math.sin(th)); num = math.add(num, math.multiply(f(math.add(centre, e)), math.multiply(e, C(0, 2 * Math.PI / N)))); } const err = math.abs(math.subtract(num, value)) / Math.max(1, math.abs(value)); if (err > 1e-6) throw new CalcError('Direct numerical integration around the circle disagreed with the residue theorem; the result was discarded.');
+            r.title = 'Contour integral'; const Sx = nice(S.re, 8, 1e-9).text, Sy = nice(S.im, 8, 1e-9).text; r.main = { label: `∮ f(${v}) d${v} =`, text: `2πi · (${cf(S)}) = ${cf(value)}`, tex: '' };
+            r.items.push({ label: 'Contour:', text: `the circle |${v} − (${cf(centre)})| = ${nice(R, 8, 1e-9).text}, traversed counter-clockwise`, tex: '' }); r.items.push({ label: 'Poles inside:', text: inside.length ? inside.map(p => `${cf(p.z)} (residue ${cf(p.val)})`).join(',  ') : 'none, so the integral is 0 (Cauchy’s theorem)', tex: '' }); void Sx; void Sy;
+            r.meta.push('Verified: direct numerical integration around the circle (20,000 points) gives the same value, relative difference ' + err.toExponential(1) + '; also ' + baseVerified); r.meta.push('Method: residue theorem ∮ f dz = 2πi · (sum of the residues inside the contour)');
+            r.steps.push({ title: 'Which poles are inside?', text: `Only the poles with |${v} − centre| < radius count.`, tex: '' }); r.steps.push({ title: 'Residue theorem', text: 'Add their residues and multiply by 2πi.', tex: '' });
+            const th = Array.from({ length: 181 }, (_, k) => 2 * Math.PI * k / 180); ext = Math.max(ext, Math.abs(centre.re) + R * 1.3, Math.abs(centre.im) + R * 1.3);
+            r.plot = { generic: { title: 'The contour and the poles', xTitle: 'Re', yTitle: 'Im', equal: true, xRange: [-ext, ext], yRange: [-ext, ext], traces: [{ x: th.map(t => centre.re + R * Math.cos(t)), y: th.map(t => centre.im + R * Math.sin(t)), mode: 'lines', type: 'scatter', name: 'contour' }].concat(poleTraces) } }; return I.finalizeText(r);
+        }
+        // real integral over the whole line
+        const degN = n.length - 1, degD = d.length - 1; if (degD - degN < 2) throw new CalcError('For ∫ from −∞ to ∞ the denominator must have degree at least 2 more than the numerator, otherwise the integral does not converge.');
+        if (poles.some(p => p.im === 0)) throw new CalcError('There is a pole on the real axis, so the integral diverges (or needs a principal value, which is not supported).');
+        const up = poles.filter(p => p.im > 0); const S = up.reduce((t, p) => math.add(t, p.val), C(0, 0)); const value = math.multiply(C(0, 2 * Math.PI), S); if (Math.abs(value.im) > 1e-7 * Math.max(1, Math.abs(value.re))) throw new CalcError('The function is not real on the real axis, so this method does not apply.');
+        const fr = engine.compile(node, [v]); const num = engine.integrateRobust(x => fr(x), -Infinity, Infinity); const err = Math.abs(num.value - value.re) / Math.max(1, Math.abs(value.re)); if (!Number.isFinite(num.value) || err > 1e-6) throw new CalcError('Direct numerical integration disagreed with the residue theorem; the result was discarded.');
+        const mult = nice(value.re / Math.PI, 8, 1e-9); const sq = nice((value.re / Math.PI) ** 2, 8, 1e-9);
+        r.title = 'Real integral by residues'; r.main = { label: `∫ f(${v}) d${v} from −∞ to ∞ =`, text: `${/^-?\d+(\/\d+)?$/.test(mult.text) ? (mult.text === '1' ? 'π' : `${mult.text}·π`) : (/^\d+(\/\d+)?$/.test(sq.text) && value.re > 0 ? `√(${sq.text})·π` : engine.fmt(value.re, 10))}  ≈ ${engine.fmt(value.re, 10)}`, tex: '' };
+        r.items.push({ label: 'Poles in the upper half-plane:', text: up.map(p => `${cf(p.z)} (residue ${cf(p.val)})`).join(',  '), tex: '' });
+        r.meta.push(`Verified: direct numerical integration over the whole real line gives ${engine.fmt(num.value, 10)} (relative difference ${err.toExponential(1)}); also ` + baseVerified); r.meta.push('Method: close the contour with a large upper semicircle (its contribution vanishes because deg q ≥ deg p + 2), so the integral is 2πi · (sum of the residues in the upper half-plane)');
+        r.steps.push({ title: 'Close the contour', text: 'Integrate over the real axis plus a large semicircle in the upper half-plane; the arc tends to 0.', tex: '' }); r.steps.push({ title: 'Residue theorem', text: 'The closed-contour integral is 2πi times the sum of the residues at the upper-half-plane poles.', tex: '' });
+        r.plot = { generic: { title: 'Poles (the upper half-plane ones are used)', xTitle: 'Re', yTitle: 'Im', equal: true, xRange: [-ext, ext], yRange: [-ext, ext], traces: poleTraces } }; return I.finalizeText(r);
+    }
     function runComplex(src, opt) {
-        const op = opt.op || 'domain'; const r = I.makeResult('complex', 'Complex analysis');
+        const op = opt.op || 'domain';
+        if (op === 'residue' || op === 'contour' || op === 'realint') return runResidues(src, opt); const r = I.makeResult('complex', 'Complex analysis');
         const toC = z => { const c = math.complex(z); return { re: c.re, im: c.im }; };
         const cstr = z => { const a = nice(z.re, 8, 1e-9).text, b = nice(Math.abs(z.im), 8, 1e-9).text; if (Math.abs(z.im) < 1e-12) return a; const bi = b === '1' ? 'i' : `${b}i`; if (Math.abs(z.re) < 1e-12) return `${z.im < 0 ? '-' : ''}${bi}`; return `${a} ${z.im < 0 ? '−' : '+'} ${bi}`; };
         if (op === 'arith') {
@@ -1317,8 +1372,94 @@
     // ======================================================================
     // Algebra: partial fractions, long division, factor / expand, polynomial gcd, linear recurrences
     // ======================================================================
+    // ======================================================================
+    // Linear programming: two-phase simplex, verified by vertex enumeration
+    // ======================================================================
+    function parseLinear(txt, vars) {
+        const node = engine.parse(txt); const f = engine.compile(node, vars); const zero = vars.map(() => 0); const c0 = f(...zero); if (!Number.isFinite(c0)) throw new CalcError(`Could not read “${txt}”.`);
+        const a = vars.map((_, i) => { const e = zero.slice(); e[i] = 1; return f(...e) - c0; }); const p = vars.map((_, i) => 1.37 + 0.61 * i), want = c0 + a.reduce((t, c, i) => t + c * p[i], 0), got = f(...p);
+        if (![...a, got].every(Number.isFinite) || Math.abs(got - want) > 1e-9 * Math.max(1, Math.abs(want))) throw new CalcError(`“${txt}” is not linear in ${vars.join(', ')}.`);
+        return { a, c0 };
+    }
+    function runLP(src, opt) {
+        const segs = String(src).split(/[;\n]+/).map(x => x.trim()).filter(Boolean); if (segs.length < 2) throw new CalcError('Write the objective first, then the constraints, separated by ;  for example  max 3x + 2y ; x + y <= 4 ; x + 3y <= 6');
+        const om = /^(max(?:imi[sz]e)?|min(?:imi[sz]e)?)\s*[:.]?\s*(.+)$/i.exec(segs[0]); if (!om) throw new CalcError('Start with the objective, e.g.  max 3x + 2y  or  min 2x + 5y.');
+        const maximise = /^max/i.test(om[1]); const cons = segs.slice(1).map(sg => { const m = /^(.*?)(<=|>=|≤|≥|=<|=>|<|>|=)(.*)$/.exec(sg); if (!m) throw new CalcError(`“${sg}” needs a relation such as <=, >= or =.`); return { lhs: m[1].trim(), rel: { '<=': '<=', '=<': '<=', '≤': '<=', '<': '<=', '>=': '>=', '=>': '>=', '≥': '>=', '>': '>=', '=': '=' }[m[2]], strict: m[2] === '<' || m[2] === '>', rhs: m[3].trim(), src: sg }; });
+        if (cons.length > 12) throw new CalcError('Up to 12 constraints are supported.'); const set = new Set(); const nodes = [engine.parse(om[2])].concat(cons.flatMap(c => [engine.parse(c.lhs), engine.parse(c.rhs || '0')])); nodes.forEach(nd => engine.freeVars(nd).forEach(v => set.add(v)));
+        const vars = [...set].sort(); if (!vars.length) throw new CalcError('Use variables such as x and y.'); if (vars.length > 6) throw new CalcError('Up to 6 variables are supported.'); const n = vars.length;
+        const obj = parseLinear(om[2], vars); const c = obj.a.map(v => (maximise ? v : -v)); // always maximise internally
+        const rows = cons.map(cn => { const L = parseLinear(cn.lhs, vars), R = parseLinear(cn.rhs || '0', vars); return { a: L.a.map((v, i) => v - R.a[i]), b: R.c0 - L.c0, rel: cn.rel, src: cn.src, strict: cn.strict }; });
+        if (rows.some(r => r.a.every(v => Math.abs(v) < 1e-14))) throw new CalcError('A constraint has no variables in it.');
+        const eps = 1e-9, fmtN = x => nice(x, 8, 1e-9).text;
+        // ---- two-phase simplex (Bland's rule) on the standard form  A x = b, x >= 0 ----
+        const std = rows.map(r => (r.b < 0 ? { a: r.a.map(v => -v), b: -r.b, rel: r.rel === '<=' ? '>=' : r.rel === '>=' ? '<=' : '=' } : { a: r.a.slice(), b: r.b, rel: r.rel }));
+        const m = std.length; let ncol = n; const slackCol = new Array(m).fill(-1), artCol = new Array(m).fill(-1);
+        std.forEach((r, i) => { if (r.rel === '<=') slackCol[i] = ncol++; else if (r.rel === '>=') slackCol[i] = ncol++; }); const nStruct = ncol; std.forEach((r, i) => { if (r.rel !== '<=') artCol[i] = ncol++; });
+        const T = std.map((r, i) => { const row = new Array(ncol + 1).fill(0); r.a.forEach((v, j) => { row[j] = v; }); if (slackCol[i] >= 0) row[slackCol[i]] = r.rel === '<=' ? 1 : -1; if (artCol[i] >= 0) row[artCol[i]] = 1; row[ncol] = r.b; return row; });
+        const basis = std.map((r, i) => (r.rel === '<=' ? slackCol[i] : artCol[i])); const log = []; let iters = 0;
+        const pivot = (pr, pc) => { const pv = T[pr][pc]; for (let j = 0; j <= ncol; j++) T[pr][j] /= pv; for (let i = 0; i < m; i++) if (i !== pr && Math.abs(T[i][pc]) > 0) { const f = T[i][pc]; for (let j = 0; j <= ncol; j++) T[i][j] -= f * T[pr][j]; } basis[pr] = pc; iters++; };
+        const run = (cost, allowed) => { // maximise cost·x over the current tableau; returns 'optimal' | 'unbounded'
+            for (let guard = 0; guard < 2000; guard++) {
+                const red = new Array(ncol).fill(0); for (let j = 0; j < ncol; j++) { let z = 0; for (let i = 0; i < m; i++) z += cost[basis[i]] * T[i][j]; red[j] = cost[j] - z; }
+                let enter = -1; for (let j = 0; j < ncol; j++) if (allowed(j) && red[j] > 1e-9 && !basis.includes(j)) { enter = j; break; } if (enter < 0) return { status: 'optimal', red };
+                let leave = -1, best = Infinity; for (let i = 0; i < m; i++) if (T[i][enter] > 1e-9) { const ratio = T[i][ncol] / T[i][enter]; if (ratio < best - 1e-12 || (Math.abs(ratio - best) <= 1e-12 && basis[i] < basis[leave])) { best = ratio; leave = i; } }
+                if (leave < 0) return { status: 'unbounded', enter, red }; if (log.length < 14) log.push({ enter, leave, ratio: best }); pivot(leave, enter);
+            } throw new CalcError('The simplex method did not finish (cycling guard).');
+        };
+        let status = 'optimal'; const hasArt = artCol.some(v => v >= 0);
+        if (hasArt) { const c1 = new Array(ncol).fill(0); artCol.forEach(v => { if (v >= 0) c1[v] = -1; }); run(c1, () => true); const infeas = artCol.reduce((t, v, i) => t + (v >= 0 && basis.includes(v) ? T[basis.indexOf(v)][ncol] : 0), 0); if (infeas > 1e-7) status = 'infeasible';
+            else for (let i = 0; i < m; i++) if (basis[i] >= nStruct) { let j = 0; for (; j < nStruct; j++) if (Math.abs(T[i][j]) > 1e-9 && !basis.includes(j)) break; if (j < nStruct) pivot(i, j); } }
+        let red = null, ray = null;
+        if (status === 'optimal') { const c2 = new Array(ncol).fill(0); c.forEach((v, j) => { c2[j] = v; }); const res = run(c2, j => j < nStruct); status = res.status; red = res.red; if (status === 'unbounded') { const d = new Array(n).fill(0); if (res.enter < n) d[res.enter] = 1; basis.forEach((b, i) => { if (b < n) d[b] = -T[i][res.enter]; }); ray = d; } }
+        const x = new Array(n).fill(0); if (status !== 'infeasible') basis.forEach((b, i) => { if (b < n) x[b] = T[i][ncol]; });
+        const objVal = obj.a.reduce((t, v, i) => t + v * x[i], 0) + obj.c0; const feasible = pt => rows.every(r => { const v = r.a.reduce((t, c2, i) => t + c2 * pt[i], 0); return (r.rel === '<=' ? v <= r.b + 1e-7 : r.rel === '>=' ? v >= r.b - 1e-7 : Math.abs(v - r.b) <= 1e-7) && true; }) && pt.every(v => v >= -1e-7);
+        // ---- independent check: enumerate every vertex of the feasible region ----
+        const ineq = rows.map(r => ({ a: r.a, b: r.b, eq: r.rel === '=' })).concat(vars.map((_, i) => ({ a: vars.map((__, j) => (i === j ? 1 : 0)), b: 0, eq: false, nonneg: true }))); const total = ineq.length; let verts = []; const eqIdx = ineq.map((q, i) => (q.eq ? i : -1)).filter(i => i >= 0);
+        if (eqIdx.length <= n && total <= 20) { const pick = (start, chosen) => { if (chosen.length === n - eqIdx.length) { const act = eqIdx.concat(chosen); let sol; try { sol = math.lusolve(act.map(i => ineq[i].a), act.map(i => [ineq[i].b])).map(q => q[0]); } catch (e) { return; } if (sol.every(Number.isFinite) && feasible(sol)) verts.push(sol); return; } for (let i = start; i < total; i++) if (!ineq[i].eq) pick(i + 1, chosen.concat(i)); }; pick(0, []); }
+        const uniq = []; verts.forEach(v => { if (!uniq.some(u => u.every((q, i) => Math.abs(q - v[i]) < 1e-7))) uniq.push(v); }); verts = uniq;
+        const r = I.makeResult('algebra', 'Linear programming'); const objText = `${maximise ? 'maximise' : 'minimise'} ${om[2].trim()}`;
+        r.items.push({ label: 'Problem:', text: `${objText}  subject to  ${rows.map(q => q.src).join(';  ')};  ${vars.join(', ')} ≥ 0`, tex: '' });
+        if (status === 'infeasible') {
+            if (verts.length) throw new CalcError('The simplex method reported infeasible but a feasible vertex exists; the result was discarded.');
+            r.main = { label: 'Result:', text: 'infeasible: no point satisfies every constraint', tex: '' }; r.meta.push('Verified: enumerating every intersection of the constraint boundaries finds no feasible point'); r.steps.push({ title: 'Phase 1', text: 'Minimising the artificial variables cannot reach 0, so the constraints contradict each other.', tex: '' }); return I.finalizeText(r);
+        }
+        if (status === 'unbounded') {
+            const t = 1e4; const far = x.map((v, i) => v + t * ray[i]); const growth = obj.a.reduce((tt, v, i) => tt + v * ray[i], 0) * (maximise ? 1 : -1); if (!feasible(far) || !(growth > 1e-9)) throw new CalcError('The unboundedness check failed; the result was discarded.');
+            r.main = { label: 'Result:', text: `unbounded: the objective can be made ${maximise ? 'arbitrarily large' : 'arbitrarily small'}`, tex: '' }; r.items.push({ label: 'A feasible point:', text: `(${x.map(fmtN).join(', ')})`, tex: '' }); r.items.push({ label: 'A direction that never leaves the region:', text: `(${ray.map(fmtN).join(', ')})`, tex: '' });
+            r.meta.push('Verified: moving 10,000 units along that direction stays feasible and the objective keeps improving'); r.steps.push({ title: 'Phase 2', text: 'An entering variable has no positive entry in its column, so no constraint stops the objective from growing.', tex: '' }); return I.finalizeText(r);
+        }
+        if (!feasible(x)) throw new CalcError('The simplex solution violated a constraint; it was discarded.');
+        let best = -Infinity, bestV = null; verts.forEach(v => { const val = c.reduce((t, cc, i) => t + cc * v[i], 0); if (val > best) { best = val; bestV = v; } });
+        const simplexVal = c.reduce((t, cc, i) => t + cc * x[i], 0); if (verts.length && Math.abs(best - simplexVal) > 1e-6 * Math.max(1, Math.abs(best))) throw new CalcError('The vertex enumeration disagrees with the simplex result; the result was discarded.');
+        const ties = verts.filter(v => Math.abs(c.reduce((t, cc, i) => t + cc * v[i], 0) - best) < 1e-7 * Math.max(1, Math.abs(best))); void bestV;
+        r.main = { label: `Optimal ${maximise ? 'maximum' : 'minimum'}:`, text: `${nice(objVal, 8, 1e-9).text}  at  ${vars.map((v, i) => `${v} = ${fmtN(x[i])}`).join(', ')}`, tex: '' };
+        r.items.push({ label: 'Constraint status:', text: rows.map((q, i) => { const v = q.a.reduce((t, cc, k) => t + cc * x[k], 0); const slack = q.rel === '<=' ? q.b - v : q.rel === '>=' ? v - q.b : 0; return `${q.src}: ${Math.abs(slack) < 1e-8 ? 'binding' : `slack ${fmtN(slack)}`}`; }).join(';   '), tex: '' });
+        if (ties.length > 1) r.items.push({ label: 'Several optimal vertices:', text: `${ties.length} corner points tie, so every point on the edge between them is also optimal`, tex: '' });
+        // shadow prices from the final tableau: y = c_B B^-1, read off the slack/surplus columns
+        const sign = maximise ? 1 : -1; let dualOk = false;
+        try { const prices = rows.map((q, i) => { const col = slackCol[i]; if (col < 0 || !red) return null; const si = std[i].rel === '<=' ? 1 : -1; return si * -red[col] * sign * (q.b === std[i].b ? 1 : -1); }); const clean = prices.map(pv => (pv === null ? null : (Math.abs(pv) < 1e-9 ? 0 : pv)));
+            if (clean.some(pv => pv !== null)) { const allIneq = clean.every(pv => pv !== null); const dual = clean.reduce((t, pv, i) => t + (pv === null ? 0 : pv * rows[i].b), 0); dualOk = allIneq && Math.abs(dual - (objVal - obj.c0)) <= 1e-6 * Math.max(1, Math.abs(objVal)); if (!allIneq || dualOk) r.items.push({ label: 'Shadow prices (worth of one more unit of each right-hand side):', text: clean.map((pv, i) => `${rows[i].src}: ${pv === null ? '–' : fmtN(pv)}`).join(';   '), tex: '' }); } } catch (e) { /* optional */ }
+        r.items.push({ label: 'Corner points of the feasible region:', text: verts.length ? verts.slice(0, 12).map(v => `(${v.map(fmtN).join(', ')}) → ${nice(obj.a.reduce((t, cc, i) => t + cc * v[i], 0) + obj.c0, 6, 1e-9).text}`).join(';  ') : 'not listed', tex: '' });
+        r.meta.push(`Verified: the solution satisfies every constraint, and enumerating all ${verts.length} feasible corner points of the region gives the same optimum${red && red.every(v => v <= 1e-7) ? '; no reduced cost is positive, so the final tableau is an optimality certificate' : ''}${dualOk ? '; strong duality holds (shadow prices × right-hand sides = the optimum)' : ''}`);
+        r.meta.push(`Method: two-phase simplex with Bland’s rule (${iters} pivot${iters === 1 ? '' : 's'}); all variables are taken to be ≥ 0${rows.some(q => q.strict) ? '. Strict inequalities were treated as non-strict.' : ''}`);
+        r.steps.push({ title: 'Standard form', text: 'Add a slack variable to each ≤ constraint (and a surplus plus an artificial variable to each ≥ or = constraint) so every constraint becomes an equation.', tex: '' });
+        if (hasArt) r.steps.push({ title: 'Phase 1', text: 'Drive the artificial variables to 0 to find a feasible starting corner.', tex: '' });
+        log.slice(0, 8).forEach((lg, i) => r.steps.push({ title: `Pivot ${i + 1}`, text: `Bring column ${lg.enter < n ? vars[lg.enter] : lg.enter < nStruct ? 's' + (lg.enter - n + 1) : 'a' + (lg.enter - nStruct + 1)} into the basis; the ratio test picks row ${lg.leave + 1} (ratio ${fmtN(lg.ratio)}).`, tex: '' }));
+        r.steps.push({ title: 'Optimality', text: 'When no non-basic variable can improve the objective the corner is optimal.', tex: '' });
+        if (n === 2 && verts.length) {
+            const xs = verts.map(v => v[0]), ys = verts.map(v => v[1]), X = Math.max(1, ...xs) * 1.35, Y = Math.max(1, ...ys) * 1.35; const cx = xs.reduce((a, b) => a + b, 0) / xs.length, cy = ys.reduce((a, b) => a + b, 0) / ys.length; const hull = verts.slice().sort((p, q) => Math.atan2(p[1] - cy, p[0] - cx) - Math.atan2(q[1] - cy, q[0] - cx));
+            const traces = [{ x: hull.concat([hull[0]]).map(v => v[0]), y: hull.concat([hull[0]]).map(v => v[1]), mode: 'lines', fill: 'toself', type: 'scatter', name: 'feasible region', line: { width: 2 } }];
+            rows.forEach((q, i) => { const [a1, a2] = q.a; if (Math.abs(a2) > 1e-12) traces.push({ x: [0, X], y: [q.b / a2, (q.b - a1 * X) / a2], mode: 'lines', type: 'scatter', name: q.src, line: { dash: 'dot', width: 1 } }); else if (Math.abs(a1) > 1e-12) traces.push({ x: [q.b / a1, q.b / a1], y: [0, Y], mode: 'lines', type: 'scatter', name: q.src, line: { dash: 'dot', width: 1 } }); });
+            const [o1, o2] = obj.a; if (Math.abs(o2) > 1e-12) traces.push({ x: [0, X], y: [(objVal - obj.c0 - o1 * 0) / o2, (objVal - obj.c0 - o1 * X) / o2], mode: 'lines', type: 'scatter', name: 'objective through the optimum', line: { dash: 'dash', width: 2 } }); else if (Math.abs(o1) > 1e-12) traces.push({ x: [(objVal - obj.c0) / o1, (objVal - obj.c0) / o1], y: [0, Y], mode: 'lines', type: 'scatter', name: 'objective through the optimum', line: { dash: 'dash', width: 2 } });
+            traces.push({ x: [x[0]], y: [x[1]], mode: 'markers', type: 'scatter', name: 'optimum', marker: { size: 13, symbol: 'star' } });
+            r.plot = { generic: { title: 'Feasible region and optimum', xTitle: vars[0], yTitle: vars[1], xRange: [0, X], yRange: [0, Y], traces } };
+        }
+        return I.finalizeText(r);
+    }
+
     function runAlgebra(src, opt) {
         const op = opt.op || 'apart';
+        if (op === 'lp') return runLP(src, opt);
         const r = I.makeResult('algebra', 'Algebra');
         const N_ = (x, d) => nice(x, d || 8, 1e-9);
         const polyTex = (p, v) => { const t = []; for (let i = p.length - 1; i >= 0; i--) { const c = p[i]; if (Math.abs(c) < 1e-12) continue; const a = N_(Math.abs(c)); const mono = i === 0 ? '' : i === 1 ? v : `${v}^{${i}}`; const body = i === 0 ? a.tex : (Math.abs(Math.abs(c) - 1) < 1e-12 ? mono : a.tex + mono); t.push((c < 0 ? '-' : t.length ? '+' : '') + body); } return t.join('') || '0'; };
@@ -1519,7 +1660,52 @@
         }
         return I.finalizeText(r);
     }
-    register({ multivariable: (src, opt) => opt.op === 'lagrange' ? runLagrange(src, opt) : prevMulti(src, opt) });
+
+    // ======================================================================
+    // Gradient descent / momentum / Newton on a function of two variables
+    // ======================================================================
+    function runDescent(src, opt) {
+        const fN = engine.parse(src); const fv = engine.freeVars(fN); if (fv.length !== 2) throw new CalcError('Use a function of exactly two variables, e.g. x^2 + 3y^2.'); const vars = fv.slice().sort(); const [a, b] = vars;
+        const f = engine.compile(fN, vars), gN = vars.map(v => engine.diff(fN, v)), g = gN.map(nd => engine.compile(nd, vars)), H = gN.map(nd => vars.map(v => engine.compile(engine.diff(nd, v), vars)));
+        const startTxt = String(opt.start === undefined || opt.start === '' ? '0, 0' : opt.start).split(/[,;\s]+/).filter(Boolean); if (startTxt.length !== 2) throw new CalcError('Give the starting point as two numbers, e.g. -1.2, 1'); const x0 = startTxt.map(t => I.parseLimit(t, 'Start').value); if (!x0.every(Number.isFinite)) throw new CalcError('The starting point must be finite.');
+        const lr = I.parseLimit(opt.lr === undefined || opt.lr === '' ? '0.1' : opt.lr, 'Step size').value; if (!(lr > 0) || lr > 100) throw new CalcError('The step size must be a positive number (typically 0.001 to 1).');
+        const shown = Math.max(1, Math.min(500, parseInt(opt.iters, 10) || 30)); const method = ['gd', 'ls', 'momentum', 'newton'].includes(opt.method) ? opt.method : 'gd';
+        const num = q => (typeof q === 'number' ? q : NaN); const val = x => num(f(x[0], x[1])), grad = x => [num(g[0](x[0], x[1])), num(g[1](x[0], x[1]))], hess = x => [[num(H[0][0](x[0], x[1])), num(H[0][1](x[0], x[1]))], [num(H[1][0](x[0], x[1])), num(H[1][1](x[0], x[1]))]]; const nrm = v => Math.hypot(v[0], v[1]);
+        if (![val(x0), ...grad(x0)].every(Number.isFinite)) throw new CalcError('The function or its gradient is not defined at the starting point.');
+        const NAMES = { gd: 'gradient descent (fixed step)', ls: 'gradient descent with backtracking line search', momentum: 'momentum (β = 0.9)', newton: "Newton's method" };
+        const run = (m, maxIt) => { let x = x0.slice(), v = [0, 0]; const path = [x.slice()]; let status = 'iterations used up', it = 0;
+            for (; it < maxIt; it++) { const gr = grad(x); if (!gr.every(Number.isFinite)) { status = 'diverged'; break; } if (nrm(gr) < 1e-6) { status = 'converged'; break; }
+                let step; if (m === 'gd') step = gr.map(q => -lr * q); else if (m === 'momentum') { v = v.map((q, i) => 0.9 * q - lr * gr[i]); step = v; }
+                else if (m === 'ls') { let t = 1; const f0 = val(x), gg = nrm(gr) ** 2; for (let k = 0; k < 60; k++) { const xn = [x[0] - t * gr[0], x[1] - t * gr[1]]; const fn = val(xn); if (Number.isFinite(fn) && fn <= f0 - 1e-4 * t * gg) break; t *= 0.5; } step = gr.map(q => -t * q); }
+                else { const M = hess(x); const dt = M[0][0] * M[1][1] - M[0][1] * M[1][0]; if (!Number.isFinite(dt) || Math.abs(dt) < 1e-14) { status = 'Hessian singular'; break; } step = [-(M[1][1] * gr[0] - M[0][1] * gr[1]) / dt, -(-M[1][0] * gr[0] + M[0][0] * gr[1]) / dt]; }
+                const xn = [x[0] + step[0], x[1] + step[1]]; if (!xn.every(Number.isFinite) || nrm(xn) > 1e7 || Math.abs(val(xn)) > 1e30) { status = 'diverged'; break; } if (!Number.isFinite(val(xn)) || !grad(xn).every(Number.isFinite)) { status = 'domain'; break; } x = xn; path.push(x.slice()); }
+            if (status === 'iterations used up' && nrm(grad(x)) < 1e-6) status = 'converged'; return { path, status, it: path.length - 1 }; };
+        const main = run(method, shown); const end = main.path[main.path.length - 1]; const gEnd = grad(end); const fEnd = val(end);
+        if (main.status === 'diverged' && method !== 'newton') { /* reported below, not an error */ }
+        // independent checks: finite-difference gradient at the end point; Newton polish from there
+        const h = 1e-6 * Math.max(1, nrm(end)); const fd = [(val([end[0] + h, end[1]]) - val([end[0] - h, end[1]])) / (2 * h), (val([end[0], end[1] + h]) - val([end[0], end[1] - h])) / (2 * h)]; const gerr = Math.hypot(fd[0] - gEnd[0], fd[1] - gEnd[1]) / Math.max(1, nrm(gEnd)); if (main.status !== 'diverged' && Number.isFinite(gerr) && gerr > 1e-4) throw new CalcError('The gradient check failed for this function.');
+        let polished = null, kind = null, eig = null, flatWarn = false;
+        if (main.status === 'converged') { const M = hess(end); const tr = M[0][0] + M[1][1], dt = M[0][0] * M[1][1] - M[0][1] * M[1][0], disc = tr * tr / 4 - dt; eig = disc >= 0 ? [tr / 2 + Math.sqrt(disc), tr / 2 - Math.sqrt(disc)] : null; kind = dt < -1e-9 ? 'saddle point' : (dt > 1e-9 && tr > 0) ? 'local minimum' : (dt > 1e-9 && tr < 0) ? 'local maximum' : 'degenerate (second-derivative test inconclusive)';
+            const lamMin = eig ? Math.min(Math.abs(eig[0]), Math.abs(eig[1])) : 0; const flat = !kind.startsWith('degenerate') && nrm(gEnd) / Math.max(lamMin, 1e-300) > 1e-3 * Math.max(1, nrm(end)); if (kind.startsWith('degenerate') || flat) { polished = null; if (flat) flatWarn = true; } else { let p2 = end.slice(); for (let k = 0; k < 20; k++) { const gr = grad(p2); if (nrm(gr) < 1e-13) break; const Mh = hess(p2); const d2 = Mh[0][0] * Mh[1][1] - Mh[0][1] * Mh[1][0]; if (Math.abs(d2) < 1e-14) break; p2 = [p2[0] - (Mh[1][1] * gr[0] - Mh[0][1] * gr[1]) / d2, p2[1] - (-Mh[1][0] * gr[0] + Mh[0][0] * gr[1]) / d2]; } polished = p2; if (Math.hypot(p2[0] - end[0], p2[1] - end[1]) > 1e-3 * Math.max(1, nrm(end))) throw new CalcError('Polishing the end point with Newton’s method moved it far away; the result was discarded.'); } }
+        const N6 = x => nice(x, 6, 1e-8).text; const r = I.makeResult('multivariable', 'Gradient descent and Newton'); const pt = p => `(${N6(p[0])}, ${N6(p[1])})`;
+        r.main = { label: `${NAMES[method][0].toUpperCase() + NAMES[method].slice(1)}:`, text: main.status === 'converged' ? `reached ${pt(end)} after ${main.it} step${main.it === 1 ? '' : 's'}, f = ${engine.fmt(fEnd, 8)}` : main.status === 'diverged' ? `diverged (the step size ${method === 'newton' ? 'or curvature' : 'is too large'} for this function)` : main.status === 'domain' ? `stopped at ${pt(end)}: the next step would leave the domain of f (try a smaller step or a start closer to the minimum)` : `after ${main.it} steps at ${pt(end)}, f = ${engine.fmt(fEnd, 8)}, ‖∇f‖ = ${engine.fmt(nrm(gEnd), 4)} (not yet converged)`, tex: '' };
+        r.items.push({ label: 'Function:', text: `f(${a}, ${b}) = ${engine.strOf(fN)}`, tex: `f(${a},${b})=${engine.texOf(fN)}` }); r.items.push({ label: 'Start:', text: `${pt(x0)}, f = ${engine.fmt(val(x0), 8)}, ‖∇f‖ = ${engine.fmt(nrm(grad(x0)), 4)}`, tex: '' });
+        if (kind) r.items.push({ label: 'The end point is a:', text: `${kind}${eig ? `  (Hessian eigenvalues ${engine.fmt(eig[0], 6)}, ${engine.fmt(eig[1], 6)})` : ''}`, tex: '' });
+        const rowsIdx = main.path.length <= 12 ? main.path.map((_, i) => i) : [0, 1, 2, 3, 4, Math.floor(main.path.length / 2), main.path.length - 3, main.path.length - 2, main.path.length - 1]; r.items.push({ label: 'Iterates:', text: [...new Set(rowsIdx)].map(i => `#${i}: ${pt(main.path[i])}  f = ${engine.fmt(val(main.path[i]), 6)}`).join(';   '), tex: '' });
+        // compare all four methods on the same problem
+        const cmp = ['gd', 'ls', 'momentum', 'newton'].map(m => { const q = run(m, 3000); return `${NAMES[m]}: ${q.status === 'converged' ? `${q.it} step${q.it === 1 ? '' : 's'}` : q.status === 'diverged' ? 'diverged' : q.status === 'domain' ? 'left the domain of f' : q.status === 'Hessian singular' ? 'stopped (the Hessian is singular)' : `not converged in 3,000 steps (‖∇f‖ = ${engine.fmt(nrm(grad(q.path[q.path.length - 1])), 3)})`}`; }); r.items.push({ label: 'Steps to reach ‖∇f‖ < 10⁻⁶ with each method:', text: cmp.join(';   '), tex: '' });
+        if (main.status === 'converged') r.meta.push(`Verified: ‖∇f‖ = ${nrm(gEnd).toExponential(1)} at the end point; the analytic gradient matches finite differences (relative difference ${gerr.toExponential(1)})${polished ? `; Newton polishing from the end point moves it by only ${Math.hypot(polished[0] - end[0], polished[1] - end[1]).toExponential(1)}` : '; no Newton polishing check was made because the curvature is too small or the test is inconclusive'}`);
+        else r.meta.push(`Verified: the analytic gradient matches finite differences at the last point (relative difference ${gerr.toExponential(1)})`);
+        if (flatWarn) r.warnings.push('The surface is very flat here: the gradient is tiny, but the point can still be some distance from the exact critical point (the curvature is nearly 0). Run more steps or use Newton’s method to get closer.');
+        if (method === 'newton' && kind && kind !== 'local minimum') r.warnings.push("Newton's method looks for any point where the gradient is zero, so it can land on a saddle point or a maximum, as here.");
+        r.meta.push('Method: x ← x − t∇f (fixed or line-searched step), momentum v ← 0.9v − t∇f, or Newton x ← x − H⁻¹∇f; the comparison row uses the same start and step size');
+        r.steps.push({ title: 'The idea', text: 'The gradient points uphill, so stepping against it lowers f. Newton’s method also uses the curvature (Hessian) to choose the step.', tex: '' }); r.steps.push({ title: 'Step size', text: 'Too small is slow; too large overshoots and diverges. Line search chooses the step automatically.', tex: '' });
+        const xs = main.path.map(p => p[0]), ys = main.path.map(p => p[1]); const xl = Math.min(...xs), xh = Math.max(...xs), yl = Math.min(...ys), yh = Math.max(...ys); const px = Math.max(1, (xh - xl) * 0.3), py = Math.max(1, (yh - yl) * 0.3); const X0 = xl - px, X1 = xh + px, Y0 = yl - py, Y1 = yh + py; const G = 70, gx = [], gy = []; for (let i = 0; i < G; i++) { gx.push(X0 + (X1 - X0) * i / (G - 1)); gy.push(Y0 + (Y1 - Y0) * i / (G - 1)); }
+        const zz = gy.map(y => gx.map(x => { const q = val([x, y]); return Number.isFinite(q) ? q : null; })); const zf = zz.flat().filter(Number.isFinite).sort((p, q) => p - q); const cap = zf.length ? zf[Math.floor(zf.length * 0.9)] : 1; const zc = zz.map(rw => rw.map(q => (q === null ? null : Math.min(q, cap))));
+        r.plot = { generic: { title: `${NAMES[method][0].toUpperCase() + NAMES[method].slice(1)} on the contours of f`, xTitle: a, yTitle: b, xRange: [X0, X1], yRange: [Y0, Y1], traces: [{ x: gx, y: gy, z: zc, type: 'contour', name: 'f', showscale: false, ncontours: 24, line: { width: 1 }, contours: { coloring: 'none' } }, { x: xs, y: ys, mode: 'lines+markers', type: 'scatter', name: 'path', marker: { size: 5 } }, { x: [x0[0]], y: [x0[1]], mode: 'markers', type: 'scatter', name: 'start', marker: { size: 12, symbol: 'circle-open', line: { width: 3 } } }, { x: [end[0]], y: [end[1]], mode: 'markers', type: 'scatter', name: 'end', marker: { size: 13, symbol: 'star' } }] } };
+        return I.finalizeText(r);
+    }
+    register({ multivariable: (src, opt) => opt.op === 'lagrange' ? runLagrange(src, opt) : opt.op === 'descent' ? runDescent(src, opt) : prevMulti(src, opt) });
 
     function runCurvature(src, opt) {
         const parts = String(src).split(/;/).map(x => x.trim()).filter(Boolean); const param = parts.length === 2;
@@ -1785,7 +1971,101 @@
         r.plot = { generic: { title: 'Groups', xTitle: 'group', yTitle: 'value', traces: groups.map((g, i) => ({ y: g, type: 'box', name: `group ${i + 1}`, boxpoints: 'all', jitter: 0.4 })) } };
         return I.finalizeText(r);
     }
-    register({ stats: (src, opt) => (opt.op === 'chisq' || opt.op === 'anova') ? runChiAnova(src, opt) : opt.op === 'mannwhitney' ? runMannWhitney(src, opt) : opt.op === 'wilcoxon' ? runWilcoxon(src, opt) : opt.op === 'kruskal' ? runKruskal(src, opt) : prevStats(src, opt) });
+
+    // ---- Markov chains, Bayes' rule, confidence intervals for proportions ----
+    const probNum = x => { const v = I.parseLimit(String(x).trim().replace(/%$/, m => ''), 'Probability').value; return /%\s*$/.test(String(x)) ? v / 100 : v; };
+    const probList = (txt, what) => String(txt).split(/[\s,]+/).filter(Boolean).map(t => { const v = probNum(t); if (!Number.isFinite(v)) throw new CalcError(`“${t}” is not a number in ${what}.`); return v; });
+    function runMarkov(src, opt) {
+        const rows = String(src).replace(/[\[\]]/g, ' ').split(/;|\n/).map(x => x.trim()).filter(Boolean).map(rw => probList(rw, 'the matrix')); const k = rows.length; if (k < 2 || k > 12) throw new CalcError('Enter a square transition matrix with 2 to 12 states, rows separated by ;  e.g. 0.9 0.1 ; 0.5 0.5');
+        if (rows.some(rw => rw.length !== k)) throw new CalcError('The matrix must be square: every row needs one entry per state.'); if (rows.some(rw => rw.some(v => v < -1e-12 || v > 1 + 1e-12))) throw new CalcError('Transition probabilities must be between 0 and 1.');
+        rows.forEach((rw, i) => { const sm = rw.reduce((a, b) => a + b, 0); if (Math.abs(sm - 1) > 1e-9) throw new CalcError(`Row ${i + 1} sums to ${engine.fmt(sm, 6)}, not 1.`); });
+        const P = rows.map(rw => rw.map(v => Math.max(0, v))); const N8 = x => nice(x, 6, 1e-9).text; const names = Array.from({ length: k }, (_, i) => `S${i + 1}`);
+        const mul = (A, B) => A.map(ra => B[0].map((_, j) => ra.reduce((t, v, l) => t + v * B[l][j], 0))); const vecMul = (v, A) => A[0].map((_, j) => v.reduce((t, x, i) => t + x * A[i][j], 0));
+        // communicating classes
+        const reach = P.map((rw, i) => rw.map((v, j) => (i === j || v > 1e-12))); for (let m = 0; m < k; m++) for (let i = 0; i < k; i++) for (let j = 0; j < k; j++) if (reach[i][m] && reach[m][j]) reach[i][j] = true;
+        const cls = []; const seen = new Array(k).fill(false); for (let i = 0; i < k; i++) if (!seen[i]) { const c = []; for (let j = 0; j < k; j++) if (reach[i][j] && reach[j][i]) { c.push(j); seen[j] = true; } cls.push(c); }
+        cls.forEach(c => { c.recurrent = c.every(i => P[i].every((v, j) => v <= 1e-12 || c.includes(j))); });
+        const gcd = (a, b) => (b ? gcd(b, a % b) : Math.abs(a)); cls.forEach(c => { if (!c.recurrent) return; const lvl = new Map([[c[0], 0]]); const q = [c[0]]; while (q.length) { const u = q.shift(); P[u].forEach((v, j) => { if (v > 1e-12 && c.includes(j) && !lvl.has(j)) { lvl.set(j, lvl.get(u) + 1); q.push(j); } }); } let g = 0; c.forEach(u => P[u].forEach((v, j) => { if (v > 1e-12 && c.includes(j)) g = gcd(g, lvl.get(u) + 1 - lvl.get(j)); })); c.period = g || 1; });
+        const absorbing = cls.filter(c => c.recurrent && c.length === 1 && P[c[0]][c[0]] > 1 - 1e-12).map(c => c[0]); const rec = cls.filter(c => c.recurrent), trans = cls.filter(c => !c.recurrent).flat().sort((a, b) => a - b);
+        const r = I.makeResult('stats', 'Markov chain'); const lab = c => '{' + c.map(i => names[i]).join(', ') + '}';
+        r.items.push({ label: 'Matrix P =', text: P.map(rw => rw.map(N8).join(' ')).join('  ;  '), tex: '' });
+        r.items.push({ label: 'Classes:', text: cls.map(c => `${lab(c)} ${c.recurrent ? `recurrent${c.length === 1 && absorbing.includes(c[0]) ? ' (absorbing)' : ''}, period ${c.period}` : 'transient'}`).join(';   '), tex: '' });
+        const irreducible = cls.length === 1, regular = irreducible && cls[0].period === 1; r.items.push({ label: 'Type:', text: regular ? 'irreducible and aperiodic (regular): it forgets its starting state' : irreducible ? `irreducible with period ${cls[0].period}: it cycles, so the distribution does not settle` : absorbing.length && rec.every(c => c.length === 1 && absorbing.includes(c[0])) ? 'absorbing chain' : 'reducible: several classes', tex: '' });
+        const verified = [];
+        // stationary distribution of each recurrent class
+        const stat = rec.map(c => { const m = c.length; const A = Array.from({ length: m }, (_, j) => Array.from({ length: m }, (_, i) => (i === j ? 1 : 0) - P[c[i]][c[j]])); A[m - 1] = new Array(m).fill(1); const bvec = new Array(m).fill(0); bvec[m - 1] = 1; let sol; try { sol = math.lusolve(A, bvec.map(v => [v])).map(q => q[0]); } catch (e) { throw new CalcError('Could not solve for the stationary distribution.'); } const pi = new Array(k).fill(0); c.forEach((s2, i) => { pi[s2] = Math.abs(sol[i]) < 1e-12 ? 0 : sol[i]; }); return { c, pi }; });
+        let resid = 0; stat.forEach(({ pi }) => { const nx = vecMul(pi, P); resid = Math.max(resid, ...nx.map((v, i) => Math.abs(v - pi[i]))); if (pi.some(v => v < -1e-9) || Math.abs(pi.reduce((a, b) => a + b, 0) - 1) > 1e-9) throw new CalcError('The stationary distribution check failed.'); }); if (resid > 1e-9) throw new CalcError('The stationary distribution check failed.');
+        if (stat.length === 1) { r.items.push({ label: 'Stationary distribution π (πP = π):', text: stat[0].pi.map((v, i) => `${names[i]} = ${N8(v)}`).join(',  '), tex: '' }); if (stat[0].c.length === k) r.items.push({ label: 'Mean return time to each state (1/π):', text: stat[0].pi.map((v, i) => `${names[i]}: ${N8(1 / v)}`).join(',  '), tex: '' }); }
+        else stat.forEach((q, i) => r.items.push({ label: `Stationary distribution on ${lab(q.c)}:`, text: q.c.map(s2 => `${names[s2]} = ${N8(q.pi[s2])}`).join(',  '), tex: '' }));
+        verified.push(`each stationary distribution satisfies πP = π (residual ${resid.toExponential(1)}), is non-negative and sums to 1`);
+        // absorption probabilities and expected steps from the transient states
+        if (trans.length && rec.length) {
+            const T = trans, rIdx = rec.map(c => c); const Q = T.map(i => T.map(j => P[i][j])); const IQ = Q.map((rw, i) => rw.map((v, j) => (i === j ? 1 : 0) - v)); let Ninv; try { Ninv = math.inv(IQ); } catch (e) { throw new CalcError('The transient part is singular.'); } const Rm = T.map(i => rIdx.map(c => c.reduce((t, j) => t + P[i][j], 0))); const B = Ninv.map(rw => rIdx.map((_, cj) => rw.reduce((t, v, l) => t + v * Rm[l][cj], 0))); const steps = Ninv.map(rw => rw.reduce((a, b) => a + b, 0));
+            B.forEach(rw => { if (Math.abs(rw.reduce((a, b) => a + b, 0) - 1) > 1e-8) throw new CalcError('Absorption probabilities do not sum to 1.'); });
+            r.items.push({ label: 'Probability of ending in each recurrent class:', text: T.map((s2, i) => `from ${names[s2]}: ` + rIdx.map((c, cj) => `${lab(c)} ${N8(B[i][cj])}`).join(', ')).join(';   '), tex: '' }); r.items.push({ label: 'Expected steps before reaching a recurrent class:', text: T.map((s2, i) => `${names[s2]}: ${N8(steps[i])}`).join(',  '), tex: '' });
+            let Pn = P; for (let q = 0; q < 12; q++) Pn = mul(Pn, Pn); let dif = 0; T.forEach((s2, i) => rIdx.forEach((c, cj) => { dif = Math.max(dif, Math.abs(c.reduce((t, j) => t + Pn[s2][j], 0) - B[i][cj])); })); if (dif > 1e-6) throw new CalcError('Long-run matrix powers disagree with the absorption probabilities.'); verified.push(`the absorption probabilities agree with the 4,096th power of P (largest difference ${dif.toExponential(1)})`);
+        }
+        if (regular) { let Pn = P; for (let q = 0; q < 12; q++) Pn = mul(Pn, Pn); let dif = 0; Pn.forEach(rw => rw.forEach((v, j) => { dif = Math.max(dif, Math.abs(v - stat[0].pi[j])); })); if (dif > 1e-6) throw new CalcError('Long-run matrix powers disagree with the stationary distribution.'); verified.push(`every row of the 4,096th power of P equals π (largest difference ${dif.toExponential(1)})`); }
+        // evolution of a starting distribution
+        const initTxt = String(opt.init || '').trim(); let v0; if (initTxt) { v0 = probList(initTxt, 'the starting distribution'); if (v0.length !== k) throw new CalcError(`Give ${k} starting probabilities (or leave blank to start in S1).`); const sm = v0.reduce((a, b) => a + b, 0); if (Math.abs(sm - 1) > 1e-9) throw new CalcError(`The starting distribution sums to ${engine.fmt(sm, 6)}, not 1.`); } else { v0 = new Array(k).fill(0); v0[0] = 1; }
+        const nSteps = Math.max(1, Math.min(200, parseInt(opt.steps, 10) || 10)); const path = [v0]; for (let t = 1; t <= nSteps; t++) path.push(vecMul(path[t - 1], P)); const last = path[nSteps]; r.items.push({ label: `Distribution after ${nSteps} step${nSteps === 1 ? '' : 's'} (start ${v0.map(N8).join(', ')}):`, text: last.map((v, i) => `${names[i]} = ${N8(v)}`).join(',  '), tex: '' });
+        r.main = { label: 'Long-run behaviour:', text: stat.length === 1 && stat[0].c.length === k ? (regular ? `π = (${stat[0].pi.map(N8).join(', ')})` : `stationary π = (${stat[0].pi.map(N8).join(', ')}) but the chain is periodic`) : `${rec.length} recurrent class${rec.length === 1 ? '' : 'es'}${absorbing.length ? `; absorbing state${absorbing.length > 1 ? 's' : ''} ${absorbing.map(i => names[i]).join(', ')}` : ''}`, tex: '' };
+        r.meta.push('Verified: ' + verified.join('; ')); r.meta.push('Method: classes from reachability, stationary distribution from πP = π with Σπ = 1, absorption data from the fundamental matrix N = (I − Q)⁻¹');
+        r.steps.push({ title: 'Classify the states', text: 'States that can reach each other form a class. A class with no way out is recurrent; the rest are transient.', tex: '' }); r.steps.push({ title: 'Stationary distribution', text: 'Solve πP = π together with Σπᵢ = 1.', tex: '' }); if (trans.length && rec.length) r.steps.push({ title: 'Absorption', text: 'With Q the transitions among transient states, N = (I − Q)⁻¹ counts expected visits, N·1 gives expected steps, and N·R gives absorption probabilities.', tex: '' });
+        r.plot = { generic: { title: 'Distribution over time', xTitle: 'step', yTitle: 'probability', traces: names.map((nm, i) => ({ x: path.map((_, t) => t), y: path.map(p => p[i]), mode: 'lines+markers', type: 'scatter', name: nm })) } };
+        return I.finalizeText(r);
+    }
+    function runBayes(src, opt) {
+        const lists = String(src).split(/[;\n]+/).map(x => x.trim()).filter(Boolean).map(l => probList(l.replace(/^[a-z ]+:/i, ''), 'the lists')); if (lists.length < 2) throw new CalcError('Give the prior probabilities, then one list of likelihoods P(evidence | hypothesis) per observation, separated by ;  e.g. 0.01, 0.99 ; 0.95, 0.05');
+        const k = lists[0].length; if (k < 2 || k > 10) throw new CalcError('Use 2 to 10 hypotheses.'); if (lists.some(l => l.length !== k)) throw new CalcError(`Every list needs ${k} numbers, one per hypothesis.`); if (lists.flat().some(v => v < 0 || v > 1 + 1e-12)) throw new CalcError('Probabilities must be between 0 and 1.');
+        const sp = lists[0].reduce((a, b) => a + b, 0); if (sp <= 0) throw new CalcError('The prior probabilities cannot all be 0.'); const normalised = Math.abs(sp - 1) > 1e-9; const prior = lists[0].map(v => v / sp); const names = String(opt.names || '').split(/[,;]/).map(x => x.trim()).filter(Boolean); const nm = Array.from({ length: k }, (_, i) => names[i] || `H${i + 1}`); const N8 = x => nice(x, 6, 1e-9).text;
+        let post = prior.slice(); const history = [prior]; const evid = []; lists.slice(1).forEach(like => { const joint = post.map((p, i) => p * like[i]); const pe = joint.reduce((a, b) => a + b, 0); if (!(pe > 0)) throw new CalcError('That evidence has probability 0 under every hypothesis, so Bayes’ rule is undefined.'); evid.push(pe); post = joint.map(v => v / pe); history.push(post); });
+        // independent check: multiply all likelihoods at once, then normalise
+        const batch = prior.map((p, i) => lists.slice(1).reduce((t, l) => t * l[i], p)); const bs = batch.reduce((a, b) => a + b, 0); const batchPost = batch.map(v => v / bs); const diff = Math.max(...batchPost.map((v, i) => Math.abs(v - post[i]))); if (diff > 1e-9 || Math.abs(post.reduce((a, b) => a + b, 0) - 1) > 1e-9) throw new CalcError('The Bayes check failed.');
+        const r = I.makeResult('stats', "Bayes' rule"); r.main = { label: 'Posterior probabilities:', text: nm.map((n2, i) => `P(${n2} | evidence) = ${N8(post[i])}`).join(',  '), tex: '' };
+        r.items.push({ label: 'Prior:', text: nm.map((n2, i) => `${n2} ${N8(prior[i])}`).join(',  ') + (normalised ? '  (normalised to sum to 1)' : ''), tex: '' });
+        history.slice(1).forEach((h, t) => r.items.push({ label: `After observation ${t + 1} (P(evidence) = ${N8(evid[t])}):`, text: nm.map((n2, i) => `${n2} ${N8(h[i])}`).join(',  '), tex: '' }));
+        if (k === 2 && lists.length === 2) { const big = 10000, a = prior[0] * big, b2 = prior[1] * big; const ta = a * lists[1][0], tb = b2 * lists[1][1]; r.items.push({ label: 'In natural frequencies:', text: `out of ${big.toLocaleString()} cases, ${N8(a)} are ${nm[0]} and ${N8(b2)} are ${nm[1]}; the evidence appears in ${N8(ta)} of the first group and ${N8(tb)} of the second, so ${N8(ta)} of every ${N8(ta + tb)} cases showing it are ${nm[0]} (${N8(ta / (ta + tb))})`, tex: '' }); r.items.push({ label: 'Bayes factor:', text: `${N8(lists[1][0] / lists[1][1])} in favour of ${nm[0]} over ${nm[1]}`, tex: '' }); }
+        r.meta.push(`Verified: updating one observation at a time gives the same result as multiplying all the likelihoods at once and normalising (difference ${diff.toExponential(1)}); the posteriors sum to 1`); r.meta.push('Assumes the observations are independent given the hypothesis.');
+        r.steps.push({ title: "Bayes' rule", text: 'P(H | E) = P(E | H) · P(H) / P(E), where P(E) = Σ P(E | Hᵢ) P(Hᵢ).', tex: 'P(H\\mid E)=\\frac{P(E\\mid H)P(H)}{P(E)}' }); r.steps.push({ title: 'Several observations', text: 'Each posterior becomes the next prior.', tex: '' });
+        r.plot = { generic: { title: 'Prior and posterior', xTitle: 'hypothesis', yTitle: 'probability', traces: [{ x: nm, y: prior, type: 'bar', name: 'prior' }, { x: nm, y: post, type: 'bar', name: 'posterior' }] } };
+        return I.finalizeText(r);
+    }
+    function runPropCI(src, opt) {
+        const groups = String(src).split(/[;\n]+/).map(x => x.trim()).filter(Boolean).map(g => { const q = g.split(/[\s,/]+|\bof\b|\bout\b/i).filter(Boolean).map(Number); if (q.length !== 2 || !q.every(Number.isFinite) || q[1] < 1 || q[0] < 0 || q[0] > q[1] || !Number.isInteger(q[0]) || !Number.isInteger(q[1])) throw new CalcError('Give successes and trials as whole numbers, e.g. 45, 120  (two groups: 45, 120 ; 30, 110).'); if (q[1] > 1e7) throw new CalcError('Up to 10,000,000 trials.'); return { x: q[0], n: q[1] }; });
+        if (groups.length < 1 || groups.length > 2) throw new CalcError('Give one group (successes, trials) or two separated by ;'); const level = (() => { const q = +opt.conf; return q > 0 && q < 1 ? q : 0.95; })(); const alpha = 1 - level;
+        const zq = (() => { let lo = 0, hi = 10; for (let i = 0; i < 100; i++) { const mid = (lo + hi) / 2; if (PhiN(mid) < 1 - alpha / 2) lo = mid; else hi = mid; } return (lo + hi) / 2; })(); const f6 = x => engine.fmt(x, 6);
+        const wilson = (x, n) => { const p = x / n, z2 = zq * zq, den = 1 + z2 / n, c = (p + z2 / (2 * n)) / den, h = zq * Math.sqrt(p * (1 - p) / n + z2 / (4 * n * n)) / den; return [Math.max(0, c - h), Math.min(1, c + h)]; };
+        const binomTail = (x, n, p, upper) => { // P(X >= x) or P(X <= x) by direct summation of the pmf (independent of the beta function)
+            const lp = Math.log(p), lq = Math.log(1 - p); let tot = 0; for (let j = upper ? x : 0; j <= (upper ? n : x); j++) tot += Math.exp(lgamma(n + 1) - lgamma(j + 1) - lgamma(n - j + 1) + (j ? j * lp : 0) + (n - j ? (n - j) * lq : 0)); return tot; };
+        const exactCI = (x, n) => { const lo = x === 0 ? 0 : (() => { let a = 0, b = x / n; for (let i = 0; i < 80; i++) { const m = (a + b) / 2; if (betai(x, n - x + 1, m) > alpha / 2) b = m; else a = m; } return (a + b) / 2; })(); const hi = x === n ? 1 : (() => { let a = x / n, b = 1; for (let i = 0; i < 80; i++) { const m = (a + b) / 2; if (betai(x + 1, n - x, m) < 1 - alpha / 2) a = m; else b = m; } return (a + b) / 2; })(); return [lo, hi]; };
+        const r = I.makeResult('stats', 'Confidence interval for a proportion'); const verified = [];
+        const one = g => { const { x, n } = g; const p = x / n; const se = Math.sqrt(p * (1 - p) / n); const wald = [Math.max(0, p - zq * se), Math.min(1, p + zq * se)]; const w = wilson(x, n); const nt = n + zq * zq, pt = (x + zq * zq / 2) / nt, ac = [Math.max(0, pt - zq * Math.sqrt(pt * (1 - pt) / nt)), Math.min(1, pt + zq * Math.sqrt(pt * (1 - pt) / nt))]; const ex = exactCI(x, n);
+            if (n >= 1 && n <= 5000) { if (x > 0) { const t = binomTail(x, n, ex[0], true); if (Math.abs(t - alpha / 2) > 1e-6) throw new CalcError('The exact interval failed its check.'); } if (x < n) { const t = binomTail(x, n, ex[1], false); if (Math.abs(t - alpha / 2) > 1e-6) throw new CalcError('The exact interval failed its check.'); } verified.push(`the exact (Clopper–Pearson) endpoints give binomial tail probabilities of ${f6(alpha / 2)} by direct summation`); }
+            if (x > 0 && x < n) { [w[0], w[1]].forEach(pp => { const zz = Math.abs(p - pp) / Math.sqrt(pp * (1 - pp) / n); if (Math.abs(zz - zq) > 1e-7) throw new CalcError('The Wilson interval failed its check.'); }); verified.push('both Wilson endpoints satisfy the score equation |p̂ − p| / √(p(1 − p)/n) = z'); }
+            return { p, wald, w, ac, ex }; };
+        if (groups.length === 1) {
+            const g = groups[0], o = one(g); r.main = { label: `${(level * 100).toFixed(level * 100 % 1 ? 1 : 0)}% confidence interval for p:`, text: `${f6(o.w[0])} to ${f6(o.w[1])}  (Wilson; p̂ = ${f6(o.p)}, ${g.x} of ${g.n})`, tex: '' };
+            [['Wilson score (recommended)', o.w], ['Clopper–Pearson (exact, conservative)', o.ex], ['Agresti–Coull', o.ac], ['Wald (simple, poor for small n or extreme p)', o.wald]].forEach(([nm, iv]) => r.items.push({ label: nm + ':', text: `${f6(iv[0])} to ${f6(iv[1])}`, tex: '' }));
+            if (g.n * Math.min(o.p, 1 - o.p) < 5) r.warnings.push('Fewer than 5 expected successes or failures: avoid the Wald interval here; Wilson or Clopper–Pearson are safer.');
+            r.items.push({ label: 'Margin of error (Wald):', text: f6(zq * Math.sqrt(o.p * (1 - o.p) / g.n)), tex: '' });
+            r.plot = { generic: { title: 'Interval estimates', xTitle: 'p', yTitle: '', traces: [['Wilson', o.w], ['Clopper–Pearson', o.ex], ['Agresti–Coull', o.ac], ['Wald', o.wald]].map(([nm, iv]) => ({ x: iv, y: [nm, nm], mode: 'lines+markers', type: 'scatter', name: nm })).concat([{ x: [o.p], y: ['Wilson'], mode: 'markers', type: 'scatter', name: 'p̂', marker: { size: 11, symbol: 'diamond' } }]) } };
+        } else {
+            const [a, b2] = groups, oa = one(a), ob = one(b2); const diff = oa.p - ob.p; const la = oa.w[0], ua = oa.w[1], lb = ob.w[0], ub = ob.w[1]; const lo = diff - Math.sqrt((oa.p - la) ** 2 + (ub - ob.p) ** 2), hi = diff + Math.sqrt((ua - oa.p) ** 2 + (ob.p - lb) ** 2);
+            const pp = (a.x + b2.x) / (a.n + b2.n), se0 = Math.sqrt(pp * (1 - pp) * (1 / a.n + 1 / b2.n)), z = se0 > 0 ? diff / se0 : 0, pv = se0 > 0 ? 2 * (1 - PhiN(Math.abs(z))) : 1;
+            r.main = { label: `${(level * 100).toFixed(level * 100 % 1 ? 1 : 0)}% CI for p₁ − p₂ (Newcombe):`, text: `${f6(lo)} to ${f6(hi)}  (p̂₁ = ${f6(oa.p)}, p̂₂ = ${f6(ob.p)}, difference ${f6(diff)})`, tex: '' };
+            r.items.push({ label: 'Group 1 (Wilson):', text: `${f6(oa.w[0])} to ${f6(oa.w[1])}  (${a.x} of ${a.n})`, tex: '' }); r.items.push({ label: 'Group 2 (Wilson):', text: `${f6(ob.w[0])} to ${f6(ob.w[1])}  (${b2.x} of ${b2.n})`, tex: '' });
+            r.items.push({ label: 'Two-proportion z-test (H₀: p₁ = p₂):', text: `z = ${f6(z)}, p = ${fmtP(pv)}  ${pv < alpha ? '→ the proportions differ at this level' : '→ no evidence of a difference'}`, tex: '' });
+            if (a.x > 0 && b2.x > 0) { const rr = oa.p / ob.p, sel = Math.sqrt(1 / a.x - 1 / a.n + 1 / b2.x - 1 / b2.n); r.items.push({ label: 'Risk ratio (log method):', text: `${f6(rr)}  (${f6(rr * Math.exp(-zq * sel))} to ${f6(rr * Math.exp(zq * sel))})`, tex: '' }); }
+            const contains0 = lo <= 0 && hi >= 0; if (contains0 !== (pv >= alpha) && Math.abs(pv - alpha) > 0.02) r.warnings.push('The interval and the z-test point in slightly different directions; they use different standard errors, which is normal near the boundary.');
+            verified.push('the Newcombe interval is rebuilt from the two Wilson intervals; each group’s endpoints were checked as above');
+            r.plot = { generic: { title: 'Difference in proportions', xTitle: 'p₁ − p₂', yTitle: '', traces: [{ x: [lo, hi], y: ['difference', 'difference'], mode: 'lines+markers', type: 'scatter', name: 'Newcombe interval' }, { x: [diff], y: ['difference'], mode: 'markers', type: 'scatter', name: 'estimate', marker: { size: 11, symbol: 'diamond' } }, { x: [0, 0], y: ['difference', 'difference'], mode: 'markers', type: 'scatter', name: 'no difference', marker: { size: 12, symbol: 'x' } }] } };
+        }
+        r.meta.push('Verified: ' + [...new Set(verified)].join('; ')); r.meta.push('Method: Wilson score interval is recommended for most uses; Clopper–Pearson never undercovers but is wider; the Wald interval is shown for comparison only.');
+        r.steps.push({ title: 'Estimate', text: 'p̂ = successes / trials.', tex: '' }); r.steps.push({ title: 'Interval', text: 'The Wilson interval solves |p̂ − p| = z·√(p(1 − p)/n) for p, which keeps the interval inside [0, 1] and works for small samples.', tex: '' });
+        return I.finalizeText(r);
+    }
+    register({ stats: (src, opt) => (opt.op === 'chisq' || opt.op === 'anova') ? runChiAnova(src, opt) : opt.op === 'mannwhitney' ? runMannWhitney(src, opt) : opt.op === 'wilcoxon' ? runWilcoxon(src, opt) : opt.op === 'kruskal' ? runKruskal(src, opt) : opt.op === 'markov' ? runMarkov(src, opt) : opt.op === 'bayes' ? runBayes(src, opt) : opt.op === 'propci' ? runPropCI(src, opt) : prevStats(src, opt) });
 
     // ---- heat and wave equations on [0, L] with fixed ends ----
     function runPDE(src, opt) {

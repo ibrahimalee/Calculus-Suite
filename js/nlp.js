@@ -167,6 +167,18 @@
         if (m) return { mode: 'ode', fn: mathify(m[2]), opts: { odeType: m[1], pdeL: 'pi', pdeT: m[3] || (m[1] === 'heat' ? '1' : '4'), pdeK: '1', pdeV: '0' }, say: m[1] === 'heat' ? 'Heat equation' : 'Wave equation' };
 
         // ---- Lagrange multipliers, curvature, radius of convergence ----
+        m = s.match(/^(gradient descent|newton'?s? method|momentum)(?: on| for| of)? (.+?)(?: (?:starting|starting from|from|start)(?: at| point)?\s*\(?\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)?)?$/);
+        if (m && /[xy]/.test(m[2]) && /\by\b|y/.test(m[2])) return { mode: 'multivariable', fn: mathify(m[2]), opts: { op: 'descent', method: /newton/.test(m[1]) ? 'newton' : /momentum/.test(m[1]) ? 'momentum' : 'gd', start: m[3] ? `${m[3]}, ${m[4]}` : '-1.2, 1', lr: '0.1', iters: '30', vars: '' }, say: 'Optimiser visualiser' };
+        m = s.match(/^(?:the )?markov chain (?:with|for|of) (?:the )?(?:transition )?(?:matrix )?(\[?\[[\d.\s,;\-/\[\]]+\]?)$/) || s.match(/^(?:the )?stationary distribution of (?:the )?(?:matrix |markov chain )?(\[?\[[\d.\s,;\-/\[\]]+\]?)$/);
+        if (m) return { mode: 'stats', fn: m[1].replace(/\],\s*\[/g, ' ; ').replace(/[\[\]]/g, ' ').replace(/,/g, ' ').replace(/\s+/g, ' ').trim(), opts: { op: 'markov', init: '', steps: '10' }, say: 'Markov chain' };
+        m = s.match(/^(?:a |the )?(?:(\d+(?:\.\d+)?)\s*%\s*)?confidence interval (?:for|of) (?:a |the )?(?:proportion )?(\d+)\s*(?:out of|of|\/|successes in|in)\s*(\d+)(?: trials?)?$/);
+        if (m) return { mode: 'stats', fn: `${m[2]}, ${m[3]}`, opts: { op: 'propci', conf: String((m[1] ? +m[1] : 95) / 100) }, say: 'Confidence interval for a proportion' };
+        m = s.match(/^(?:the )?residues? (?:of|for) (.+)$/);
+        if (m) return { mode: 'complex', fn: mathify(m[1]), opts: { op: 'residue' }, say: 'Residues' };
+        m = s.match(/^(?:the )?contour integral of (.+?) (?:around|over|on) (?:the )?(?:circle )?\|\s*z\s*(?:[-−]\s*([\d.]+))?\s*\|\s*=\s*([\d.]+)$/);
+        if (m) return { mode: 'complex', fn: mathify(m[1]), opts: { op: 'contour', cc: m[2] || '0', rad: m[3] }, say: 'Contour integral' };
+        m = s.match(/^(?:solve (?:the )?linear program[: ]*)?(maximi[sz]e|minimi[sz]e|max|min)(?: the)? (.+?)\s+(?:subject to|s\.t\.|such that|with constraints?)\s+(.+)$/);
+        if (m && /<|>|≤|≥/.test(m[3])) return { mode: 'algebra', fn: `${/^max/.test(m[1]) ? 'max' : 'min'} ${mathify(m[2])} ; ${m[3].split(/\s*(?:,|;|\band\b)\s*/).filter(Boolean).map(c => c.replace(/\s+/g, ' ')).join(' ; ')}`, opts: { op: 'lp' }, say: 'Linear programming' };
         m = s.match(/^(?:use )?lagrange(?: multipliers?)?(?: to)?(?: (?:maximi[sz]e|minimi[sz]e|optimi[sz]e|find the extrema of|extrema of))? (.+?) (?:subject to|with constraint|given|under the constraint|constrained by|where) (.+)$/) || s.match(/^(?:maximi[sz]e|minimi[sz]e|optimi[sz]e) (.+?) subject to (.+)$/);
         if (m && /=/.test(m[2])) return { mode: 'multivariable', fn: mathify(m[1]), opts: { op: 'lagrange', vars: '', constraint: mathify(m[2]), radius: '5' }, say: 'Lagrange multipliers' };
         m = s.match(/^(?:the )?(?:curvature|radius of curvature) of (.+?)(?: (?:at|when) (?:x|t) ?= ?(.+))?$/);

@@ -28,6 +28,10 @@ A calculus workstation that runs entirely in the browser – no backend, no buil
 | **Epsilon–delta** (in Limits) | For a chosen ε, the largest δ that works, with the ε-band and δ-window drawn and 20,000 points checked |
 | **Chi-square and ANOVA** (in Statistics) | Goodness of fit, independence tables, one-way ANOVA with Bonferroni pairwise comparisons; p-values cross-checked by numerical integration |
 | **Heat and wave equations** (in ODEs) | Fixed or insulated ends; finite-difference solutions with a surface plot, checked against the exact Fourier sine or cosine series |
+| **Linear programming** (in Algebra) | Two-phase simplex with optimal, infeasible and unbounded cases, shadow prices and a plot of the feasible region; checked by enumerating every corner point |
+| **Residues and contour integrals** (in Complex) | Poles and residues of rational functions, contour integrals around any circle, and real integrals over the whole line, each cross-checked by direct numerical integration |
+| **Markov chains, Bayes' rule and proportion intervals** (in Statistics) | Stationary distributions, classes and absorption; sequential Bayesian updating with natural frequencies; Wilson, exact, Agresti–Coull and Wald intervals and a two-group comparison |
+| **Gradient descent and Newton** (in Multivariable) | Optimiser paths drawn over the contour map, four methods compared on the same problem, saddle points and divergence flagged |
 | **Piecewise transforms** (in Transforms) | Laplace and Fourier transforms of piecewise functions written as `expression for condition ; …`, with exact closed forms and a numerical-integration check |
 | **Phase portraits** (in ODEs) | For x′ = Ax: node / saddle / spiral / centre classification, eigenvalues and eigenvectors, direction field with trajectories and eigenlines, checked against e^(At) |
 | **Equilibria and stability** (in ODEs) | Finds the equilibria of a nonlinear 2-D system, classifies each from the Jacobian (saddle, node, spiral, star), draws nullclines, direction field and trajectories; flags centres as inconclusive |

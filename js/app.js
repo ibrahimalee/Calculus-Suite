@@ -23,7 +23,8 @@
         ['double', 'Double integral ∬ f dy dx'],
         ['divergence', 'Divergence ∇·F (vector field)'],
         ['curl', 'Curl ∇×F (vector field)'],
-        ['lagrange', 'Lagrange multipliers (constrained extrema)']
+        ['lagrange', 'Lagrange multipliers (constrained extrema)'],
+        ['descent', 'Gradient descent & Newton visualiser']
     ];
     const VECTOR_OPS = ['divergence', 'curl'];
 
@@ -184,6 +185,10 @@
                 { key: 'op', label: 'Operation', type: 'select', def: 'gradient', options: OPS_MULTI },
                 { key: 'vars', label: 'Variables (comma-separated, blank = auto)', type: 'text', def: '', placeholder: 'x, y' },
                 { key: 'point', label: 'Evaluate at point (optional)', type: 'text', def: '', placeholder: 'e.g. 1, 2', show: v => ['gradient', 'divergence'].includes(v.op) },
+                { key: 'method', label: 'Method', type: 'select', def: 'gd', options: [['gd', 'Gradient descent (fixed step)'], ['ls', 'Gradient descent with line search'], ['momentum', 'Momentum'], ['newton', "Newton's method"]], show: v => v.op === 'descent' },
+                { key: 'start', label: 'Starting point  x, y', type: 'text', def: '-1.2, 1', placeholder: 'e.g. -1.2, 1', show: v => v.op === 'descent' },
+                { key: 'lr', label: 'Step size', type: 'text', def: '0.1', placeholder: '0.1', show: v => v.op === 'descent' && v.method !== 'newton' && v.method !== 'ls' },
+                { key: 'iters', label: 'Steps to show (1–500)', type: 'number', def: '30', min: 1, max: 500, show: v => v.op === 'descent' },
                 { key: 'constraint', label: 'Constraint  g(x, y, …) = c', type: 'text', def: '', placeholder: 'e.g. x^2 + y^2 = 1', show: v => v.op === 'lagrange' },
                 { key: 'direction', label: 'Direction vector (optional)', type: 'text', def: '', placeholder: 'e.g. 1, 1', show: v => v.op === 'gradient' },
                 { key: 'xLow', label: 'x from', type: 'text', def: '0', show: v => v.op === 'double' },
@@ -202,6 +207,12 @@
                 { label: 'Laplacian of x² − y² (harmonic)', fn: 'x^2-y^2', opts: { op: 'laplacian', vars: '' } },
                 { label: 'Curl of the rotation field (−y, x)', fn: '-y ; x', opts: { op: 'curl', vars: '' } },
                 { label: 'Divergence of (xy, yz, zx)', fn: 'x*y ; y*z ; z*x', opts: { op: 'divergence', vars: '' } },
+                { label: 'Descent: a simple bowl, fixed step', fn: 'x^2 + 3*y^2', opts: { op: 'descent', method: 'gd', start: '3, 2', lr: '0.1', iters: '30' } },
+                { label: 'Descent: Rosenbrock valley with line search', fn: '(1-x)^2 + 100*(y-x^2)^2', opts: { op: 'descent', method: 'ls', start: '-1.2, 1', lr: '0.1', iters: '100' } },
+                { label: "Descent: Newton's method on Rosenbrock", fn: '(1-x)^2 + 100*(y-x^2)^2', opts: { op: 'descent', method: 'newton', start: '-1.2, 1', lr: '0.1', iters: '30' } },
+                { label: 'Descent: momentum on a narrow valley', fn: 'x^2 + 10*y^2', opts: { op: 'descent', method: 'momentum', start: '4, 1', lr: '0.02', iters: '80' } },
+                { label: "Descent: Newton lands on Himmelblau's maximum", fn: '(x^2+y-11)^2 + (x+y^2-7)^2', opts: { op: 'descent', method: 'newton', start: '0, 0', lr: '0.1', iters: '10' } },
+                { label: 'Descent: step too large (diverges)', fn: 'x^2 + 3*y^2', opts: { op: 'descent', method: 'gd', start: '3, 2', lr: '0.9', iters: '20' } },
                 { label: 'Lagrange: maximise xy on the unit circle', fn: 'x*y', opts: { op: 'lagrange', vars: '', constraint: 'x^2 + y^2 = 1', radius: '3' } },
                 { label: 'Lagrange: x + 2y + 3z on the unit sphere', fn: 'x + 2*y + 3*z', opts: { op: 'lagrange', vars: '', constraint: 'x^2 + y^2 + z^2 = 1', radius: '2' } },
                 { label: 'Lagrange: closest point on a line', fn: 'x^2 + y^2', opts: { op: 'lagrange', vars: '', constraint: 'x + y = 2', radius: '4' } }
@@ -454,20 +465,34 @@
     };
     MODES.stats = {
         label: 'Statistics', icon: 'x̄',
-        input: v => ({ chisq: { label: 'Observed counts', placeholder: 'e.g. 18, 22, 20, 40     or a table:  20, 15 ; 10, 25', hint: 'One row = goodness of fit against equal (or given) proportions. Several rows separated by ; = test of independence.' }, wilcoxon: { label: 'Differences, or two paired samples separated by ;', placeholder: 'e.g. 1.5 2.1 0.8 3.3 -0.4     or     10 12 9 14 ; 8 11 10 9', hint: 'One list is treated as differences to test against 0. Two lists are paired before-and-after values.' }, kruskal: { label: 'Groups separated by ;', placeholder: 'e.g. 2.9 3.0 2.5 ; 3.8 2.7 4.0 ; 2.8 3.4 3.7', hint: 'Rank-based alternative to ANOVA for three or more groups.' }, mannwhitney: { label: 'Two samples separated by ;', placeholder: 'e.g. 1.1 2.2 3.3 4.4 ; 2.5 3.5 6.1 7.2 8.3', hint: 'Compares two independent samples using ranks. Exact p-values for small samples without ties.' }, anova: { label: 'Groups separated by ;', placeholder: 'e.g. 5.1 4.9 5.3 ; 6.2 6.8 6.5 ; 5.0 5.2 4.8', hint: 'Each group is a list of numbers. Tests whether all group means are equal.' }, describe: { label: 'Data', placeholder: 'e.g. 2 4 4 4 5 5 7 9', hint: 'Numbers separated by spaces, commas or new lines.' }, regression: { label: 'Data points (x y pairs)', placeholder: 'e.g. 1 2.1 ; 2 3.9 ; 3 6.2 ; 4 7.8', hint: 'Pairs separated by ;  or a flat list x₁ y₁ x₂ y₂ …' }, dist: { label: 'x  (or  a, b  for an interval)', placeholder: 'e.g. 1.96', hint: 'Value(s) at which to evaluate the distribution; for “inverse” enter a probability.' }, ttest: { label: 'Sample', placeholder: 'e.g. 5.1 4.9 5.6 5.8 6.0', hint: 'One sample against μ₀, or add a second sample below for Welch’s test.' } }[v.op || 'describe']),
+        input: v => ({ chisq: { label: 'Observed counts', placeholder: 'e.g. 18, 22, 20, 40     or a table:  20, 15 ; 10, 25', hint: 'One row = goodness of fit against equal (or given) proportions. Several rows separated by ; = test of independence.' }, markov: { label: 'Transition matrix P (rows separated by ;)', placeholder: 'e.g. 0.9 0.1 ; 0.5 0.5', hint: 'Each row is the probability of moving from that state to every state, so every row sums to 1. Finds the long-run behaviour, classes and absorption.' }, bayes: { label: 'Prior, then likelihood lists (separated by ;)', placeholder: 'e.g. 0.01, 0.99 ; 0.95, 0.05', hint: 'First list: prior probability of each hypothesis. Each further list: P(evidence | hypothesis) for one observation. Give the hypotheses names below if you like.' }, propci: { label: 'Successes, trials  (two groups: 45, 120 ; 30, 110)', placeholder: 'e.g. 45, 120', hint: 'Wilson (recommended), exact, Agresti–Coull and Wald intervals; with two groups also the difference, a z-test and the risk ratio.' }, wilcoxon: { label: 'Differences, or two paired samples separated by ;', placeholder: 'e.g. 1.5 2.1 0.8 3.3 -0.4     or     10 12 9 14 ; 8 11 10 9', hint: 'One list is treated as differences to test against 0. Two lists are paired before-and-after values.' }, kruskal: { label: 'Groups separated by ;', placeholder: 'e.g. 2.9 3.0 2.5 ; 3.8 2.7 4.0 ; 2.8 3.4 3.7', hint: 'Rank-based alternative to ANOVA for three or more groups.' }, mannwhitney: { label: 'Two samples separated by ;', placeholder: 'e.g. 1.1 2.2 3.3 4.4 ; 2.5 3.5 6.1 7.2 8.3', hint: 'Compares two independent samples using ranks. Exact p-values for small samples without ties.' }, anova: { label: 'Groups separated by ;', placeholder: 'e.g. 5.1 4.9 5.3 ; 6.2 6.8 6.5 ; 5.0 5.2 4.8', hint: 'Each group is a list of numbers. Tests whether all group means are equal.' }, describe: { label: 'Data', placeholder: 'e.g. 2 4 4 4 5 5 7 9', hint: 'Numbers separated by spaces, commas or new lines.' }, regression: { label: 'Data points (x y pairs)', placeholder: 'e.g. 1 2.1 ; 2 3.9 ; 3 6.2 ; 4 7.8', hint: 'Pairs separated by ;  or a flat list x₁ y₁ x₂ y₂ …' }, dist: { label: 'x  (or  a, b  for an interval)', placeholder: 'e.g. 1.96', hint: 'Value(s) at which to evaluate the distribution; for “inverse” enter a probability.' }, ttest: { label: 'Sample', placeholder: 'e.g. 5.1 4.9 5.6 5.8 6.0', hint: 'One sample against μ₀, or add a second sample below for Welch’s test.' } }[v.op || 'describe']),
         fields: [
-            { key: 'op', label: 'Tool', type: 'select', def: 'describe', options: [['describe', 'Descriptive statistics'], ['regression', 'Regression & curve fitting'], ['dist', 'Probability distributions'], ['ttest', 't-tests & confidence intervals'], ['chisq', 'Chi-square test (fit or independence)'], ['anova', 'One-way ANOVA (with pairwise comparisons)'], ['mannwhitney', 'Mann–Whitney U test (no normality needed)'], ['wilcoxon', 'Wilcoxon signed-rank test (paired / one sample)'], ['kruskal', 'Kruskal–Wallis test (3+ groups, ranks)']] },
+            { key: 'op', label: 'Tool', type: 'select', def: 'describe', options: [['describe', 'Descriptive statistics'], ['regression', 'Regression & curve fitting'], ['dist', 'Probability distributions'], ['ttest', 't-tests & confidence intervals'], ['chisq', 'Chi-square test (fit or independence)'], ['anova', 'One-way ANOVA (with pairwise comparisons)'], ['mannwhitney', 'Mann–Whitney U test (no normality needed)'], ['wilcoxon', 'Wilcoxon signed-rank test (paired / one sample)'], ['kruskal', 'Kruskal–Wallis test (3+ groups, ranks)'], ['markov', 'Markov chain (stationary distribution, absorption)'], ['bayes', "Bayes' rule (posterior probabilities)"], ['propci', 'Confidence interval for a proportion']] },
             { key: 'model', label: 'Model', type: 'select', def: 'linear', options: [['linear', 'Linear'], ['quadratic', 'Quadratic'], ['cubic', 'Cubic'], ['exponential', 'Exponential  A·e^(Bx)'], ['power', 'Power  A·x^B'], ['logarithmic', 'Logarithmic  a + b·ln x']], show: v => v.op === 'regression' },
             { key: 'predict', label: 'Predict y at x = (optional)', type: 'text', def: '', show: v => v.op === 'regression' },
             { key: 'dist', label: 'Distribution', type: 'select', def: 'normal', options: [['normal', 'Normal (μ, σ)'], ['t', "Student's t (ν)"], ['chisq', 'Chi-square (k)'], ['exponential', 'Exponential (λ)'], ['uniform', 'Uniform (a, b)'], ['binomial', 'Binomial (n, p)'], ['poisson', 'Poisson (λ)']], show: v => v.op === 'dist' },
             { key: 'params', label: 'Parameters (comma-separated)', type: 'text', def: '0, 1', placeholder: 'μ, σ', show: v => v.op === 'dist' },
             { key: 'what', label: 'Calculate', type: 'select', def: 'le', options: [['le', 'P(X ≤ x)'], ['ge', 'P(X ≥ x)'], ['between', 'P(a ≤ X ≤ b)'], ['pdf', 'Density / probability at x'], ['inv', 'Inverse: x for a given probability']], show: v => v.op === 'dist' },
             { key: 'expected', label: 'Expected proportions (blank = all equal)', type: 'text', def: '', placeholder: 'e.g. 0.5, 0.3, 0.2', show: v => v.op === 'chisq' },
+            { key: 'init', label: 'Starting distribution (blank = start in S1)', type: 'text', def: '', placeholder: 'e.g. 0.2, 0.8', show: v => v.op === 'markov' },
+            { key: 'steps', label: 'Steps to simulate', type: 'number', def: '10', min: 1, max: 200, show: v => v.op === 'markov' },
+            { key: 'names', label: 'Hypothesis names (optional)', type: 'text', def: '', placeholder: 'e.g. disease, healthy', show: v => v.op === 'bayes' },
+            { key: 'conf', label: 'Confidence level', type: 'text', def: '0.95', placeholder: '0.95', show: v => v.op === 'propci' },
             { key: 'mu0', label: 'Hypothesised mean μ₀', type: 'text', def: '0', show: v => v.op === 'ttest' },
             { key: 'data2', label: 'Second sample (optional – Welch test)', type: 'text', def: '', show: v => v.op === 'ttest' },
             { key: 'alpha', label: 'Significance level α', type: 'text', def: '0.05', show: v => ['ttest', 'chisq', 'anova', 'mannwhitney', 'wilcoxon', 'kruskal'].includes(v.op) }
         ],
         examples: [
+            { label: 'Markov: two-state weather chain', fn: '0.9 0.1 ; 0.5 0.5', opts: { op: 'markov', init: '', steps: '10' } },
+            { label: 'Markov: random walk with absorbing ends', fn: '1 0 0 0 ; 0.5 0 0.5 0 ; 0 0.5 0 0.5 ; 0 0 0 1', opts: { op: 'markov', init: '0, 1, 0, 0', steps: '12' } },
+            { label: 'Markov: periodic chain', fn: '0 1 ; 1 0', opts: { op: 'markov', init: '', steps: '8' } },
+            { label: 'Markov: two separate classes', fn: '0.5 0.5 0 0 ; 0.5 0.5 0 0 ; 0 0 0.3 0.7 ; 0 0 0.6 0.4', opts: { op: 'markov', init: '', steps: '5' } },
+            { label: "Bayes: a rare disease and a positive test", fn: '0.01, 0.99 ; 0.95, 0.05', opts: { op: 'bayes', names: 'disease, healthy' } },
+            { label: "Bayes: three positive tests in a row", fn: '0.01, 0.99 ; 0.95, 0.05 ; 0.95, 0.05 ; 0.95, 0.05', opts: { op: 'bayes', names: 'disease, healthy' } },
+            { label: "Bayes: three hypotheses (Monty Hall style)", fn: '1/3, 1/3, 1/3 ; 0, 0.5, 1', opts: { op: 'bayes', names: 'door 1, door 2, door 3' } },
+            { label: 'Proportion CI: 45 of 120', fn: '45, 120', opts: { op: 'propci', conf: '0.95' } },
+            { label: 'Proportion CI: no successes in 20', fn: '0, 20', opts: { op: 'propci', conf: '0.95' } },
+            { label: 'Proportion CI: compare two groups', fn: '45, 120 ; 30, 110', opts: { op: 'propci', conf: '0.95' } },
             { label: 'Wilcoxon signed-rank: one sample (exact)', fn: '1.5 2.1 0.8 3.3 -0.4 2.2 1.1', opts: { op: 'wilcoxon', alpha: '0.05' } },
             { label: 'Wilcoxon: paired before / after', fn: '10 12 9 14 11 ; 8 11 10 9 7', opts: { op: 'wilcoxon', alpha: '0.05' } },
             { label: 'Kruskal–Wallis: three groups', fn: '2.9 3.0 2.5 2.6 3.2 ; 3.8 2.7 4.0 2.4 ; 2.8 3.4 3.7 2.2 2.0', opts: { op: 'kruskal', alpha: '0.05' } },
@@ -516,13 +541,23 @@
     };
     MODES.complex = {
         label: 'Complex', icon: 'ℂ',
-        input: v => ({ domain: { label: 'f(z)', placeholder: 'e.g. (z^2-1)/(z^2+1)', hint: 'Domain colouring shows the argument of f(z) as hue; zeros and poles are marked for rational functions.' }, roots: { label: 'Polynomial p(z)', placeholder: 'e.g. z^4 - 1', hint: 'All complex roots with multiplicity, plotted in the complex plane.' }, arith: { label: 'Complex expression', placeholder: 'e.g. (3+4i)*(1-2i)/(2+i)', hint: 'Use i for the imaginary unit. Gives rectangular and polar form, roots and the Argand diagram.' } }[v.op || 'domain']),
+        input: v => ({ residue: { label: 'Rational function f(z)', placeholder: 'e.g. 1/(z^2*(z-1))', hint: 'Finds every pole with its order and residue, checked two independent ways.' }, contour: { label: 'Rational function f(z)', placeholder: 'e.g. 1/(z^2+1)', hint: 'The integral around a counter-clockwise circle is 2πi times the sum of the residues inside; checked by integrating directly.' }, realint: { label: 'Rational function f(x)', placeholder: 'e.g. 1/(x^4+1)', hint: 'Needs no poles on the real axis and degree(denominator) ≥ degree(numerator) + 2. Closes the contour in the upper half-plane.' }, domain: { label: 'f(z)', placeholder: 'e.g. (z^2-1)/(z^2+1)', hint: 'Domain colouring shows the argument of f(z) as hue; zeros and poles are marked for rational functions.' }, roots: { label: 'Polynomial p(z)', placeholder: 'e.g. z^4 - 1', hint: 'All complex roots with multiplicity, plotted in the complex plane.' }, arith: { label: 'Complex expression', placeholder: 'e.g. (3+4i)*(1-2i)/(2+i)', hint: 'Use i for the imaginary unit. Gives rectangular and polar form, roots and the Argand diagram.' } }[v.op || 'domain']),
         fields: [
-            { key: 'op', label: 'Tool', type: 'select', def: 'domain', options: [['domain', 'Domain colouring of f(z)'], ['roots', 'Roots of a polynomial'], ['arith', 'Complex arithmetic & polar form']] },
+            { key: 'op', label: 'Tool', type: 'select', def: 'domain', options: [['domain', 'Domain colouring of f(z)'], ['roots', 'Roots of a polynomial'], ['arith', 'Complex arithmetic & polar form'], ['residue', 'Poles and residues of a rational function'], ['contour', 'Contour integral around a circle (residue theorem)'], ['realint', 'Real integral from −∞ to ∞ by residues']] },
+            { key: 'cc', label: 'Circle centre (a number, or  re, im)', type: 'text', def: '0', placeholder: '0   or   1, 2', show: v => v.op === 'contour' },
+            { key: 'rad', label: 'Circle radius', type: 'text', def: '2', placeholder: '2', show: v => v.op === 'contour' },
             { key: 'range', label: 'Window half-width', type: 'text', def: '2', show: v => v.op === 'domain' },
             { key: 'nth', label: 'Show n-th roots, n =', type: 'number', def: '3', min: 2, max: 12, show: v => v.op === 'arith' }
         ],
         examples: [
+            { label: 'Residues: 1/(z²(z−1))', fn: '1/(z^2*(z-1))', opts: { op: 'residue' } },
+            { label: 'Residues: 1/(z²+1)² (double poles)', fn: '1/(z^2+1)^2', opts: { op: 'residue' } },
+            { label: 'Contour: ∮ 1/(z²+1) around |z − i| = ½', fn: '1/(z^2+1)', opts: { op: 'contour', cc: '0, 1', rad: '0.5' } },
+            { label: 'Contour: ∮ 1/z around the unit circle', fn: '1/z', opts: { op: 'contour', cc: '0', rad: '1' } },
+            { label: 'Contour: four poles inside |z| = 2', fn: 'z^2/(z^4-1)', opts: { op: 'contour', cc: '0', rad: '2' } },
+            { label: 'Real integral: ∫ 1/(x²+1)', fn: '1/(x^2+1)', opts: { op: 'realint' } },
+            { label: 'Real integral: ∫ 1/(x⁴+1)', fn: '1/(x^4+1)', opts: { op: 'realint' } },
+            { label: 'Real integral: ∫ x²/((x²+1)(x²+4))', fn: 'x^2/(x^4+5*x^2+4)', opts: { op: 'realint' } },
             { label: 'Domain colouring: (z²−1)/(z²+1)', fn: '(z^2-1)/(z^2+1)', opts: { op: 'domain', range: '2' } },
             { label: 'Domain colouring: sin z', fn: 'sin(z)', opts: { op: 'domain', range: '5' } },
             { label: 'Domain colouring: eᶻ', fn: 'exp(z)', opts: { op: 'domain', range: '4' } },
@@ -534,9 +569,9 @@
 
     MODES.algebra = {
         label: 'Algebra', icon: 'p(x)',
-        input: v => ({ apart: { label: 'Rational function', placeholder: 'e.g. (x^2+1)/(x^3-x)', hint: 'Splits a fraction into simpler ones, the first step of many integrals and Laplace inversions.' }, div: { label: 'Rational function', placeholder: 'e.g. (x^4+1)/(x^2-3x+2)', hint: 'Divides the numerator by the denominator and gives the quotient and remainder.' }, factor: { label: 'Expression', placeholder: 'e.g. x^4 - 1', hint: 'Factors over the rationals and expands, checking both forms against your input.' }, gcd: { label: 'Two polynomials separated by ;', placeholder: 'e.g. x^2-1 ; x^3-1', hint: 'Greatest common divisor and least common multiple, using Euclid’s algorithm.' }, gf: { label: 'Recurrence', placeholder: 'e.g. a(n) = a(n-1) + a(n-2)', hint: 'Finds the rational generating function A(x) = Σ aₙxⁿ for a linear recurrence, checked against the sequence.' }, recur: { label: 'Recurrence', placeholder: 'e.g. a(n) = a(n-1) + a(n-2)', hint: 'Linear with constant coefficients. An extra term that is a polynomial in n times rⁿ (3, 2n+1, 5ⁿ, n·2ⁿ) is allowed. Gives the closed form from the initial values.' } }[v.op] || { label: 'Expression', placeholder: '', hint: '' }),
+        input: v => ({ apart: { label: 'Rational function', placeholder: 'e.g. (x^2+1)/(x^3-x)', hint: 'Splits a fraction into simpler ones, the first step of many integrals and Laplace inversions.' }, div: { label: 'Rational function', placeholder: 'e.g. (x^4+1)/(x^2-3x+2)', hint: 'Divides the numerator by the denominator and gives the quotient and remainder.' }, factor: { label: 'Expression', placeholder: 'e.g. x^4 - 1', hint: 'Factors over the rationals and expands, checking both forms against your input.' }, gcd: { label: 'Two polynomials separated by ;', placeholder: 'e.g. x^2-1 ; x^3-1', hint: 'Greatest common divisor and least common multiple, using Euclid’s algorithm.' }, lp: { label: 'Objective, then constraints (separate with ;)', placeholder: 'e.g. max 3x + 2y ; x + y <= 4 ; x + 3y <= 6', hint: 'Start with max or min. Constraints use <=, >= or =. All variables are taken to be ≥ 0. Shows the optimum, shadow prices and, for two variables, the feasible region.' }, gf: { label: 'Recurrence', placeholder: 'e.g. a(n) = a(n-1) + a(n-2)', hint: 'Finds the rational generating function A(x) = Σ aₙxⁿ for a linear recurrence, checked against the sequence.' }, recur: { label: 'Recurrence', placeholder: 'e.g. a(n) = a(n-1) + a(n-2)', hint: 'Linear with constant coefficients. An extra term that is a polynomial in n times rⁿ (3, 2n+1, 5ⁿ, n·2ⁿ) is allowed. Gives the closed form from the initial values.' } }[v.op] || { label: 'Expression', placeholder: '', hint: '' }),
         fields: [
-            { key: 'op', label: 'Tool', type: 'select', def: 'apart', options: [['apart', 'Partial fractions'], ['div', 'Polynomial long division'], ['factor', 'Factor and expand'], ['gcd', 'Polynomial gcd and lcm'], ['recur', 'Linear recurrence (closed form)'], ['gf', 'Generating function of a recurrence']] },
+            { key: 'op', label: 'Tool', type: 'select', def: 'apart', options: [['apart', 'Partial fractions'], ['div', 'Polynomial long division'], ['factor', 'Factor and expand'], ['gcd', 'Polynomial gcd and lcm'], ['recur', 'Linear recurrence (closed form)'], ['gf', 'Generating function of a recurrence'], ['lp', 'Linear programming (simplex)']] },
             { key: 'init', label: 'Initial values a(0), a(1), …', type: 'text', def: '0, 1', placeholder: '0, 1', show: v => v.op === 'recur' || v.op === 'gf' }
         ],
         examples: [
@@ -554,6 +589,12 @@
             { label: 'Geometric forcing: aₙ = 2aₙ₋₁ + 3ⁿ', fn: 'a(n) = 2*a(n-1) + 3^n', opts: { op: 'recur', init: '1' } },
             { label: 'Resonance: aₙ = 2aₙ₋₁ + 2ⁿ', fn: 'a(n) = 2*a(n-1) + 2^n', opts: { op: 'recur', init: '1' } },
             { label: 'Polynomial forcing: aₙ = aₙ₋₁ + n  (triangular numbers)', fn: 'a(n) = a(n-1) + n', opts: { op: 'recur', init: '0' } },
+            { label: 'Linear programming: maximise 3x + 2y', fn: 'max 3x + 2y ; x + y <= 4 ; x + 3y <= 6', opts: { op: 'lp' } },
+            { label: 'Linear programming: production mix', fn: 'max 40x + 30y ; x + y <= 12 ; 2x + y <= 16', opts: { op: 'lp' } },
+            { label: 'Linear programming: diet (minimise, ≥ constraints)', fn: 'min 2x + 3y ; x + y >= 4 ; x + 3y >= 6', opts: { op: 'lp' } },
+            { label: 'Linear programming: three variables', fn: 'max 3a + 2b + 4c ; a + b + 2c <= 4 ; 2a + 3c <= 5 ; 2a + b + 3c <= 7', opts: { op: 'lp' } },
+            { label: 'Linear programming: unbounded', fn: 'max x + y ; x - y <= 1', opts: { op: 'lp' } },
+            { label: 'Linear programming: infeasible', fn: 'max x + y ; x + y <= 2 ; x + y >= 3', opts: { op: 'lp' } },
             { label: 'Generating function: Fibonacci', fn: 'a(n) = a(n-1) + a(n-2)', opts: { op: 'gf', init: '0, 1' } },
             { label: 'Generating function: aₙ = 2aₙ₋₁ + 2ⁿ', fn: 'a(n) = 2*a(n-1) + 2^n', opts: { op: 'gf', init: '1' } },
             { label: 'Complex roots: aₙ = 2aₙ₋₁ − 2aₙ₋₂', fn: 'a(n) = 2*a(n-1) - 2*a(n-2)', opts: { op: 'recur', init: '0, 1' } }
@@ -878,7 +919,7 @@
                 preview.innerHTML = `<span class="preview-tex plain">${esc(lines[0] || '')}</span><span class="preview-meta">${lines.length} line${lines.length === 1 ? '' : 's'}</span>`;
                 return true;
             }
-            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur', 'gf'].includes(currentValues().op)) || (state.mode === 'applications' && currentValues().op === 'curvature' && src.includes(';')) || (state.mode === 'ode' && ['linear2', 'equilibria'].includes(currentValues().odeType)) || (state.mode === 'laplace' && (/\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src) || /(^|[\s;)])(for|if|when|otherwise)(\s|$|(?=[-+(\d]))/i.test(src)))) {
+            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur', 'gf', 'lp'].includes(currentValues().op)) || (state.mode === 'applications' && currentValues().op === 'curvature' && src.includes(';')) || (state.mode === 'ode' && ['linear2', 'equilibria'].includes(currentValues().odeType)) || (state.mode === 'laplace' && (/\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src) || /(^|[\s;)])(for|if|when|otherwise)(\s|$|(?=[-+(\d]))/i.test(src)))) {
                 preview.className = 'preview-box valid';
                 const n = src.split(/[\n;]+/).filter(x => x.trim()).length;
                 preview.innerHTML = `<span class="preview-tex plain">${esc(src.length > 160 ? src.slice(0, 160) + '…' : src)}</span><span class="preview-meta">${state.mode === 'stats' ? (src.split(/[\s,;]+/).filter(Boolean).length + ' values') : state.mode === 'vector' ? (n + ' component' + (n === 1 ? '' : 's')) : 'ready'}</span>`;
