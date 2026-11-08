@@ -61,6 +61,16 @@ A calculus workstation that runs entirely in the browser – no backend, no buil
 
 Plus: command palette (`Ctrl+K`), installable offline PWA, Markdown report export, PNG plot export, LaTeX rendering, 2D/3D/contour plots, history, shareable links (`#s=…`), copy as text/LaTeX, dark mode, keyboard shortcuts, example gallery, background worker with timeout.
 
+## For teachers: worksheets without accounts
+
+Open `teacher.html`. Build a worksheet (write questions, or generate practice problems with checked answers), press **Create the student link**, and send that one link. Students see only the questions: no calculator unless you allow one. When they finish they get a short `CSW1.…` code to send back. Paste the codes into the **Gradebook** tab and everything is marked on your device, with a class average, per-question percentages and a CSV export.
+
+- Question types: number, formula (any equivalent form, optional "+C"), multiple choice, short text, list of numbers, matrix, prime factorisation.
+- Nothing is uploaded. The answer key lives in your browser (and in files you export), not in the student link.
+- **Practice mode** puts the key in the link so students get instant ✓/✗; a curious student could read it, so use it for practice only.
+- This is for homework, practice and low-stakes quizzes. It cannot stop a student using another tool, and a code cannot prove who wrote it.
+- Answers typed by students are never executed: they are parsed by a whitelist of maths functions only.
+
 ## Design & trust
 
 - A single stroke-icon set, light / dark / auto themes and six accent colours (Appearance menu), a sliding tab indicator, loading progress bar and live engine status.

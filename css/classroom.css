@@ -1,0 +1,85 @@
+/* Classroom pages: student worksheet and teacher gradebook. Builds on home.css (paper, ink, one accent). */
+.sub-bar-tag { font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); border: 1px solid var(--line-strong); border-radius: 2px; padding: 5px 8px; }
+.bar .spacer { margin-left: auto; }
+.page { padding-block: clamp(28px, 5vw, 64px) 96px; max-width: 880px; }
+.page.wide { max-width: 1200px; }
+.page h1 { font-size: clamp(2rem, 4.4vw, 3.2rem); line-height: 1.05; margin: 0 0 14px; }
+.page .lead { max-width: 62ch; color: var(--text-2); margin: 0 0 22px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.notice { margin: 0 0 22px; padding: 12px 14px; border-left: 3px solid var(--accent); background: var(--accent-soft); font-size: 14.5px; color: var(--text); }
+.notice.ok { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.field { display: block; margin: 0 0 16px; }
+.field > span, .lab { display: block; margin-bottom: 6px; font: 500 11px/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); }
+.in, .page textarea, .page select { width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--line-strong); border-radius: 4px; padding: 11px 12px; font: 400 16px/1.4 var(--mono); min-height: 46px; }
+.page textarea { resize: vertical; min-height: 90px; font-family: var(--mono); }
+.page select { appearance: auto; font-family: var(--font); }
+.in:focus, .page textarea:focus, .page select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--ink); }
+.small { font-size: 13px; color: var(--text-3); margin: 6px 0 0; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.row > * { flex: 0 0 auto; }
+.grow { flex: 1 1 220px !important; }
+.btn-sm { min-height: 40px; padding: 0 14px; font-size: 13.5px; }
+.btn[disabled] { opacity: .5; cursor: not-allowed; box-shadow: none; transform: none; }
+.btn-danger { border-color: #a3182f; color: #a3182f; background: transparent; }
+:root[data-theme="dark"] .btn-danger { border-color: #f08a8f; color: #f08a8f; }
+
+/* student */
+.who { margin: 26px 0 8px; max-width: 420px; }
+ol.qs { list-style: none; counter-reset: q; margin: 24px 0 0; padding: 0; border-top: 1px solid var(--line-strong); }
+.q { counter-increment: q; padding: 24px 0 26px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 3.2rem minmax(0, 1fr); gap: 4px 14px; }
+.q::before { content: counter(q, decimal-leading-zero); font: 500 13px/2.2 var(--mono); color: var(--accent); }
+.q-body { min-width: 0; }
+.q-prompt { font-size: 18px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 12px; }
+.q-pts { font: 400 12px var(--mono); color: var(--text-3); margin-left: 8px; white-space: nowrap; }
+.q .in { max-width: 560px; }
+.q-note { min-height: 1.3em; margin: 6px 0 0; font: 400 13px/1.4 var(--mono); color: var(--text-2); overflow-wrap: anywhere; }
+.q-note.bad { color: var(--accent); }
+.q-prev { margin: 6px 0 0; min-height: 0; color: var(--text-2); font-size: 15px; overflow-x: auto; }
+.choices { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-width: 560px; }
+.choices label { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; min-height: 48px; border: 1px solid var(--line-strong); border-radius: 4px; cursor: pointer; background: var(--surface); }
+.choices label:hover { border-color: var(--ink); }
+.choices input { margin-top: 4px; width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+.choices label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+details.hint { margin-top: 10px; font-size: 14.5px; color: var(--text-2); }
+details.hint summary { cursor: pointer; font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; padding: 8px 0; min-height: 36px; }
+.verdict { margin: 12px 0 0; padding: 8px 12px; font: 500 14px/1.4 var(--mono); border-left: 3px solid var(--line-strong); }
+.verdict.good { border-color: var(--ok); color: var(--ok); }
+.verdict.miss { border-color: var(--accent); color: var(--accent); }
+.finish { margin: 30px 0 0; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+.progress { font: 400 13px var(--mono); color: var(--text-2); }
+#done { margin-top: 36px; padding: 22px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 6px; }
+#done h2 { font-size: 1.6rem; margin: 0 0 8px; }
+#codeBox { font: 400 13px/1.5 var(--mono); min-height: 130px; word-break: break-all; }
+.score-big { font: 500 clamp(2rem, 6vw, 3.4rem)/1 var(--serif); color: var(--accent); margin: 6px 0 10px; }
+
+/* teacher */
+.tabs2 { display: flex; gap: 0; border-bottom: 1px solid var(--line-strong); margin: 0 0 26px; }
+.tabs2 button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 14px 18px; min-height: 48px; font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); cursor: pointer; margin-bottom: -1px; }
+.tabs2 button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px 24px; }
+.card { background: var(--surface); border: 1px solid var(--line-strong); border-radius: 6px; padding: 16px 18px; margin: 0 0 14px; }
+.card h3 { font-size: 1.15rem; margin: 0 0 12px; display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.card h3 small { font: 400 12px var(--mono); color: var(--text-3); }
+.qcard .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) 110px; gap: 12px; }
+.checks { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 4px 0 14px; }
+.checks label { display: flex; gap: 10px; align-items: flex-start; min-height: 32px; font-size: 15px; }
+.checks input { width: 18px; height: 18px; margin-top: 3px; accent-color: var(--accent); flex: none; }
+.err { color: var(--accent); font: 400 13px/1.4 var(--mono); margin: 6px 0 0; min-height: 1.3em; }
+#linkOut { font: 400 12.5px/1.5 var(--mono); word-break: break-all; min-height: 110px; }
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); }
+table.grades { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+table.grades th, table.grades td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: center; white-space: nowrap; }
+table.grades th:first-child, table.grades td:first-child { text-align: left; position: sticky; left: 0; background: var(--surface); }
+table.grades thead th { font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); border-bottom: 1px solid var(--line-strong); }
+table.grades tr.sum td { font: 500 12.5px var(--mono); color: var(--text-2); background: var(--surface-2); }
+.ok { color: var(--ok); font-weight: 600; } .no { color: var(--accent); font-weight: 600; }
+.cellbtn { background: none; border: 0; padding: 4px 8px; min-width: 40px; min-height: 36px; cursor: pointer; font: inherit; color: inherit; border-radius: 3px; }
+.cellbtn:hover, .cellbtn:focus-visible { background: var(--accent-soft); }
+.detail { text-align: left !important; white-space: normal !important; background: var(--surface-2); }
+.detail dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font: 400 13px/1.5 var(--mono); }
+.detail dt { color: var(--text-3); } .detail dd { margin: 0; overflow-wrap: anywhere; }
+.stats { display: flex; flex-wrap: wrap; gap: 14px 40px; margin: 18px 0; }
+.stats div b { display: block; font: 500 2rem/1 var(--serif); }
+.stats div span { font: 400 12px var(--mono); color: var(--text-2); letter-spacing: .06em; text-transform: uppercase; }
+.dropzone { border: 1px dashed var(--line-strong); border-radius: 6px; padding: 16px; text-align: center; color: var(--text-2); font-size: 14px; }
+@media (max-width: 800px) { .cols { grid-template-columns: minmax(0, 1fr); } .q { grid-template-columns: minmax(0, 1fr); } .q::before { line-height: 1.2; } .qcard .grid2 { grid-template-columns: minmax(0, 1fr); } .tabs2 button { flex: 1; padding-inline: 8px; } }
+@media print { .bar, .finish, .tabs2, .btn, details.hint summary { display: none !important; } details.hint[open] { display: block; } body::before { display: none; } .q { break-inside: avoid; } }

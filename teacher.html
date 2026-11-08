@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>For teachers – Calculus Suite Pro</title>
+    <meta name="description" content="Build a worksheet, share one link, and grade the answer codes your students send back. No accounts, no server, free.">
+    <meta name="theme-color" content="#ece6d8">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="css/home.css">
+    <link rel="stylesheet" href="css/classroom.css">
+    <script>
+        (function () { try { var m = localStorage.getItem('themeMode') || localStorage.getItem('theme') || 'auto'; var d = m === 'dark' || (m === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light'); } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); } })();
+    </script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="bar">
+        <a class="wordmark" href="./" aria-label="Calculus Suite Pro, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite<small>PRO</small></span></a>
+        <span class="sub-bar-tag spacer">For teachers</span>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
+        <a class="btn btn-line bar-cta" href="app.html">Calculator</a>
+    </header>
+    <main id="main" class="wrap page wide">
+        <p class="kicker"><span class="dot" aria-hidden="true"></span>Classroom · no accounts · no server</p>
+        <h1>Set a worksheet. Share one link. Grade the codes.</h1>
+        <p class="lead">Students open your link and see only the questions, with no calculator unless you allow one. When they finish they get a short code to send back. Paste the codes into the gradebook here and everything is marked on your device. Nothing is uploaded anywhere.</p>
+        <p class="notice">This is meant for homework, practice and low-stakes quizzes. It can’t stop a student from using another tool, and a code can’t prove who wrote it. Your answer key stays in this browser (and in any file you export), never in the student link, unless you switch on practice mode.</p>
+
+        <div class="tabs2" role="tablist" aria-label="Teacher tools">
+            <button role="tab" id="tabBuild" aria-selected="true" aria-controls="paneBuild">1 · Build a worksheet</button>
+            <button role="tab" id="tabGrade" aria-selected="false" aria-controls="paneGrade" tabindex="-1">2 · Gradebook</button>
+        </div>
+
+        <section id="paneBuild" role="tabpanel" aria-labelledby="tabBuild">
+            <div class="card">
+                <div class="row">
+                    <label class="field grow" style="margin:0"><span>Worksheet</span><select id="wsPick" aria-label="Choose a saved worksheet"></select></label>
+                    <button class="btn btn-line btn-sm" id="newBtn" type="button">New</button>
+                    <button class="btn btn-line btn-sm" id="dupBtn" type="button">Copy</button>
+                    <button class="btn btn-line btn-sm" id="expBtn" type="button">Export file</button>
+                    <label class="btn btn-line btn-sm" style="cursor:pointer">Import file<input id="impFile" type="file" accept=".json,application/json" hidden></label>
+                    <button class="btn btn-danger btn-sm" id="delBtn" type="button">Delete</button>
+                </div>
+                <p class="small">Worksheets are saved in this browser. Export a file to keep a backup or move to another computer; it contains your answer key, so keep it private.</p>
+            </div>
+
+            <div class="cols">
+                <div>
+                    <label class="field"><span>Title</span><input class="in" id="wsTitle" maxlength="120" placeholder="Week 3 · Derivatives"></label>
+                    <label class="field"><span>Instructions for students (optional)</span><textarea id="wsInstr" maxlength="2000" rows="3" placeholder="Give answers in simplest form. Use * for multiplication, ^ for powers."></textarea></label>
+                </div>
+                <div>
+                    <label class="field"><span>Your email (optional)</span><input class="in" id="wsEmail" type="email" maxlength="120" placeholder="teacher@school.org" autocomplete="email"><span class="small" style="text-transform:none;letter-spacing:0">Adds an “Email it to my teacher” button for students.</span></label>
+                    <div class="checks">
+                        <label><input type="checkbox" id="wsCalc"><span>Show a link to the calculator <span class="small">(off by default)</span></span></label>
+                        <label><input type="checkbox" id="wsSelf"><span>Practice mode: students see ✓/✗ immediately <span class="small">(the answers are inside the link, so a curious student could read them)</span></span></label>
+                    </div>
+                </div>
+            </div>
+
+            <h2 style="font-size:1.6rem;margin:10px 0 14px">Questions <small id="qCount" class="small"></small></h2>
+            <div id="qList"></div>
+            <div class="card">
+                <h3>Add questions</h3>
+                <div class="row">
+                    <button class="btn btn-solid btn-sm" id="addQ" type="button">+ Write a question</button>
+                </div>
+                <p class="lab" style="margin-top:18px">Or generate practice problems with checked answers</p>
+                <div class="row">
+                    <label class="field" style="margin:0"><span>Topic</span><select id="genTopic"></select></label>
+                    <label class="field" style="margin:0"><span>Level</span><select id="genLevel"><option value="1">1 · warm-up</option><option value="2">2 · standard</option><option value="3">3 · harder</option></select></label>
+                    <label class="field" style="margin:0"><span>How many</span><input class="in" id="genCount" type="number" min="1" max="20" value="5" style="width:90px"></label>
+                    <label class="field" style="margin:0"><span>Seed</span><input class="in" id="genSeed" type="number" min="1" value="1" style="width:110px"></label>
+                    <button class="btn btn-line btn-sm" id="genBtn" type="button" style="align-self:flex-end">Generate</button>
+                </div>
+                <p class="small">The same seed always gives the same problems, so you can recreate a worksheet. Every generated answer is checked by the calculator engine.</p>
+            </div>
+
+            <div class="card">
+                <h3>Share with students</h3>
+                <div class="row"><button class="btn btn-solid" id="linkBtn" type="button">Create the student link <span aria-hidden="true">→</span></button></div>
+                <p class="err" id="linkErr" role="alert"></p>
+                <div id="linkBox" hidden>
+                    <label class="field"><span>Student link</span><textarea id="linkOut" readonly rows="4"></textarea></label>
+                    <div class="row">
+                        <button class="btn btn-solid btn-sm" id="copyLink" type="button">Copy link</button>
+                        <a class="btn btn-line btn-sm" id="openLink" href="#" target="_blank" rel="noopener">Preview as a student ↗</a>
+                        <button class="btn btn-line btn-sm" id="toGrade" type="button">Go to the gradebook →</button>
+                    </div>
+                    <p class="small" id="linkNote" role="status"></p>
+                </div>
+            </div>
+        </section>
+
+        <section id="paneGrade" role="tabpanel" aria-labelledby="tabGrade" hidden>
+            <div class="card">
+                <div class="row">
+                    <label class="field grow" style="margin:0"><span>Grade submissions for</span><select id="gradePick" aria-label="Worksheet to grade"></select></label>
+                    <button class="btn btn-danger btn-sm" id="clearSubs" type="button">Clear submissions</button>
+                </div>
+            </div>
+            <div class="cols">
+                <div>
+                    <label class="field"><span>Paste the codes students sent</span><textarea id="codes" rows="7" placeholder="CSW1.… (one per line, or paste a whole email thread)"></textarea></label>
+                    <div class="row"><button class="btn btn-solid btn-sm" id="addCodes" type="button">Add and grade</button>
+                        <label class="btn btn-line btn-sm" style="cursor:pointer">Open files<input id="codeFiles" type="file" accept=".txt,.json,text/plain" multiple hidden></label></div>
+                    <p class="err" id="gradeErr" role="status" aria-live="polite"></p>
+                </div>
+                <div>
+                    <div class="stats" id="stats" aria-live="polite"></div>
+                    <div class="row"><button class="btn btn-line btn-sm" id="csvBtn" type="button">Download CSV</button><button class="btn btn-line btn-sm" id="printGrades" type="button">Print</button></div>
+                </div>
+            </div>
+            <div class="tbl-wrap" id="tblWrap" hidden><table class="grades" id="grades"></table></div>
+            <p class="small" id="skipNote"></p>
+            <p class="small">Click a ✓ or ✗ to see what the student typed. If two codes share a name, the most recent one is used. Codes are kept in this browser until you clear them.</p>
+        </section>
+    </main>
+    <script src="vendor/math.min.js"></script>
+    <script src="vendor/algebrite.min.js"></script>
+    <script src="vendor/katex/katex.min.js"></script>
+    <script src="js/engine.js"></script>
+    <script src="js/extras.js"></script>
+    <script src="js/practice.js"></script>
+    <script src="js/classroom.js"></script>
+    <script src="js/teacher.js"></script>
+</body>
+</html>

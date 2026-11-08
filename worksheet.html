@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Worksheet – Calculus Suite Pro</title>
+    <meta name="description" content="A worksheet shared by your teacher. Answer the questions and send back your code.">
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#ece6d8">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="css/home.css">
+    <link rel="stylesheet" href="css/classroom.css">
+    <script>
+        (function () { try { var m = localStorage.getItem('themeMode') || localStorage.getItem('theme') || 'auto'; var d = m === 'dark' || (m === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light'); } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); } })();
+    </script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to the questions</a>
+    <header class="bar">
+        <a class="wordmark" href="./" aria-label="Calculus Suite Pro, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite<small>PRO</small></span></a>
+        <span class="sub-bar-tag spacer">Worksheet</span>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
+    </header>
+    <main id="main" class="wrap page">
+        <p id="loading" role="status">Opening the worksheet…</p>
+        <div id="problem" hidden>
+            <h1>That link didn’t open</h1>
+            <p class="lead" id="problemText"></p>
+            <p><a class="btn btn-line" href="./">Go to the home page</a></p>
+        </div>
+        <article id="sheet" hidden>
+            <p class="kicker"><span class="dot" aria-hidden="true"></span>Worksheet</p>
+            <h1 id="wsTitle"></h1>
+            <p class="lead" id="wsInstr"></p>
+            <p class="notice" id="selfNote" hidden>This is a practice worksheet: it checks your answers on this page as soon as you press <b>Check my answers</b>.</p>
+            <p id="calcRow" hidden><a class="btn btn-line btn-sm" href="app.html" target="_blank" rel="noopener">Open the calculator in a new tab <span aria-hidden="true">↗</span></a></p>
+            <label class="field who"><span>Your name</span><input class="in" id="stuName" autocomplete="name" maxlength="80" placeholder="First and last name"></label>
+            <ol class="qs" id="qs"></ol>
+            <div class="finish">
+                <button class="btn btn-solid btn-lg" id="finishBtn" type="button">Finish and get my code <span aria-hidden="true">→</span></button>
+                <button class="btn btn-line btn-lg" id="checkBtn" type="button" hidden>Check my answers</button>
+                <span class="progress" id="progress" role="status"></span>
+            </div>
+            <p class="err" id="finishErr" role="alert"></p>
+            <section id="done" hidden aria-labelledby="doneH">
+                <h2 id="doneH">Your answers are ready to send</h2>
+                <div id="scoreBox" hidden></div>
+                <p>Send this code to your teacher. It holds your name and your answers, nothing else. You can send it again later if you change an answer.</p>
+                <label class="field"><span>Your code</span><textarea id="codeBox" readonly rows="5"></textarea></label>
+                <div class="row">
+                    <button class="btn btn-solid btn-sm" id="copyBtn" type="button">Copy the code</button>
+                    <a class="btn btn-line btn-sm" id="dlBtn" href="#" download="answers.txt">Download as a file</a>
+                    <a class="btn btn-line btn-sm" id="mailBtn" href="#" hidden>Email it to my teacher</a>
+                    <button class="btn btn-line btn-sm" id="printBtn" type="button">Print my answers</button>
+                </div>
+                <p class="small" id="copyNote" role="status"></p>
+            </section>
+            <p class="small" style="margin-top:40px">Your answers are saved in this browser as you type. This worksheet was made by whoever sent you the link; never type passwords or private details into it. <a href="./">About Calculus Suite Pro</a></p>
+        </article>
+    </main>
+    <script src="vendor/math.min.js"></script>
+    <script src="vendor/katex/katex.min.js"></script>
+    <script src="js/classroom.js"></script>
+    <script src="js/worksheet.js"></script>
+</body>
+</html>
