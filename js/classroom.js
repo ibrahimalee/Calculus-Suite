@@ -12,7 +12,7 @@
 })(typeof self !== 'undefined' ? self : this, function create(math) {
     'use strict';
     const TYPES = ['number', 'expr', 'choice', 'text', 'list', 'matrix', 'factors'];
-    const LIMITS = { questions: 40, prompt: 1200, key: 400, title: 120, instr: 2000, name: 80, option: 160, answer: 400 };
+    const LIMITS = { questions: 40, prompt: 1200, key: 400, title: 120, instr: 2000, name: 80, option: 160, answer: 400, rand: 300, roster: 400 };
     const TYPE_LABEL = { number: 'Number', expr: 'Expression / formula', choice: 'Multiple choice', text: 'Short text', list: 'List of numbers', matrix: 'Matrix', factors: 'Prime factorisation' };
 
     // ---------- small helpers ----------
@@ -29,34 +29,98 @@
     async function unpack(str) { str = String(str || '').trim(); if (!str) throw new Error('Empty link.'); const kind = str[0], body = str.slice(1); let bytes = unb64u(body); if (kind === 'z') bytes = await inflate(bytes); else if (kind !== 'r') throw new Error('This link is not a worksheet.'); return JSON.parse(unutf8(bytes)); }
 
     // ---------- worksheet model ----------
+    /** Check that a question's key can be read for its type (throws a teacher-friendly message). */
+    function validateKey(c, i) {
+        if (c.type === 'number') { try { numeric(c.key); } catch (e) { throw new Error(`Question ${i + 1}: the correct answer must be a number (like 12, 3/4 or sqrt(2)).`); } }
+        if (c.type === 'expr') { try { safeParse(c.key.replace(c.plusC ? /\s*[+-]\s*C\s*$/i : /$^/, '')); } catch (e) { throw new Error(`Question ${i + 1}: the correct expression could not be read (${e.message}).`); } }
+        if (c.type === 'list') { try { numList(c.key); } catch (e) { throw new Error(`Question ${i + 1}: the correct list must be numbers separated by commas.`); } }
+        if (c.type === 'matrix') { try { parseMatrix(c.key); } catch (e) { throw new Error(`Question ${i + 1}: the correct matrix must be rows of numbers separated by ;`); } }
+        if (c.type === 'factors') { try { factorMap(c.key); } catch (e) { throw new Error(`Question ${i + 1}: write the factorisation like 2^3*5.`); } }
+    }
     /** Validate and clean a worksheet object from the builder (or from an imported file). Throws on a problem. */
     function normalise(ws) {
         if (!ws || typeof ws !== 'object') throw new Error('Not a worksheet.');
         const qs = Array.isArray(ws.questions) ? ws.questions : []; if (!qs.length) throw new Error('Add at least one question.'); if (qs.length > LIMITS.questions) throw new Error(`At most ${LIMITS.questions} questions.`);
-        const out = { id: /^[A-Za-z0-9_-]{4,16}$/.test(ws.id || '') ? ws.id : uid(), title: clip(ws.title, LIMITS.title).trim() || 'Worksheet', instructions: clip(ws.instructions, LIMITS.instr), email: clip(ws.email, 120).trim(), calculator: !!ws.calculator, selfCheck: !!ws.selfCheck, timeLimit: Math.max(0, Math.min(600, Math.round(+ws.timeLimit || 0))), timeLock: ws.timeLock === undefined ? true : !!ws.timeLock, created: ws.created || Date.now(), questions: [] };
+        const out = { id: /^[A-Za-z0-9_-]{4,16}$/.test(ws.id || '') ? ws.id : uid(), title: clip(ws.title, LIMITS.title).trim() || 'Worksheet', instructions: clip(ws.instructions, LIMITS.instr), email: clip(ws.email, 120).trim(), calculator: !!ws.calculator, selfCheck: !!ws.selfCheck, partial: !!ws.partial, shuffleQ: !!ws.shuffleQ, shuffleC: !!ws.shuffleC, timeLimit: Math.max(0, Math.min(600, Math.round(+ws.timeLimit || 0))), timeLock: ws.timeLock === undefined ? true : !!ws.timeLock, created: ws.created || Date.now(), questions: [] };
         qs.forEach((q, i) => {
             const type = TYPES.includes(q.type) ? q.type : 'number'; const prompt = clip(q.prompt, LIMITS.prompt).trim(); if (!prompt) throw new Error(`Question ${i + 1} has no text.`);
             const c = { type, prompt, points: Math.max(1, Math.min(100, Math.round(+q.points || 1))), hint: clip(q.hint, 400), key: clip(q.key, LIMITS.key).trim() };
             if (q.placeholder) c.placeholder = clip(q.placeholder, 60);
+            if (q.tags) c.tags = clip(q.tags, 80);
+            const rand = clip(q.rand, LIMITS.rand).trim(); if (rand) { try { parseVars(rand); } catch (e) { throw new Error(`Question ${i + 1}: ${e.message}`); } c.rand = rand; }
             if (type === 'choice') { const opts = (Array.isArray(q.options) ? q.options : []).map(o => clip(o, LIMITS.option).trim()).filter(Boolean); if (opts.length < 2 || opts.length > 8) throw new Error(`Question ${i + 1} needs 2 to 8 choices.`); c.options = opts; const k = parseInt(c.key, 10); if (!(k >= 0 && k < opts.length)) throw new Error(`Question ${i + 1}: pick the correct choice.`); c.key = String(k); }
             else if (!c.key) throw new Error(`Question ${i + 1} has no correct answer.`);
-            if (type === 'number') { if (q.tol !== undefined && q.tol !== '' && +q.tol > 0) c.tol = +q.tol; try { numeric(c.key); } catch (e) { throw new Error(`Question ${i + 1}: the correct answer must be a number (like 12, 3/4 or sqrt(2)).`); } }
-            if (type === 'expr') { c.plusC = !!q.plusC; try { safeParse(c.key.replace(c.plusC ? /\s*[+-]\s*C\s*$/i : /$^/, '')); } catch (e) { throw new Error(`Question ${i + 1}: the correct expression could not be read (${e.message}).`); } }
-            if (type === 'list') { try { numList(c.key); } catch (e) { throw new Error(`Question ${i + 1}: the correct list must be numbers separated by commas.`); } }
-            if (type === 'matrix') { try { parseMatrix(c.key); } catch (e) { throw new Error(`Question ${i + 1}: the correct matrix must be rows of numbers separated by ;`); } }
-            if (type === 'factors') { try { factorMap(c.key); } catch (e) { throw new Error(`Question ${i + 1}: write the factorisation like 2^3*5.`); } }
+            if (type === 'number' && q.tol !== undefined && q.tol !== '' && +q.tol > 0) c.tol = +q.tol;
+            if (type === 'expr') c.plusC = !!q.plusC;
+            if (c.rand) {
+                for (let k = 0; k < 6; k++) {
+                    const v = instantiateQuestion(c, 'check' + k, i);
+                    const left = [v.prompt, v.hint, v.key].concat(v.options || []).find(t => /@\{/.test(String(t || ''))); if (left) throw new Error(`Question ${i + 1}: “${String(left).match(/@\{[^}]*\}?/)[0]}” uses a name that is not defined in the random numbers box (or cannot be worked out).`);
+                    validateKey(v, i);
+                }
+            } else validateKey(c, i);
             out.questions.push(c);
         });
         return out;
     }
+    // ---------- random numbers per student ----------
+    const reserved = n => FUNCS.has(n) || Object.prototype.hasOwnProperty.call(CONSTS, n) || n === 'x';
+    const mulberry = seed => { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+    const normName = s => String(s || '').normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
+    const variantSeed = (wsId, name) => fnv('v|' + wsId + '|' + normName(name));
+    const round10 = v => Math.round(v * 1e10) / 1e10;
+    /** "a = 2..9", "b = -5..5 except 0", "c = 1, 2, 4, 8", "d = 0..1 step 0.25" (one per line or separated by ;) */
+    function parseVars(text) {
+        const out = [], seen = new Set();
+        String(text || '').split(/[\n;]+/).map(t => t.trim()).filter(Boolean).forEach(line => {
+            const m = /^([A-Za-z_][A-Za-z0-9_]{0,5})\s*(?:=|:)\s*(.+)$/.exec(line); if (!m) throw new Error(`could not read “${line.slice(0, 30)}” in the random numbers. Write it like a = 2..9`);
+            const name = m[1]; if (reserved(name)) throw new Error(`“${name}” cannot be used as a name for random numbers.`); if (seen.has(name)) throw new Error(`“${name}” is defined twice.`); seen.add(name);
+            let spec = m[2].trim(), except = []; const ex = /\s+(?:except|not)\s+(.+)$/i.exec(spec); if (ex) { try { except = ex[1].split(/[,\s]+/).filter(Boolean).map(numeric); } catch (e) { throw new Error(`could not read the values after “except” for ${name}.`); } spec = spec.slice(0, ex.index); }
+            let values; try {
+                const rg = /^(.+?)\s*\.\.\s*(.+?)(?:\s+step\s+(\S+))?$/i.exec(spec);
+                if (rg) { const lo = numeric(rg[1]), hi = numeric(rg[2]), step = rg[3] ? numeric(rg[3]) : 1; if (!(step > 0) || hi < lo) throw new Error('range'); const n = Math.floor((hi - lo) / step + 1e-9) + 1; if (n > 2000) throw new Error('range'); values = Array.from({ length: n }, (_, i) => round10(lo + i * step)); }
+                else { values = spec.split(/\s*,\s*/).filter(Boolean).map(numeric); if (!values.length || values.length > 40) throw new Error('list'); }
+            } catch (e) { throw new Error(`could not read the values for ${name}. Use a range like 2..9 or a list like 1, 2, 4.`); }
+            values = values.filter(v => !except.some(x => Math.abs(x - v) < 1e-9)); if (!values.length) throw new Error(`no values are left for ${name} after the exceptions.`);
+            out.push({ name, values });
+        });
+        if (out.length > 8) throw new Error('at most 8 random numbers per question.');
+        return out;
+    }
+    function fmtNum(v) { if (Object.is(v, -0)) v = 0; return Number.isInteger(v) ? String(v) : String(parseFloat(v.toPrecision(10))); }
+    /** Replace @{expr} with its value. Text that does not use the random names is left alone. */
+    function fill(text, scope, asKey) {
+        const names = new Set(Object.keys(scope));
+        return String(text === undefined || text === null ? '' : text).replace(/@\{([^{}]{1,80})\}/g, (all, inner) => {
+            let e = inner.trim(), signed = false; if (e[0] === '+') { signed = true; e = e.slice(1); }
+            let p; try { p = safeParse(e); } catch (er) { return all; }
+            if (!p.vars.length || p.vars.some(v => !names.has(v))) return all;
+            const v = evalAt(p, scope); if (!Number.isFinite(v)) return all; const s = fmtNum(round10(v));
+            return signed ? (v >= 0 ? '+' + s : s) : (asKey && v < 0 ? '(' + s + ')' : s);
+        });
+    }
+    function drawScope(vars, seed, i) { const rnd = mulberry(parseInt(fnv(seed + '|' + i), 16)); const sc = {}; vars.forEach(v => { sc[v.name] = v.values[Math.floor(rnd() * v.values.length)]; }); return sc; }
+    function instantiateQuestion(q, seed, i) {
+        const c = Object.assign({}, q, { orig: i }); if (!q.rand) return c;
+        const sc = drawScope(parseVars(q.rand), seed, i); c.prompt = fill(q.prompt, sc); c.hint = fill(q.hint, sc); if (q.options) c.options = q.options.map(o => fill(o, sc)); if (q.type !== 'choice' && q.key !== undefined) c.key = fill(q.key, sc, true); c.params = sc; return c;
+    }
+    const isRandomised = ws => !!(ws && (ws.shuffleQ || ws.shuffleC || (ws.questions || []).some(q => q.rand)));
+    /** One student's version of the worksheet: numbers filled in, plus the display order and choice orders. Questions stay in their original positions. */
+    function instantiate(ws, seed) {
+        const qs = ws.questions.map((q, i) => instantiateQuestion(q, seed, i)); const rnd = mulberry(parseInt(fnv(seed + '|order'), 16));
+        const shuffle = arr => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
+        const order = qs.map((_, i) => i); if (ws.shuffleQ) shuffle(order);
+        if (ws.shuffleC) qs.forEach(q => { if (q.type === 'choice' && q.options) q.optOrder = shuffle(q.options.map((_, j) => j)); });
+        return Object.assign({}, ws, { seed, questions: qs, order });
+    }
     /** What a student receives. The key is left out unless the worksheet is in self-check mode. */
     async function encodeStudent(ws) {
-        const o = { v: 1, id: ws.id, t: ws.title, i: ws.instructions, e: ws.email, a: ws.calculator ? 1 : 0, s: ws.selfCheck ? 1 : 0, tl: ws.timeLimit || 0, lk: ws.timeLock === false ? 0 : 1, q: ws.questions.map(q => { const r = { y: q.type, p: q.prompt, n: q.points }; if (q.hint) r.h = q.hint; if (q.placeholder) r.ph = q.placeholder; if (q.options) r.o = q.options; if (ws.selfCheck) { r.k = q.key; if (q.tol) r.tl = q.tol; if (q.plusC) r.pc = 1; } return r; }) };
+        const o = { v: 1, id: ws.id, t: ws.title, i: ws.instructions, e: ws.email, a: ws.calculator ? 1 : 0, s: ws.selfCheck ? 1 : 0, sq: ws.shuffleQ ? 1 : 0, sc: ws.shuffleC ? 1 : 0, tl: ws.timeLimit || 0, lk: ws.timeLock === false ? 0 : 1, q: ws.questions.map(q => { const r = { y: q.type, p: q.prompt, n: q.points }; if (q.hint) r.h = q.hint; if (q.placeholder) r.ph = q.placeholder; if (q.options) r.o = q.options; if (q.rand) r.rv = q.rand; if (ws.selfCheck) { r.k = q.key; if (q.tol) r.tl = q.tol; if (q.plusC) r.pc = 1; } return r; }) };
         return pack(o);
     }
     async function decodeStudent(str) {
         const o = await unpack(str); if (!o || o.v !== 1 || !Array.isArray(o.q)) throw new Error('This link is not a worksheet.'); if (o.q.length > LIMITS.questions) throw new Error('Too many questions.');
-        return { id: clip(o.id, 16), title: clip(o.t, LIMITS.title) || 'Worksheet', instructions: clip(o.i, LIMITS.instr), email: /^[^\s@<>"]+@[^\s@<>"]+$/.test(o.e || '') ? clip(o.e, 120) : '', calculator: !!o.a, selfCheck: !!o.s, timeLimit: Math.max(0, Math.min(600, Math.round(+o.tl || 0))), timeLock: o.lk !== 0, questions: o.q.map(r => { const type = TYPES.includes(r.y) ? r.y : 'text'; const q = { type, prompt: clip(r.p, LIMITS.prompt), points: Math.max(1, Math.min(100, Math.round(+r.n || 1))), hint: clip(r.h, 400), placeholder: clip(r.ph, 60) }; if (Array.isArray(r.o)) q.options = r.o.slice(0, 8).map(x => clip(x, LIMITS.option)); if (o.s) { q.key = clip(r.k, LIMITS.key); if (r.tl > 0) q.tol = +r.tl; q.plusC = !!r.pc; } return q; }) };
+        return { id: clip(o.id, 16), title: clip(o.t, LIMITS.title) || 'Worksheet', instructions: clip(o.i, LIMITS.instr), email: /^[^\s@<>"]+@[^\s@<>"]+$/.test(o.e || '') ? clip(o.e, 120) : '', calculator: !!o.a, selfCheck: !!o.s, shuffleQ: !!o.sq, shuffleC: !!o.sc, timeLimit: Math.max(0, Math.min(600, Math.round(+o.tl || 0))), timeLock: o.lk !== 0, questions: o.q.map(r => { const type = TYPES.includes(r.y) ? r.y : 'text'; const q = { type, prompt: clip(r.p, LIMITS.prompt), points: Math.max(1, Math.min(100, Math.round(+r.n || 1))), hint: clip(r.h, 400), placeholder: clip(r.ph, 60) }; if (Array.isArray(r.o)) q.options = r.o.slice(0, 8).map(x => clip(x, LIMITS.option)); if (r.rv) q.rand = clip(r.rv, LIMITS.rand); if (o.s) { q.key = clip(r.k, LIMITS.key); if (r.tl > 0) q.tol = +r.tl; q.plusC = !!r.pc; } return q; }) };
     }
 
     // ---------- safe expression handling (answers are untrusted text) ----------
@@ -85,16 +149,17 @@
     const near = (a, b, tol) => Math.abs(a - b) <= (tol !== undefined ? tol : 1e-6 * Math.max(1, Math.abs(b)));
     function sampleScopes(names, n) { let s = 0x2545F491; const rnd = () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s >>> 0) % 10000) / 10000; }; return Array.from({ length: n }, () => { const sc = {}; names.forEach(v => { sc[v] = -2.9 + 6 * rnd(); }); return sc; }); }
     /** Check one answer against a question that carries its key. Returns { ok: true|false, note }. */
-    function check(q, answer) {
+    function check(q, answer) { const r = checkInner(q, answer); if (r.frac === undefined) r.frac = r.ok ? 1 : 0; return r; }
+    function checkInner(q, answer) {
         const raw = clip(answer, LIMITS.answer).trim(); if (!raw) return { ok: false, note: 'blank' };
         try {
             switch (q.type) {
                 case 'choice': return { ok: String(parseInt(raw, 10)) === String(q.key), note: '' };
                 case 'text': { const norm = (s, sym) => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(sym ? /[^a-z0-9.\-+/]+/g : /[^a-z0-9]+/g, ''); return { ok: String(q.key).split('|').some(k => norm(k, /\d/.test(k)) === norm(raw, /\d/.test(k))), note: '' }; }
                 case 'number': { const v = numeric(raw), k = numeric(q.key); return { ok: near(v, k, q.tol), note: '' }; }
-                case 'list': { const a = numList(raw).sort((x, y) => x - y), k = numList(q.key).sort((x, y) => x - y); return { ok: a.length === k.length && a.every((v, i) => near(v, k[i], q.tol)), note: '' }; }
-                case 'matrix': { const a = parseMatrix(raw), k = parseMatrix(q.key); return { ok: a.length === k.length && a[0].length === k[0].length && a.every((r, i) => r.every((v, j) => near(v, k[i][j], q.tol))), note: '' }; }
-                case 'factors': return { ok: sameMap(factorMap(raw), factorMap(q.key)), note: '' };
+                case 'list': { const a = numList(raw), k = numList(q.key), used = new Array(a.length).fill(false); let hit = 0; k.forEach(kv => { const j = a.findIndex((av, idx) => !used[idx] && near(av, kv, q.tol)); if (j >= 0) { used[j] = true; hit++; } }); const ok = a.length === k.length && hit === k.length; return { ok, note: '', frac: ok ? 1 : hit / Math.max(a.length, k.length) }; }
+                case 'matrix': { const a = parseMatrix(raw), k = parseMatrix(q.key); if (a.length !== k.length || a[0].length !== k[0].length) return { ok: false, note: 'wrong size', frac: 0 }; let hit = 0; a.forEach((r, i) => r.forEach((v, j) => { if (near(v, k[i][j], q.tol)) hit++; })); const tot = k.length * k[0].length; return { ok: hit === tot, note: '', frac: hit / tot }; }
+                case 'factors': { const a = factorMap(raw), k = factorMap(q.key); let hit = 0; k.forEach((e, pr) => { if (a.get(pr) === e) hit++; }); const ok = sameMap(a, k); return { ok, note: '', frac: ok ? 1 : hit / Math.max(a.size, k.size) }; }
                 case 'expr': {
                     const strip = s => (q.plusC ? String(s).replace(/\s*[+-]\s*C\s*$/i, '') : String(s)); const a = safeParse(strip(raw)), k = safeParse(strip(q.key));
                     const names = [...new Set(a.vars.concat(k.vars))]; if (a.vars.some(v => !k.vars.includes(v)) && a.vars.length) { /* extra variable in the student's answer */ }
@@ -118,7 +183,7 @@
     // ---------- submissions ----------
     function makeSubmission(ws, name, answers, meta) {
         const nm = clip(name, LIMITS.name).trim(); if (!nm) throw new Error('Enter your name first.');
-        const body = { w: ws.id, n: nm, t: Date.now(), a: ws.questions.map((_, i) => clip(answers[i], LIMITS.answer)) }; if (meta && Number.isFinite(meta.used)) { body.d = Math.max(0, Math.min(86400, Math.round(meta.used))); if (meta.over) body.o = 1; }
+        const body = { w: ws.id, n: nm, t: Date.now(), a: ws.questions.map((_, i) => clip(answers[i], LIMITS.answer)) }; if (meta && /^[0-9a-f]{8}$/.test(meta.seed || '')) body.s = meta.seed; if (meta && Number.isFinite(meta.used)) { body.d = Math.max(0, Math.min(86400, Math.round(meta.used))); if (meta.over) body.o = 1; }
         const payload = b64u(utf8(JSON.stringify(body)));
         return `CSW1.${payload}.${fnv(payload + '|' + ws.id)}`;
     }
@@ -127,7 +192,7 @@
         let body; try { body = JSON.parse(unutf8(unb64u(m[1]))); } catch (e) { return { ok: false, error: 'The code is damaged (part of it may be missing).' }; }
         if (!body || typeof body.w !== 'string' || !Array.isArray(body.a)) return { ok: false, error: 'The code is damaged.' };
         if (fnv(m[1] + '|' + body.w) !== m[2]) return { ok: false, error: 'The code has a typo or is incomplete (checksum mismatch).' };
-        return { ok: true, sub: { w: clip(body.w, 16), n: clip(body.n, LIMITS.name), t: +body.t || 0, d: Number.isFinite(+body.d) && body.d !== undefined ? Math.max(0, Math.min(86400, Math.round(+body.d))) : null, o: body.o === 1, a: body.a.slice(0, LIMITS.questions).map(x => clip(x, LIMITS.answer)) } };
+        return { ok: true, sub: { w: clip(body.w, 16), n: clip(body.n, LIMITS.name), t: +body.t || 0, d: Number.isFinite(+body.d) && body.d !== undefined ? Math.max(0, Math.min(86400, Math.round(+body.d))) : null, o: body.o === 1, s: /^[0-9a-f]{8}$/.test(body.s || '') ? body.s : null, a: body.a.slice(0, LIMITS.questions).map(x => clip(x, LIMITS.answer)) } };
     }
     /** Split pasted text into codes (one per line, or run together) and parse each. */
     function parseMany(text) {
@@ -135,18 +200,40 @@
         const out = parts.map(seg => { const flat = seg.replace(/\s+/g, ''); const m = /^CSW1\.[A-Za-z0-9_-]+\.[0-9a-f]{8}/.exec(flat); const code = m ? m[0] : flat.slice(0, 80); return Object.assign(parseSubmission(code), { code }); });
         return { results: out, stray };
     }
-    function grade(ws, sub) {
-        const per = ws.questions.map((q, i) => { const r = check(q, sub.a[i]); return { ok: r.ok, note: r.note, pts: r.ok ? q.points : 0, answer: sub.a[i] || '' }; });
-        return { name: sub.n, time: sub.t, used: sub.d === undefined ? null : sub.d, over: !!sub.o, per, score: per.reduce((a, p) => a + p.pts, 0), max: ws.questions.reduce((a, q) => a + q.points, 0) };
+    function grade(ws, sub, ov) {
+        const rnd = isRandomised(ws), seed = rnd ? (sub.s || variantSeed(ws.id, sub.n)) : null, qs = rnd ? instantiate(ws, seed).questions : ws.questions, nk = normName(sub.n);
+        const per = qs.map((q, i) => {
+            const r = check(q, sub.a[i]); let pts = r.ok ? q.points : (ws.partial && r.frac > 0 ? Math.round(r.frac * q.points * 100) / 100 : 0); const auto = pts; let over = false, comment = '';
+            const o = ov && ov[nk + '|' + i]; if (o && Number.isFinite(+o.pts)) { pts = Math.max(0, Math.min(q.points, Math.round(+o.pts * 100) / 100)); over = true; comment = clip(o.note, 200); }
+            return { ok: pts >= q.points, note: r.note, pts, auto, over, comment, partial: pts > 0 && pts < q.points, max: q.points, answer: sub.a[i] || '', shown: q.type === 'choice' && sub.a[i] !== undefined && sub.a[i] !== '' ? (q.options[+sub.a[i]] || sub.a[i]) : (sub.a[i] || ''), prompt: q.prompt, expect: q.type === 'choice' ? (q.options[+q.key] || '') : q.key };
+        });
+        return { name: sub.n, time: sub.t, seed, used: sub.d === undefined ? null : sub.d, over: !!sub.o, per, score: Math.round(per.reduce((a, p) => a + p.pts, 0) * 100) / 100, max: ws.questions.reduce((a, q) => a + q.points, 0) };
     }
     /** Grade many submissions: the latest submission per student name wins; wrong-worksheet codes are reported. */
-    function gradeAll(ws, subs) {
-        const byName = new Map(), skipped = []; subs.forEach(s => { if (s.w !== ws.id) { skipped.push({ name: s.n, why: 'a different worksheet' }); return; } const k = s.n.trim().toLowerCase(); const prev = byName.get(k); if (!prev || s.t >= prev.t) { if (prev) skipped.push({ name: prev.n, why: 'an older submission by the same name' }); byName.set(k, s); } else skipped.push({ name: s.n, why: 'an older submission by the same name' }); });
-        const rows = [...byName.values()].map(s => grade(ws, s)).sort((a, b) => a.name.localeCompare(b.name));
-        const n = rows.length, perQ = ws.questions.map((q, i) => (n ? rows.filter(r => r.per[i].ok).length / n : 0));
+    function gradeAll(ws, subs, ov) {
+        const byName = new Map(), skipped = []; subs.forEach(s => { if (s.w !== ws.id) { skipped.push({ name: s.n, why: 'a different worksheet' }); return; } const k = normName(s.n); const prev = byName.get(k); if (!prev || s.t >= prev.t) { if (prev) skipped.push({ name: prev.n, why: 'an older submission by the same name' }); byName.set(k, s); } else skipped.push({ name: s.n, why: 'an older submission by the same name' }); });
+        const rows = [...byName.values()].map(s => grade(ws, s, ov)).sort((a, b) => a.name.localeCompare(b.name));
+        const n = rows.length, rnd = isRandomised(ws), perQ = ws.questions.map((q, i) => (n ? rows.reduce((a, r) => a + r.per[i].pts / r.per[i].max, 0) / n : 0)), blank = ws.questions.map((q, i) => rows.filter(r => !String(r.per[i].answer).trim()).length);
+        const common = ws.questions.map((q, i) => { if (rnd) return []; const m = new Map(); rows.forEach(r => { const p = r.per[i]; if (p.ok || !String(p.answer).trim()) return; const k = String(p.answer).trim().toLowerCase().replace(/\s+/g, ' '); const e = m.get(k) || { raw: String(p.answer).trim(), count: 0 }; e.count++; m.set(k, e); }); return [...m.values()].filter(e => e.count >= 2).sort((a, b) => b.count - a.count).slice(0, 3).map(e => ({ answer: q.type === 'choice' ? `${String.fromCharCode(65 + (+e.raw || 0))}. ${(q.options || [])[+e.raw] || e.raw}` : e.raw, count: e.count })); });
         const pct = rows.map(r => (r.max ? r.score / r.max : 0)).sort((a, b) => a - b); const mean = n ? pct.reduce((a, b) => a + b, 0) / n : 0, median = n ? (pct[Math.floor((n - 1) / 2)] + pct[Math.ceil((n - 1) / 2)]) / 2 : 0;
-        return { rows, skipped, perQuestion: perQ, mean, median, count: n };
+        const bins = [0, 0, 0, 0, 0]; pct.forEach(v => { bins[Math.min(4, Math.floor(v * 5))]++; });
+        return { rows, skipped, perQuestion: perQ, blank, common, bins, mean, median, count: n };
     }
+    // ---------- roster, review sets, shared questions ----------
+    function lev(a, b) { if (Math.abs(a.length - b.length) > 3) return 9; const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }
+    /** Who has not handed in, and who handed in under a name that is not on the class list (with a likely match). */
+    function matchRoster(text, rows) {
+        const names = String(text || '').split(/\n|;/).map(t => clip(t, LIMITS.name).trim()).filter(Boolean).slice(0, LIMITS.roster); if (!names.length) return { size: 0, missing: [], unknown: [] };
+        const got = new Set(rows.map(r => normName(r.name))), keys = names.map(normName), keyset = new Set(keys);
+        const missing = names.filter((n, i) => !got.has(keys[i]));
+        const unknown = rows.filter(r => !keyset.has(normName(r.name))).map(r => { let best = null, bd = 3; names.forEach((n, i) => { const d = lev(keys[i], normName(r.name)); if (d < bd && missing.includes(n)) { bd = d; best = n; } }); return { name: r.name, suggest: best }; });
+        return { size: names.length, missing, unknown };
+    }
+    /** Copies of the questions that fewer than `threshold` of the class got right (needs at least 2 students). */
+    function reviewQuestions(ws, res, threshold) { if (res.count < 2) return []; return ws.questions.map((q, i) => ({ q, i, pct: res.perQuestion[i] })).filter(x => x.pct < (threshold === undefined ? 0.7 : threshold)).sort((a, b) => a.pct - b.pct).map(x => { const c = JSON.parse(JSON.stringify(x.q)); delete c.orig; return c; }); }
+    const qKey = q => fnv([q.type, q.prompt, q.key, q.rand || ''].join('|'));
+    async function encodeQuestions(questions) { const clean = normalise({ questions }).questions; return pack({ v: 1, k: 'q', q: clean }); }
+    async function decodeQuestions(str) { const o = await unpack(str); if (!o || o.k !== 'q' || !Array.isArray(o.q)) throw new Error('This link does not contain shared questions.'); return normalise({ questions: o.q.slice(0, LIMITS.questions) }).questions; }
     const csvCell = v => { let s = String(v === undefined || v === null ? '' : v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     function toCSV(ws, res) {
         const timed = ws.timeLimit > 0; const head = ['Name'].concat(ws.questions.map((_, i) => `Q${i + 1} (${ws.questions[i].points})`), ['Score', 'Out of', 'Percent'], timed ? ['Minutes used', 'Ran out of time'] : []);
@@ -165,5 +252,5 @@
         }
         return out;
     }
-    return { TYPES, TYPE_LABEL, LIMITS, uid, normalise, encodeStudent, decodeStudent, check, readable, makeSubmission, parseSubmission, parseMany, grade, gradeAll, toCSV, fromPractice, safeParse, _fnv: fnv };
+    return { TYPES, TYPE_LABEL, LIMITS, uid, normalise, encodeStudent, decodeStudent, check, readable, makeSubmission, parseSubmission, parseMany, grade, gradeAll, toCSV, fromPractice, safeParse, parseVars, fill, instantiate, instantiateQuestion, isRandomised, variantSeed, normName, matchRoster, reviewQuestions, qKey, encodeQuestions, decodeQuestions, _fnv: fnv };
 });

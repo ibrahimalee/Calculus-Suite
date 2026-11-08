@@ -18,6 +18,7 @@
 .row > * { flex: 0 0 auto; }
 .grow { flex: 1 1 220px !important; }
 .btn-sm { min-height: 40px; padding: 0 14px; font-size: 13.5px; }
+.btn-sm { max-width: 100%; white-space: normal; text-align: center; line-height: 1.25; padding-block: 8px; }
 .btn[disabled] { opacity: .5; cursor: not-allowed; box-shadow: none; transform: none; }
 .btn-danger { border-color: #a3182f; color: #a3182f; background: transparent; }
 :root[data-theme="dark"] .btn-danger { border-color: #f08a8f; color: #f08a8f; }
@@ -98,3 +99,35 @@ table.grades tr.sum td { font: 500 12.5px var(--mono); color: var(--text-2); bac
 .dropzone { border: 1px dashed var(--line-strong); border-radius: 6px; padding: 16px; text-align: center; color: var(--text-2); font-size: 14px; }
 @media (max-width: 800px) { .cols { grid-template-columns: minmax(0, 1fr); } .q { grid-template-columns: minmax(0, 1fr); } .q::before { line-height: 1.2; } .qcard .grid2 { grid-template-columns: minmax(0, 1fr); } .tabs2 button { flex: 1; padding-inline: 8px; } }
 @media print { .bar, .finish, .tabs2, .btn, details.hint summary { display: none !important; } details.hint[open] { display: block; } body::before { display: none; } .q { break-inside: avoid; } }
+
+/* batch 3: random numbers, bank, analysis, printing */
+.randbox { margin: 0 0 14px; border-top: 1px dashed var(--line-strong); padding-top: 10px; }
+.randbox summary { cursor: pointer; font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); padding: 8px 0; min-height: 36px; }
+.sample { font-family: var(--mono); overflow-wrap: anywhere; }
+.bank-list { display: grid; gap: 6px; margin-top: 12px; }
+.bank-row { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-2); }
+.bank-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+.badge { flex: none; font: 500 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); border: 1px solid var(--line-strong); border-radius: 2px; padding: 3px 6px; white-space: nowrap; }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: min(560px, calc(100vw - 32px)); background: var(--ink); color: var(--on-ink); padding: 12px 16px; border-radius: 6px; font-size: 14px; z-index: 60; box-shadow: 0 8px 28px rgba(0,0,0,.28); }
+.cellbtn.part { color: #7a5200; font-weight: 600; }
+:root[data-theme="dark"] .cellbtn.part { color: #e0b24a; }
+.ovform { margin: 0 0 12px; padding: 0 0 12px; border-bottom: 1px dashed var(--line-strong); }
+.ovq { margin: 0 0 6px; font-size: 14.5px; overflow-wrap: anywhere; }
+.hbars { display: grid; gap: 6px; margin: 4px 0 16px; max-width: 520px; }
+.hbar { display: grid; grid-template-columns: 76px 1fr 26px; gap: 10px; align-items: center; font: 400 12px var(--mono); }
+.hbar i { display: block; height: 14px; background: var(--accent); min-width: 2px; border-radius: 1px; }
+.hbar b { text-align: right; font-weight: 500; }
+table.qa td { white-space: normal; text-align: left; }
+details#analysis > summary { cursor: pointer; font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; padding: 6px 0; min-height: 36px; }
+.print-root { display: none; }
+@media print {
+  body.print-ws > *:not(.print-root) { display: none !important; }
+  body.print-ws .print-root { display: block !important; }
+  .print-page { break-after: page; padding: 0; color: #000; font-size: 12.5pt; line-height: 1.45; }
+  .print-page:last-child { break-after: auto; }
+  .print-page h1 { font-size: 20pt; margin: 0 0 8pt; } .print-page h2 { font-size: 14pt; margin: 14pt 0 4pt; }
+  .print-who { margin: 0 0 12pt; } .print-instr { white-space: pre-wrap; margin: 0 0 12pt; font-style: italic; }
+  .print-qs { padding-left: 22pt; } .print-qs > li { margin: 0 0 12pt; break-inside: avoid; } .print-prompt { margin: 0 0 4pt; white-space: pre-wrap; }
+  .print-pts { font-size: 9.5pt; color: #444; } .print-space { height: 70pt; border-bottom: 1px solid #bbb; } .print-choices { display: grid; gap: 3pt; margin-left: 4pt; }
+  .print-key { padding-left: 22pt; } .print-key li { margin: 0 0 4pt; }
+}

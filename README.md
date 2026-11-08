@@ -77,6 +77,9 @@ Open `teacher.html`. Build a worksheet (write questions, or generate practice pr
 - This is for homework, practice and low-stakes quizzes. It cannot stop a student using another tool, and a code cannot prove who wrote it.
 - **QR code** for the student link (put it on a slide or print it); **time limits** with a start gate, a countdown that survives reloads, automatic lock and code at zero, and time used shown in the gradebook and CSV. The timer runs in the student's browser, so it is a guide, not a proctor.
 - Answers typed by students are never executed: they are parsed by a whitelist of maths functions only.
+- **Different numbers for every student.** Give a question random numbers (`a = 2..9`, `b = -5..5 except 0`) and write `@{a}`, `@{+b}` or `@{a*b}` in the question and the answer. Each student's numbers are made from their name, so the same student always gets the same version, the answer key follows automatically, and you can also shuffle the question order and the multiple-choice answers. The submission code carries the version, so grading uses exactly what the student saw.
+- **Gradebook tools:** partial credit for lists, matrices and factorisations; click any mark to see the student's answer and change the points (with a comment); a class list that shows who has not handed in and which names do not match; question analysis with common wrong answers, blanks and a score histogram; one-click **review worksheet** from the questions most of the class missed.
+- **Question bank** with tags and search, export/import as a file, a teacher-to-teacher link for sharing questions (it contains the answers, so send it only to colleagues), and **printing** a worksheet with an answer key, one named copy per student.
 
 ## Design & trust
 

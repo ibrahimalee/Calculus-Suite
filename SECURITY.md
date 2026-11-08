@@ -11,6 +11,7 @@ If you find a vulnerability (for example script injection through an input, a sh
 - **Content-Security-Policy** (see `vercel.json`): scripts only from this origin plus three pinned inline-script hashes, no plugins, no external connections, no `<base>` tricks, forms only to this origin. The classroom pages cannot be framed by other sites; the calculator can (on purpose, for the embed feature).
 - **No third-party scripts at runtime.** Every library is vendored, and there is no CDN fallback.
 - **Known trade-off:** the policy needs `'unsafe-eval'` because the maths library compiles expressions with `new Function`; this is why input is parsed through the whitelist first. `'unsafe-inline'` is allowed for styles only (KaTeX and Plotly set inline styles).
+- **Shared question links** (`teacher.html#q=…`) contain the answer key and are meant for teachers only; they are validated and size-limited on opening, shown as text (never as HTML), and cleared from the address bar once imported. Random per-student numbers come from the student's typed name, so they are a convenience, not a secret.
 - **Classroom limits (by design):** a student can read the key in practice-mode worksheets, can fabricate a submission code, and can bypass the browser-side timer. Use it for homework, practice and low-stakes quizzes.
 
 Last reviewed with a manual and automated scan: dependency audit (no known advisories for the shipped versions), static analysis, fuzzing of every tool, hostile-link and hostile-file probes, and a full browser run under the policy.

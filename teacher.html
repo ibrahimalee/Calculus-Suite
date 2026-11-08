@@ -28,6 +28,11 @@
         <p class="lead">Students open your link and see only the questions, with no calculator unless you allow one. When they finish they get a short code to send back. Paste the codes into the gradebook here and everything is marked on your device. Nothing is uploaded anywhere.</p>
         <p class="notice">This is meant for homework, practice and low-stakes quizzes. It can’t stop a student from using another tool, and a code can’t prove who wrote it. Your answer key stays in this browser (and in any file you export), never in the student link, unless you switch on practice mode.</p>
 
+        <div id="importBanner" class="notice ok" hidden role="status">
+            <p style="margin:0 0 10px"><b id="importTitle"></b> <span id="importDetail"></span></p>
+            <div class="row"><button class="btn btn-solid btn-sm" id="importNew" type="button">Add to a new worksheet</button><button class="btn btn-line btn-sm" id="importHere" type="button">Add to the open worksheet</button><button class="btn btn-line btn-sm" id="importBank" type="button">Save to my question bank</button><button class="btn btn-line btn-sm" id="importNo" type="button">Dismiss</button></div>
+        </div>
+
         <div class="tabs2" role="tablist" aria-label="Teacher tools">
             <button role="tab" id="tabBuild" aria-selected="true" aria-controls="paneBuild">1 · Build a worksheet</button>
             <button role="tab" id="tabGrade" aria-selected="false" aria-controls="paneGrade" tabindex="-1">2 · Gradebook</button>
@@ -57,6 +62,9 @@
                         <label><input type="checkbox" id="wsCalc"><span>Show a link to the calculator <span class="small">(off by default)</span></span></label>
                         <label style="flex-basis:100%"><span class="row" style="gap:10px"><input class="in" id="wsTime" type="number" min="0" max="600" step="1" value="0" style="width:90px" aria-label="Time limit in minutes, 0 for none"><span>Time limit in minutes <span class="small">(0 = untimed)</span></span></span></label>
                         <label><input type="checkbox" id="wsLock" checked><span>Lock answers and send the code automatically when time runs out <span class="small">(the timer runs in the student’s browser, so it is a guide, not a proctor)</span></span></label>
+                        <label><input type="checkbox" id="wsPartial"><span>Partial credit for lists, matrices and factorisations <span class="small">(points in proportion to the parts that are right)</span></span></label>
+                        <label><input type="checkbox" id="wsShuffleQ"><span>Shuffle the question order for each student</span></label>
+                        <label><input type="checkbox" id="wsShuffleC"><span>Shuffle the multiple-choice answers for each student</span></label>
                         <label><input type="checkbox" id="wsSelf"><span>Practice mode: students see ✓/✗ immediately <span class="small">(the answers are inside the link, so a curious student could read them)</span></span></label>
                     </div>
                 </div>
@@ -78,6 +86,38 @@
                     <button class="btn btn-line btn-sm" id="genBtn" type="button" style="align-self:flex-end">Generate</button>
                 </div>
                 <p class="small">The same seed always gives the same problems, so you can recreate a worksheet. Every generated answer is checked by the calculator engine.</p>
+            </div>
+
+            <div class="card" id="bankCard">
+                <h3>Question bank <small id="bankCount"></small></h3>
+                <p class="small" style="margin-top:0">Keep questions you like and reuse them in any worksheet. The bank lives in this browser; export it to back it up or give it to a colleague.</p>
+                <div class="row">
+                    <label class="field grow" style="margin:0"><span>Search the bank</span><input class="in" id="bankSearch" type="search" placeholder="derivative, week 3, …" autocomplete="off"></label>
+                    <label class="field grow" style="margin:0"><span>Tags for new saves</span><input class="in" id="bankTags" maxlength="80" placeholder="e.g. derivatives, easy" autocomplete="off"></label>
+                </div>
+                <div id="bankList" class="bank-list" role="list"></div>
+                <div class="row" style="margin-top:12px">
+                    <button class="btn btn-line btn-sm" id="bankSaveAll" type="button">Save this worksheet’s questions to the bank</button>
+                    <button class="btn btn-line btn-sm" id="bankExport" type="button">Export the bank</button>
+                    <label class="btn btn-line btn-sm" style="cursor:pointer">Import a bank file<input id="bankFile" type="file" accept=".json,application/json" hidden></label>
+                </div>
+                <p class="small" id="bankNote" role="status"></p>
+            </div>
+
+            <div class="card" id="reviewCard">
+                <h3>Review what the class missed</h3>
+                <p class="small" style="margin-top:0">Looks through the submissions you have graded on all your worksheets and lists the questions that most students got wrong, so you can build a review sheet from them. Questions with random numbers come back with new numbers.</p>
+                <div class="row"><button class="btn btn-line btn-sm" id="findMissed" type="button">Find the most-missed questions</button></div>
+                <div id="missedList" class="bank-list" role="list"></div>
+                <p class="small" id="missedNote" role="status"></p>
+            </div>
+
+            <div class="card" id="printCard">
+                <h3>Print or save as PDF</h3>
+                <label class="field"><span>One copy per student (optional)</span><textarea id="printNames" rows="3" placeholder="Ada Lovelace&#10;Alan Turing&#10;(leave empty for a single copy)"></textarea><span class="small" style="text-transform:none;letter-spacing:0">With random numbers or shuffling, each named copy is exactly the version that student would get online, so you can grade their paper from the same key.</span></label>
+                <div class="checks"><label><input type="checkbox" id="printKey" checked><span>Add an answer key at the end</span></label><label><input type="checkbox" id="printSpace" checked><span>Leave space to write under each question</span></label></div>
+                <div class="row"><button class="btn btn-line btn-sm" id="printBtn" type="button">Print worksheet</button></div>
+                <p class="err" id="printErr" role="alert"></p>
             </div>
 
             <div class="card">
@@ -102,6 +142,9 @@
                     </div>
                     <p class="small" id="qrNote" role="status"></p>
                 </div>
+                <div class="row" style="margin-top:14px"><button class="btn btn-line btn-sm" id="shareQ" type="button">Make a link to share these questions with another teacher</button></div>
+                <div id="shareQBox" hidden><label class="field" style="margin-top:10px"><span>Teacher-to-teacher link (contains the answer key)</span><textarea id="shareQOut" readonly rows="3"></textarea></label><div class="row"><button class="btn btn-line btn-sm" id="shareQCopy" type="button">Copy</button></div></div>
+                <p class="small" id="shareQNote" role="status"></p>
             </div>
         </section>
 
@@ -118,17 +161,22 @@
                     <div class="row"><button class="btn btn-solid btn-sm" id="addCodes" type="button">Add and grade</button>
                         <label class="btn btn-line btn-sm" style="cursor:pointer">Open files<input id="codeFiles" type="file" accept=".txt,.json,text/plain" multiple hidden></label></div>
                     <p class="err" id="gradeErr" role="status" aria-live="polite"></p>
+                    <label class="field" style="margin-top:14px"><span>Class list (optional, one name per line)</span><textarea id="roster" rows="4" maxlength="20000" placeholder="Ada Lovelace&#10;Alan Turing"></textarea></label>
+                    <p class="small" id="rosterNote" role="status"></p>
                 </div>
                 <div>
                     <div class="stats" id="stats" aria-live="polite"></div>
-                    <div class="row"><button class="btn btn-line btn-sm" id="csvBtn" type="button">Download CSV</button><button class="btn btn-line btn-sm" id="printGrades" type="button">Print</button></div>
+                    <div class="row"><button class="btn btn-line btn-sm" id="csvBtn" type="button">Download CSV</button><button class="btn btn-line btn-sm" id="printGrades" type="button">Print</button><button class="btn btn-line btn-sm" id="makeReview" type="button">Review sheet from missed questions</button></div>
+                    <p class="small" id="reviewNote" role="status"></p>
                 </div>
             </div>
-            <div class="tbl-wrap" id="tblWrap" hidden><table class="grades" id="grades"></table></div>
+            <div class="tbl-wrap" id="tblWrap" hidden tabindex="0" role="region" aria-label="Gradebook table"><table class="grades" id="grades"></table></div>
             <p class="small" id="skipNote"></p>
-            <p class="small">Click a ✓ or ✗ to see what the student typed. If two codes share a name, the most recent one is used. Codes are kept in this browser until you clear them.</p>
+            <details id="analysis" class="card" hidden><summary>Question analysis</summary><div id="analysisBody"></div></details>
+            <p class="small">Click a mark to see what the student typed and to adjust the points for that question. If two codes share a name, the most recent one is used. Codes are kept in this browser until you clear them.</p>
         </section>
     </main>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <script src="vendor/math.min.js"></script>
     <script src="vendor/algebrite.min.js"></script>
     <script src="vendor/katex/katex.min.js"></script>

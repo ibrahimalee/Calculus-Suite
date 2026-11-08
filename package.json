@@ -7,7 +7,7 @@
   "scripts": {
     "test": "node --test tests/*.test.js",
     "serve": "python3 -m http.server 8080",
-    "e2e": "node tests/e2e/ui-checks.js && node tests/e2e/plot-checks.js && node tests/e2e/new-tools.js && node tests/e2e/home.js && node tests/e2e/classroom.js && node tests/e2e/hostile.js"
+    "e2e": "node tests/e2e/ui-checks.js && node tests/e2e/plot-checks.js && node tests/e2e/new-tools.js && node tests/e2e/home.js && node tests/e2e/classroom.js && node tests/e2e/classroom2.js && node tests/e2e/hostile.js"
   },
   "devDependencies": {
     "playwright": "^1.49.0",

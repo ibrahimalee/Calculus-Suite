@@ -36,9 +36,11 @@
             <p class="notice" id="selfNote" hidden>This is a practice worksheet: it checks your answers on this page as soon as you press <b>Check my answers</b>.</p>
             <p id="calcRow" hidden><a class="btn btn-line btn-sm" href="app.html" target="_blank" rel="noopener">Open the calculator in a new tab <span aria-hidden="true">↗</span></a></p>
             <label class="field who"><span>Your name</span><input class="in" id="stuName" autocomplete="name" maxlength="80" placeholder="First and last name"></label>
+            <p class="small who-note"><button class="btn btn-line btn-sm" id="renameBtn" type="button" hidden>Not your name? Start again</button></p>
             <section id="gate" class="notice" hidden aria-labelledby="gateH">
                 <h2 id="gateH" style="font-size:1.4rem;margin:0 0 8px">This worksheet is timed</h2>
-                <p style="margin:0 0 12px">You have <b id="gateMin"></b> minutes. The timer starts when you press the button and keeps running if you reload the page. <span id="gateLock">When time is up your answers are locked and your code is made for you.</span> Type your name above first.</p>
+                <p id="gateText" style="margin:0 0 12px">You have <b id="gateMin"></b> minutes. The timer starts when you press the button and keeps running if you reload the page. <span id="gateLock">When time is up your answers are locked and your code is made for you.</span> Type your name above first.</p>
+                <p id="gateRand" style="margin:0 0 12px" hidden>This worksheet gives each student their own numbers (and sometimes a different order), made from the name you type. Use the name your teacher knows you by, spelled the same way each time. Type it above, then start.</p>
                 <button class="btn btn-solid" id="startBtn" type="button">Start the timer <span aria-hidden="true">→</span></button>
                 <p class="err" id="gateErr" role="alert"></p>
             </section>
