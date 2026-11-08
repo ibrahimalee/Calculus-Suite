@@ -1,6 +1,9 @@
 const test = require('node:test'), assert = require('node:assert');
 const NL = require('../js/nlp.js');
 const cases = [
+  ['kruskal wallis 1 2 3 ; 4 5 6 ; 7 8 9', { mode: 'stats', opts: { op: 'kruskal' } }],
+  ['phase portrait of 1 2 ; 3 4', { mode: 'ode', opts: { odeType: 'linear2' } }],
+  ['generating function of a(n)=a(n-1)+a(n-2) with a(0)=0, a(1)=1', { mode: 'algebra', opts: { op: 'gf', init: '0, 1' } }],
   ['mann whitney test 1 2 3 4 ; 5 6 7 8', { mode: 'stats', opts: { op: 'mannwhitney' } }],
   ['epsilon delta for x^2 near 2 with epsilon 0.05', { mode: 'limit', opts: { task: 'epsdelta', point: '2', eps: '0.05' } }],
   ['chi square test 18,22,20,40', { mode: 'stats', opts: { op: 'chisq' } }],

@@ -152,3 +152,15 @@ test('insulated-end PDEs, ANOVA pairwise comparisons and Mann-Whitney verify the
   assert.throws(() => E.run.stats('1 1 1 ; 1 1 1', { op: 'mannwhitney' }), /identical/);
   assert.throws(() => E.run.algebra('x^10-1', { op: 'factor' }), /degree 8/);
 });
+test('phase portraits, Wilcoxon, Kruskal-Wallis and generating functions verify themselves', () => {
+  const cls = M => E.run.ode(M, { odeType: 'linear2', range: '4' });
+  assert.match(cls('1 2 ; 3 4').main.text, /^saddle/); assert.match(cls('-1 0 ; 0 -2').main.text, /^stable node/); assert.match(cls('0 1 ; -4 0').main.text, /^center/);
+  assert.match(cls('-1 1 ; -1 -1').main.text, /^stable spiral/); assert.match(cls('1 1 ; 0 1').main.text, /^degenerate node.*unstable/); assert.match(cls('2 0 ; 0 2').main.text, /^star node/);
+  assert.ok(cls('1 2 ; 3 4').meta.some(m => /^Verified.*e\^\(At\)/.test(m))); assert.throws(() => cls('1 2 3'), /2×2/);
+  const w = E.run.stats('1.5 2.1 0.8 3.3 -0.4 2.2 1.1', { op: 'wilcoxon' }); assert.match(w.main.text, /W = 1.*p = 0\.03125/); assert.ok(w.meta.some(m => /^Verified/.test(m)));
+  assert.match(E.run.stats('10 12 9 14 11 ; 8 11 10 9 7', { op: 'wilcoxon' }).items.map(i => i.text).join('|'), /normal approximation/);
+  assert.throws(() => E.run.stats('0 0 0', { op: 'wilcoxon' }), /non-zero/);
+  const k = E.run.stats('1 2 3 ; 4 5 6 ; 7 8 9', { op: 'kruskal' }); assert.match(k.main.text, /H = 7\.2.*p = 0\.02732/); assert.throws(() => E.run.stats('1 1 ; 1 1', { op: 'kruskal' }), /identical/);
+  const g = E.run.algebra('a(n) = a(n-1) + a(n-2)', { op: 'gf', init: '0, 1' }); assert.equal(g.main.text, '(x) / (−x^2 − x + 1)'); assert.ok(g.meta.some(m => /^Verified/.test(m)));
+  assert.equal(E.run.algebra('a(n) = 3*a(n-1)', { op: 'gf', init: '2' }).main.text, '(2) / (−3·x + 1)');
+});

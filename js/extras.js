@@ -1248,7 +1248,7 @@
         const polyTxt = (p, v) => { const t = []; for (let i = p.length - 1; i >= 0; i--) { const c = p[i]; if (Math.abs(c) < 1e-12) continue; const a = N_(Math.abs(c)); const mono = i === 0 ? '' : i === 1 ? v : `${v}^${i}`; const body = i === 0 ? a.text : (Math.abs(Math.abs(c) - 1) < 1e-12 ? mono : a.text + '·' + mono); t.push((c < 0 ? ' − ' : t.length ? ' + ' : '') + body); } return t.join('').replace(/^ − /, '−') || '0'; };
         const oneVar = (node) => { const fv = engine.freeVars(node); if (fv.length > 1) throw new CalcError(`Use a single variable (found ${fv.join(', ')}).`); return fv[0] || 'x'; };
 
-        if (op === 'recur') {
+        if (op === 'recur' || op === 'gf') {
             const m = String(src).replace(/\s+/g, '').match(/^a\(n\)=(.+)$/i);
             if (!m) throw new CalcError('Write the recurrence as a(n) = a(n-1) + a(n-2).');
             let k = 0; const rhs = m[1].replace(/a\(n-(\d+)\)/gi, (_, d) => { k = Math.max(k, +d); return `v${d}`; });
@@ -1275,6 +1275,19 @@
                 for (let q = 0; q <= forceInfo.d; q++) comb = I.polyMul(comb, [-forceInfo.r, 1]);
             }
             const K = comb.length - 1; if (K > 12) throw new CalcError('The combined order is too high for a reliable closed form.');
+            if (op === 'gf') {
+                const Qx = comb.map((_, j) => comb[K - j]); const prod = new Array(60).fill(0); for (let i = 0; i < 60; i++) for (let j = 0; j <= K && i + j < 60; j++) prod[i + j] += terms[i] * Qx[j];
+                const sc = Math.max(1, ...terms.slice(0, 40).map(Math.abs)); const Px = I.polyTrim(prod.slice(0, K)); for (let n = K; n < 56; n++) if (Math.abs(prod[n]) > 1e-8 * sc * Math.max(1, Math.pow(Math.max(1, ...Qx.map(Math.abs)), 2))) throw new CalcError('The generating function did not close up (numerical trouble).');
+                const rts = comb.length > 1 ? I.polyRootsMult(comb.slice()) : []; const rho = rts.length ? Math.max(...rts.map(z => Math.hypot(z.re, z.im))) : 0;
+                r.title = 'Generating function'; r.main = { label: 'A(x) = Σ aₙxⁿ =', text: `(${polyTxt(Px, 'x')}) / (${polyTxt(Qx, 'x')})`, tex: `A(x)=\\frac{${polyTex(Px, 'x')}}{${polyTex(Qx, 'x')}}` };
+                r.items.push({ label: 'Denominator from the characteristic polynomial:', text: `${polyTxt(Qx, 'x')}  (the reversal of ${polyTxt(comb, 'r')})`, tex: '' });
+                r.items.push({ label: 'Series expansion:', text: terms.slice(0, 12).map(x => N_(x, 8).text).join(' + ') .replace(/ \+ (?=-)/g, ' ') + ' …', tex: '' });
+                r.items.push({ label: 'Radius of convergence of A(x):', text: rho > 1e-12 ? N_(1 / rho, 6).text : '∞', tex: '' });
+                r.meta.push('Verified: multiplying the first 56 terms by the denominator leaves a polynomial of degree < ' + K + ' (every higher coefficient vanishes), so the fraction reproduces the sequence');
+                r.meta.push('Method: A(x)·Q(x) is a polynomial because the recurrence kills every coefficient beyond the order');
+                r.steps.push({ title: 'Multiply by the denominator', text: 'Put Q(x) = 1 − c₁x − … − c_kx^k (plus factors for any extra term). Then A(x)·Q(x) only keeps the first few terms.', tex: '' }); r.steps.push({ title: 'Divide', text: 'So A(x) = P(x)/Q(x), where P comes from the initial values.', tex: '' });
+                return I.finalizeText(r);
+            }
             const roots = I.polyRootsMult(comb.slice()); const total = roots.reduce((a, z) => a + z.mult, 0); if (total !== K) throw new CalcError('Could not find the characteristic roots reliably.');
             const cols = []; roots.forEach(z => { for (let q = 0; q < z.mult; q++) cols.push({ z: math.complex(z.re, z.im), q }); });
             const basis = (c, n) => math.multiply(math.pow(c.z, n), n === 0 && c.q === 0 ? 1 : Math.pow(n, c.q));
@@ -1648,7 +1661,54 @@
         r.plot = { generic: { title: 'The two samples', xTitle: 'sample', yTitle: 'value', traces: [{ y: A, type: 'box', name: 'sample 1', boxpoints: 'all', jitter: 0.4 }, { y: B, type: 'box', name: 'sample 2', boxpoints: 'all', jitter: 0.4 }] } };
         return I.finalizeText(r);
     }
-    register({ stats: (src, opt) => (opt.op === 'chisq' || opt.op === 'anova') ? runChiAnova(src, opt) : opt.op === 'mannwhitney' ? runMannWhitney(src, opt) : prevStats(src, opt) });
+
+    const rankAvg = vals => { const idx = vals.map((v, i) => i).sort((a, b) => vals[a] - vals[b]); const rk = new Array(vals.length); let tieSum = 0; for (let i = 0; i < idx.length;) { let j = i; while (j + 1 < idx.length && vals[idx[j + 1]] === vals[idx[i]]) j++; const r = (i + j) / 2 + 1; for (let q = i; q <= j; q++) rk[idx[q]] = r; const t = j - i + 1; if (t > 1) tieSum += t * t * t - t; i = j + 1; } return { rk, tieSum }; };
+    const PhiN = x => 0.5 * (1 + (x >= 0 ? 1 : -1) * gammaP(0.5, x * x / 2));
+    const fmtP = p => (p < 1e-4 ? p.toExponential(3) : engine.fmt(p, 5));
+
+    function runWilcoxon(src, opt) {
+        const alpha = (() => { const q = +opt.alpha; return q > 0 && q < 1 ? q : 0.05; })();
+        const rows = String(src).split(/[;\n]+/).map(x => x.trim()).filter(Boolean); if (rows.length < 1 || rows.length > 2) throw new CalcError('Give one sample of differences, or two paired samples separated by a semicolon.');
+        let d; if (rows.length === 2) { const a = numList(rows[0], 'Value'), b = numList(rows[1], 'Value'); if (a.length !== b.length) throw new CalcError('Paired samples need the same number of values.'); d = a.map((x, i) => x - b[i]); } else d = numList(rows[0], 'Value');
+        const zeros = d.filter(x => x === 0).length; d = d.filter(x => x !== 0); const n = d.length; if (n < 2) throw new CalcError('Need at least two non-zero differences.'); if (n > 5000) throw new CalcError('Up to 5,000 differences.');
+        const { rk, tieSum } = rankAvg(d.map(Math.abs)); const Wp = d.reduce((a, x, i) => a + (x > 0 ? rk[i] : 0), 0), Wm = n * (n + 1) / 2 - Wp;
+        if (Math.abs(Wp + Wm - n * (n + 1) / 2) > 1e-9) throw new CalcError('Internal check failed.');
+        let p, how;
+        if (!tieSum && n <= 22) { const maxS = n * (n + 1) / 2, dp = new Float64Array(maxS + 1); dp[0] = 1; for (let r = 1; r <= n; r++) for (let sm = maxS; sm >= r; sm--) dp[sm] += dp[sm - r]; const total = dp.reduce((a, b) => a + b, 0); if (Math.abs(total - Math.pow(2, n)) > 1e-6 * total) throw new CalcError('Internal check failed.'); let lo = 0; for (let sm = 0; sm <= Wp; sm++) lo += dp[sm]; let hi = 0; for (let sm = Wp; sm <= maxS; sm++) hi += dp[sm]; p = Math.min(1, 2 * Math.min(lo, hi) / total); how = `exact (all ${Math.pow(2, n)} sign patterns)`; }
+        else { const mu = n * (n + 1) / 4, sg = Math.sqrt(n * (n + 1) * (2 * n + 1) / 24 - tieSum / 48); const z = (Math.abs(Wp - mu) - 0.5) / sg; p = Math.min(1, 2 * (1 - PhiN(Math.max(0, z)))); how = `normal approximation with continuity${tieSum ? ' and tie' : ''} correction`; }
+        const r = I.makeResult('stats', 'Wilcoxon signed-rank test'); const W = Math.min(Wp, Wm);
+        r.main = { label: 'Signed-rank test:', text: `W = ${engine.fmt(W, 6)}  (W⁺ = ${engine.fmt(Wp, 6)}, W⁻ = ${engine.fmt(Wm, 6)}),  p = ${fmtP(p)}`, tex: '' };
+        r.items.push({ label: 'Decision:', text: p < alpha ? `Reject H₀ at α = ${alpha}: the differences are not centred on 0.` : `Do not reject H₀ at α = ${alpha}: no evidence of a shift.`, tex: '' });
+        r.items.push({ label: 'Differences used:', text: `${n} non-zero${zeros ? ` (${zeros} zero difference${zeros > 1 ? 's' : ''} dropped)` : ''}; median difference ${engine.fmt(d.slice().sort((a, b) => a - b)[Math.floor((n - 1) / 2)] / 2 + d.slice().sort((a, b) => a - b)[Math.ceil((n - 1) / 2)] / 2, 5)}`, tex: '' });
+        r.items.push({ label: 'p-value method:', text: how, tex: '' });
+        r.meta.push(`Verified: W⁺ + W⁻ = n(n+1)/2${!tieSum && n <= 22 ? '; the exact distribution counts all 2ⁿ sign patterns' : ''}`);
+        r.meta.push('Paired or one-sample test with no normality assumption; it assumes the differences are roughly symmetric about their centre.');
+        r.steps.push({ title: 'Rank the sizes', text: 'Drop zero differences, rank |d| from smallest to largest (ties share the average rank).', tex: '' }); r.steps.push({ title: 'Add up the signs', text: 'W⁺ is the sum of ranks of the positive differences. If there is no shift, W⁺ is near n(n+1)/4.', tex: '' });
+        r.plot = { generic: { title: 'The differences', xTitle: 'index', yTitle: 'difference', traces: [{ y: d, x: d.map((_, i) => i + 1), type: 'bar', name: 'd' }] } };
+        return I.finalizeText(r);
+    }
+    function runKruskal(src, opt) {
+        const alpha = (() => { const q = +opt.alpha; return q > 0 && q < 1 ? q : 0.05; })();
+        const groups = String(src).split(/[;\n]+/).map(x => x.trim()).filter(Boolean).map(g => numList(g, 'Value')); if (groups.length < 2) throw new CalcError('Give at least two groups separated by semicolons.'); if (groups.some(g => g.length < 1)) throw new CalcError('Every group needs at least one value.');
+        const all = groups.flat(), N = all.length, k = groups.length; if (N > 5000) throw new CalcError('Up to 5,000 values.');
+        const { rk, tieSum } = rankAvg(all); const C = 1 - tieSum / (N * N * N - N); if (!(C > 0)) throw new CalcError('All values are identical, so the test is undefined.');
+        let pos = 0; const R = groups.map(g => { const sm = g.reduce((a, _, i) => a + rk[pos + i], 0); pos += g.length; return sm; });
+        if (Math.abs(R.reduce((a, b) => a + b, 0) - N * (N + 1) / 2) > 1e-9) throw new CalcError('Internal check failed.');
+        const H = (12 / (N * (N + 1)) * R.reduce((a, rr, i) => a + rr * rr / groups[i].length, 0) - 3 * (N + 1)) / C, df = k - 1, pv = 1 - gammaP(df / 2, H / 2);
+        const pdf = x => Math.exp((df / 2 - 1) * Math.log(x) - x / 2 - (df / 2) * Math.log(2) - lgamma(df / 2)); const num = H > 0 ? 1 - simpson(u => (u === 0 ? 0 : pdf(u * u) * 2 * u), 0, Math.sqrt(H), 40000) : 1; if (Math.abs(num - pv) > 2e-4 && pv > 1e-6) throw new CalcError('The p-value failed its numerical check.');
+        const r = I.makeResult('stats', 'Kruskal–Wallis test');
+        r.main = { label: 'Kruskal–Wallis:', text: `H = ${engine.fmt(H, 6)},  df = ${df},  p = ${fmtP(pv)}`, tex: '' };
+        r.items.push({ label: 'Decision:', text: pv < alpha ? `Reject H₀ at α = ${alpha}: at least one group tends to give different values.` : `Do not reject H₀ at α = ${alpha}: no evidence the groups differ.`, tex: '' });
+        r.items.push({ label: 'Mean rank per group:', text: R.map((rr, i) => `group ${i + 1}: ${engine.fmt(rr / groups[i].length, 5)} (n = ${groups[i].length})`).join(';  '), tex: '' });
+        r.items.push({ label: 'Effect size ε² =', text: engine.fmt(Math.max(0, (H - k + 1) / (N - k)), 4), tex: '' });
+        if (groups.some(g => g.length < 5)) r.warnings.push('Some groups have fewer than 5 values; the χ² approximation behind the p-value can be inaccurate for samples this small.');
+        r.meta.push('Verified: the rank sums add to N(N+1)/2 and the p-value matches direct numerical integration of the χ² density');
+        r.meta.push('Rank-based alternative to one-way ANOVA with no normality assumption (tie-corrected). It says whether groups differ, not which ones.');
+        r.steps.push({ title: 'Rank everything together', text: 'Pool all groups, rank from smallest to largest, ties share the average rank.', tex: '' }); r.steps.push({ title: 'Compare mean ranks', text: 'H = 12/(N(N+1)) Σ Rᵢ²/nᵢ − 3(N+1), divided by a tie correction; under H₀ it follows χ² with k − 1 degrees of freedom.', tex: '' });
+        r.plot = { generic: { title: 'Groups', xTitle: 'group', yTitle: 'value', traces: groups.map((g, i) => ({ y: g, type: 'box', name: `group ${i + 1}`, boxpoints: 'all', jitter: 0.4 })) } };
+        return I.finalizeText(r);
+    }
+    register({ stats: (src, opt) => (opt.op === 'chisq' || opt.op === 'anova') ? runChiAnova(src, opt) : opt.op === 'mannwhitney' ? runMannWhitney(src, opt) : opt.op === 'wilcoxon' ? runWilcoxon(src, opt) : opt.op === 'kruskal' ? runKruskal(src, opt) : prevStats(src, opt) });
 
     // ---- heat and wave equations on [0, L] with fixed ends ----
     function runPDE(src, opt) {
@@ -1701,7 +1761,43 @@
         const sx = Math.max(1, Math.floor(Nx / 60)); const gx = xs.filter((_, i) => i % sx === 0); r.plot3 = { generic: { title: 'u(x, t) as a surface', axes: ['x', 't', 'u'], traces: [{ type: 'surface', x: gx, y: rec.map(q => q.t), z: rec.map(q => q.u.filter((_, i) => i % sx === 0)), showscale: false }] } };
         return I.finalizeText(r);
     }
-    register({ ode: (src, opt) => (opt.odeType === 'heat' || opt.odeType === 'wave') ? runPDE(src, opt) : prevOde(src, opt) });
+
+    function runLinear2(src, opt) {
+        const nums = String(src).replace(/[\[\]]/g, ' ').split(/[\s,;]+/).filter(Boolean).map(x => I.parseLimit(x, 'Entry').value); if (nums.length !== 4 || !nums.every(Number.isFinite)) throw new CalcError('Enter a 2×2 matrix, e.g. 1 2 ; 3 4  (rows separated by ;).');
+        const [a, b, c, d] = nums, M = [[a, b], [c, d]], tr = a + d, det = a * d - b * c, disc = tr * tr - 4 * det, eps = 1e-12 * Math.max(1, Math.abs(tr), Math.abs(det));
+        const R = Math.max(0.5, Math.min(100, +opt.range || 4)); const N8 = x => nice(x, 6, 1e-9).text;
+        const r = I.makeResult('ode', 'Linear system  x′ = Ax');
+        let kind, stab, ev = [];
+        if (Math.abs(det) <= eps) { kind = 'degenerate (det A = 0): a whole line of equilibria, or a single direction of motion'; stab = tr < -eps ? 'trajectories converge onto the line of equilibria' : tr > eps ? 'trajectories move away from the line of equilibria' : 'neutral'; }
+        else if (det < 0) { kind = 'saddle'; stab = 'unstable'; }
+        else if (disc > eps) { kind = tr < 0 ? 'stable node (sink)' : 'unstable node (source)'; stab = tr < 0 ? 'asymptotically stable' : 'unstable'; }
+        else if (Math.abs(disc) <= eps) { const star = Math.abs(b) < 1e-12 && Math.abs(c) < 1e-12 && Math.abs(a - d) < 1e-12; kind = `${star ? 'star node (proper)' : 'degenerate node (improper)'}, ${tr < 0 ? 'stable' : 'unstable'}`; stab = tr < 0 ? 'asymptotically stable' : 'unstable'; }
+        else { kind = Math.abs(tr) <= eps ? 'center' : tr < 0 ? 'stable spiral (spiral sink)' : 'unstable spiral (spiral source)'; stab = Math.abs(tr) <= eps ? 'stable but not asymptotically (closed orbits)' : tr < 0 ? 'asymptotically stable' : 'unstable'; }
+        const lam = disc >= -eps ? [(tr + Math.sqrt(Math.max(0, disc))) / 2, (tr - Math.sqrt(Math.max(0, disc))) / 2].map(x => ({ re: x, im: 0 })) : [{ re: tr / 2, im: Math.sqrt(-disc) / 2 }, { re: tr / 2, im: -Math.sqrt(-disc) / 2 }];
+        const vec = l => { const v1 = [b, l - a], v2 = [l - d, c]; const v = Math.hypot(...v1) >= Math.hypot(...v2) ? v1 : v2; const m = Math.hypot(...v); return m < 1e-12 ? null : v.map(x => x / m); };
+        const realEv = lam.every(z => Math.abs(z.im) < 1e-12) ? lam.map(z => ({ l: z.re, v: vec(z.re) })) : [];
+        r.title = 'Phase portrait of x′ = Ax'; r.main = { label: 'Classification:', text: `${kind}  (${stab})`, tex: '' };
+        r.items.push({ label: 'Matrix A =', text: `[[${N8(a)}, ${N8(b)}], [${N8(c)}, ${N8(d)}]]`, tex: `A=\\begin{bmatrix}${N8(a)}&${N8(b)}\\\\${N8(c)}&${N8(d)}\\end{bmatrix}` });
+        r.items.push({ label: 'Trace, determinant, discriminant:', text: `tr A = ${N8(tr)},  det A = ${N8(det)},  tr² − 4 det = ${N8(disc)}`, tex: '' });
+        r.items.push({ label: 'Eigenvalues:', text: lam.map(z => Math.abs(z.im) < 1e-12 ? N8(z.re) : `${N8(z.re)} ${z.im < 0 ? '−' : '+'} ${N8(Math.abs(z.im))}i`).join(',  '), tex: '' });
+        if (realEv.length) { const uniq = Math.abs(disc) <= eps ? [realEv[0]] : realEv; r.items.push({ label: 'Eigenvectors:', text: uniq.map(q => q.v ? `λ = ${N8(q.l)}: (${q.v.map(x => N8(x)).join(', ')})` : `λ = ${N8(q.l)}: every non-zero vector`).join(';  '), tex: '' }); }
+        r.items.push({ label: 'General solution:', text: Math.abs(disc) <= eps ? (Math.abs(b) < 1e-12 && Math.abs(c) < 1e-12 && Math.abs(a - d) < 1e-12 ? `x(t) = e^(${N8(a)}t)·x₀  (every direction scales the same way)` : `x(t) = e^(${N8(tr / 2)}t)·(c₁v + c₂(t·v + w)),  where v is the eigenvector and (A − λI)w = v`) : disc > 0 ? 'x(t) = c₁ v₁ e^(λ₁t) + c₂ v₂ e^(λ₂t)' : `x(t) = ${Math.abs(tr) <= eps ? '' : `e^(${N8(tr / 2)}t)·`}[c₁(cos ${N8(Math.sqrt(-disc) / 2)}t·u − sin ${N8(Math.sqrt(-disc) / 2)}t·w) + c₂(sin ${N8(Math.sqrt(-disc) / 2)}t·u + cos ${N8(Math.sqrt(-disc) / 2)}t·w)],  where u + iw is an eigenvector for ${N8(tr / 2)} + ${N8(Math.sqrt(-disc) / 2)}i`, tex: '' });
+        // independent check: RK4 against the matrix exponential
+        const x0 = [1, 0.5], f = v => [a * v[0] + b * v[1], c * v[0] + d * v[1]]; const rk = (v, h) => { const k1 = f(v), k2 = f(v.map((x, i) => x + h / 2 * k1[i])), k3 = f(v.map((x, i) => x + h / 2 * k2[i])), k4 = f(v.map((x, i) => x + h * k3[i])); return v.map((x, i) => x + h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i])); };
+        let w = x0.slice(); for (let i = 0; i < 400; i++) w = rk(w, 1 / 400); const ex = math.multiply(math.expm(math.matrix(M)), x0).toArray(); const err = Math.hypot(w[0] - ex[0], w[1] - ex[1]) / Math.max(1, Math.hypot(...ex)); if (err > 1e-8) throw new CalcError('The numerical check against the matrix exponential failed.');
+        r.meta.push(`Verified: the numerical trajectory agrees with the exact solution e^(At)·x₀ (relative error ${err.toExponential(1)})`);
+        r.meta.push('Classification uses the trace–determinant plane: det < 0 saddle; det > 0 with tr² > 4det nodes, tr² < 4det spirals (centre if tr = 0).');
+        r.steps.push({ title: 'Find the eigenvalues', text: 'Solve λ² − (tr A)λ + det A = 0.', tex: '' }); r.steps.push({ title: 'Read off the behaviour', text: 'Real parts decide stability; non-zero imaginary parts mean rotation (spirals or centres); real eigenvalues of opposite sign give a saddle.', tex: '' });
+        const traces = []; const gx = [], gy = [], ang = []; const G = 11; for (let i = 0; i < G; i++) for (let j = 0; j < G; j++) { const x = -R + 2 * R * i / (G - 1), y = -R + 2 * R * j / (G - 1), v = f([x, y]), m = Math.hypot(...v); if (m < 1e-12) continue; const len = 0.55 * R * 2 / (G - 1); gx.push(x - v[0] / m * len / 2, x + v[0] / m * len / 2, null); gy.push(y - v[1] / m * len / 2, y + v[1] / m * len / 2, null); void ang; }
+        traces.push({ x: gx, y: gy, mode: 'lines', type: 'scatter', name: 'direction field', line: { width: 1 }, hoverinfo: 'skip' });
+        const traj = (sgn, st) => { let v = st.slice(); const X = [v[0]], Y = [v[1]]; for (let i = 0; i < 4000; i++) { v = rk(v, sgn * 0.01); if (Math.abs(v[0]) > 3 * R || Math.abs(v[1]) > 3 * R || !Number.isFinite(v[0])) break; X.push(v[0]); Y.push(v[1]); } return [X, Y]; };
+        for (let k = 0; k < 8; k++) { const th = 2 * Math.PI * k / 8 + 0.2, st = [0.7 * R * Math.cos(th), 0.7 * R * Math.sin(th)]; const [fx, fy] = traj(1, st), [bx, by] = traj(-1, st); traces.push({ x: bx.reverse().concat(fx), y: by.reverse().concat(fy), mode: 'lines', type: 'scatter', name: k ? undefined : 'trajectories', showlegend: k === 0, line: { width: 2 } }); }
+        realEv.forEach((q, i) => { if (q.v) traces.push({ x: [-3 * R * q.v[0], 3 * R * q.v[0]], y: [-3 * R * q.v[1], 3 * R * q.v[1]], mode: 'lines', type: 'scatter', name: `eigenline λ = ${N8(q.l)}`, line: { dash: 'dash', width: 2 } }); void i; });
+        traces.push({ x: [0], y: [0], mode: 'markers', type: 'scatter', name: 'equilibrium', marker: { size: 9 } });
+        r.plot = { generic: { title: `Phase portrait: ${kind}`, xTitle: 'x', yTitle: 'y', equal: true, xRange: [-R, R], yRange: [-R, R], traces } };
+        return I.finalizeText(r);
+    }
+    register({ ode: (src, opt) => (opt.odeType === 'heat' || opt.odeType === 'wave') ? runPDE(src, opt) : opt.odeType === 'linear2' ? runLinear2(src, opt) : prevOde(src, opt) });
 
 
     // ======================================================================

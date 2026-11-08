@@ -147,6 +147,14 @@
         if (m) return { mode: 'limit', fn: mathify(m[1]), opts: { task: 'epsdelta', point: m[2], eps: m[3] || '0.1', direction: 'both', variable: '' }, say: 'Epsilon–delta' };
         m = s.match(/^(?:run |do )?(?:a )?chi[- ]?(?:square|squared)(?: test)?(?: (?:of|on|for))? ([\d.,;\s]+?)(?: (?:expected|with expected|against) ([\d.,\s]+))?$/);
         if (m) return { mode: 'stats', fn: m[1].trim(), opts: { op: 'chisq', expected: (m[2] || '').trim(), alpha: '0.05' }, say: 'Chi-square test' };
+        m = s.match(/^(?:run |do )?(?:a )?wilcoxon(?: signed[- ]?rank)?(?: test)?(?: (?:of|on|for))? ([\d.,;\s-]+)$/);
+        if (m) return { mode: 'stats', fn: m[1].trim(), opts: { op: 'wilcoxon', alpha: '0.05' }, say: 'Wilcoxon signed-rank test' };
+        m = s.match(/^(?:run |do )?(?:a )?kruskal[- ]?wallis(?: test)?(?: (?:of|on|for))? ([\d.,;\s-]+)$/);
+        if (m) return { mode: 'stats', fn: m[1].trim(), opts: { op: 'kruskal', alpha: '0.05' }, say: 'Kruskal–Wallis test' };
+        m = s.match(/^(?:the )?(?:phase portrait|classify|stability) (?:of |for )?(?:the )?(?:linear )?(?:system |matrix )?(?:with matrix |a = )?\[?\[?\s*(-?[\d.]+)[,\s]+(-?[\d.]+)\s*\]?\s*[;,]?\s*\[?\s*(-?[\d.]+)[,\s]+(-?[\d.]+)\s*\]?\]?$/);
+        if (m) return { mode: 'ode', fn: `${m[1]} ${m[2]} ; ${m[3]} ${m[4]}`, opts: { odeType: 'linear2', range: '4' }, say: 'Phase portrait of a linear system' };
+        m = s.match(/^(?:the )?generating function (?:of|for) (?:the )?(?:recurrence |sequence )?(a\s*\(\s*n\s*\)\s*=\s*[^,;]+?)(?:\s*(?:,|;|with|where)\s*(?:a\s*\(\s*0\s*\)\s*=\s*[^,;]+(?:\s*,\s*a\s*\(\s*1\s*\)\s*=\s*[^,;]+)*))?$/);
+        if (m) { const init = [...s.matchAll(/a\s*\(\s*(\d)\s*\)\s*=\s*(-?[\d.]+)/g)].sort((a, b) => a[1] - b[1]).map(x => x[2]); return { mode: 'algebra', fn: m[1].replace(/\s+/g, ''), opts: { op: 'gf', init: init.join(', ') || '0, 1' }, say: 'Generating function' }; }
         m = s.match(/^(?:run |do )?(?:a )?mann[- ]?whitney(?: u)?(?: test)?(?: (?:of|on|for))? ([\d.,;\s-]+)$/);
         if (m) return { mode: 'stats', fn: m[1].trim(), opts: { op: 'mannwhitney', alpha: '0.05' }, say: 'Mann–Whitney U test' };
         m = s.match(/^(?:run |do )?(?:a )?(?:one[- ]?way )?anova(?: test)?(?: (?:of|on|for))? ([\d.,;\s-]+)$/);
