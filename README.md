@@ -29,6 +29,7 @@ A calculus workstation that runs entirely in the browser – no backend, no buil
 | **Chi-square and ANOVA** (in Statistics) | Goodness of fit, independence tables, one-way ANOVA with Bonferroni pairwise comparisons; p-values cross-checked by numerical integration |
 | **Heat and wave equations** (in ODEs) | Fixed or insulated ends; finite-difference solutions with a surface plot, checked against the exact Fourier sine or cosine series |
 | **Phase portraits** (in ODEs) | For x′ = Ax: node / saddle / spiral / centre classification, eigenvalues and eigenvectors, direction field with trajectories and eigenlines, checked against e^(At) |
+| **Equilibria and stability** (in ODEs) | Finds the equilibria of a nonlinear 2-D system, classifies each from the Jacobian (saddle, node, spiral, star), draws nullclines, direction field and trajectories; flags centres as inconclusive |
 | **Wilcoxon and Kruskal–Wallis** (in Statistics) | Rank-based paired and multi-group tests with exact p-values for small samples and numerical cross-checks |
 | **Generating functions** (in Algebra) | Rational A(x) for a linear recurrence, verified on 56 terms |
 | **Mann–Whitney U** (in Statistics) | Rank-based comparison of two samples: exact p-values for small samples, tie-corrected normal approximation otherwise |

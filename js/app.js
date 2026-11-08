@@ -123,16 +123,17 @@
             input: v => ({
                 first: { label: "y′ = f(x, y)", placeholder: 'e.g. x + y   or   x*y   or   y*(1-y)', hint: 'Right-hand side of dy/dx. Linear and separable equations are solved in closed form; all are solved numerically.' },
                 second: { label: "y″ = f(x, y, yp)", placeholder: 'e.g. -y   or   -0.5*yp - 4*y', hint: 'Write y′ as yp. Constant-coefficient homogeneous equations also get a closed form.' },
+                equilibria: { label: 'System  x′ ; y′  (use x and y)', placeholder: 'e.g. y ; -sin(x) - 0.3*y', hint: 'Finds the equilibria in the window, classifies each with the Jacobian, and draws the phase portrait with nullclines.' },
                 linear2: { label: 'Matrix A  (rows separated by ;)', placeholder: 'e.g. 1 2 ; 3 4     or     0 1 ; -1 0', hint: 'Classifies the equilibrium (node, saddle, spiral, centre), gives eigenvalues and eigenvectors, and draws the phase portrait.' },
                 heat: { label: 'Initial temperature u(x, 0)', placeholder: 'e.g. sin(x)   or   x*(pi-x)', hint: 'Heat equation uₜ = α·uₓₓ on [0, L] with both ends held at 0. The profile must be 0 at both ends.' },
                 wave: { label: 'Initial shape u(x, 0)', placeholder: 'e.g. sin(x)   or   x*(pi-x)', hint: 'Wave equation uₜₜ = c²·uₓₓ on [0, L] with both ends fixed at 0 (a plucked string).' },
                 system: { label: 'System  x′, y′, (z′) = …  (separate with ;)', placeholder: 'e.g. y ; -x      or      x*(1-0.5*y) ; y*(0.5*x-1)', hint: 'State variables are x, y, z and time is t.' }
             }[v.odeType || 'first']),
             fields: [
-                { key: 'odeType', label: 'Equation type', type: 'select', def: 'first', options: [['first', 'First order  y′ = f(x, y)'], ['second', 'Second order  y″ = f(x, y, y′)'], ['system', 'System of ODEs (2–3 equations)'], ['heat', 'Heat equation  uₜ = α·uₓₓ  (PDE)'], ['wave', 'Wave equation  uₜₜ = c²·uₓₓ  (PDE)'], ['linear2', 'Phase portrait of a 2×2 linear system  x′ = Ax']] },
-                { key: 'x0', label: 'Start x₀ (or t₀)', type: 'text', def: '0', show: v => v.odeType !== 'heat' && v.odeType !== 'wave' && v.odeType !== 'linear2' },
-                { key: 'xEnd', label: 'End', type: 'text', def: '10', show: v => v.odeType !== 'heat' && v.odeType !== 'wave' && v.odeType !== 'linear2' },
-                { key: 'range', label: 'Plot window half-width', type: 'text', def: '4', show: v => v.odeType === 'linear2' },
+                { key: 'odeType', label: 'Equation type', type: 'select', def: 'first', options: [['first', 'First order  y′ = f(x, y)'], ['second', 'Second order  y″ = f(x, y, y′)'], ['system', 'System of ODEs (2–3 equations)'], ['heat', 'Heat equation  uₜ = α·uₓₓ  (PDE)'], ['wave', 'Wave equation  uₜₜ = c²·uₓₓ  (PDE)'], ['linear2', 'Phase portrait of a 2×2 linear system  x′ = Ax'], ['equilibria', 'Equilibria & stability of a nonlinear 2-D system']] },
+                { key: 'x0', label: 'Start x₀ (or t₀)', type: 'text', def: '0', show: v => v.odeType !== 'heat' && v.odeType !== 'wave' && v.odeType !== 'linear2' && v.odeType !== 'equilibria' },
+                { key: 'xEnd', label: 'End', type: 'text', def: '10', show: v => v.odeType !== 'heat' && v.odeType !== 'wave' && v.odeType !== 'linear2' && v.odeType !== 'equilibria' },
+                { key: 'range', label: 'Plot window half-width', type: 'text', def: '4', show: v => v.odeType === 'linear2' || v.odeType === 'equilibria' },
                 { key: 'pdeL', label: 'Length L of the rod / string', type: 'text', def: 'pi', show: v => v.odeType === 'heat' || v.odeType === 'wave' },
                 { key: 'pdeBC', label: 'Ends', type: 'select', def: 'dirichlet', options: [['dirichlet', 'Fixed at 0  (u = 0)'], ['neumann', 'Insulated / free  (uₓ = 0)']], show: v => v.odeType === 'heat' || v.odeType === 'wave' },
                 { key: 'pdeT', label: 'Final time T', type: 'text', def: '1', show: v => v.odeType === 'heat' || v.odeType === 'wave' },
@@ -156,6 +157,10 @@
                 { label: '3-D spiral with drift', fn: '-y ; x ; 0.1', opts: { odeType: 'system', x0: '0', xEnd: '14', initial: '1, 0, 0' } },
                 { label: 'Power series: y′ = x + y', fn: 'x+y', opts: { odeType: 'first', x0: '0', xEnd: '2', y0: '1', series: 'yes', terms: '8' } },
                 { label: 'Power series: y″ = x·y (Airy-type)', fn: 'x*y', opts: { odeType: 'second', x0: '0', xEnd: '2', y0: '1', v0: '0', series: 'yes', terms: '10' } },
+                { label: 'Equilibria: damped pendulum', fn: 'y ; -sin(x) - 0.3*y', opts: { odeType: 'equilibria', range: '4' } },
+                { label: 'Equilibria: Lotka–Volterra', fn: 'x*(1-0.5*y) ; y*(0.5*x-1)', opts: { odeType: 'equilibria', range: '4' } },
+                { label: 'Equilibria: competing species', fn: 'x*(3-x-2*y) ; y*(2-x-y)', opts: { odeType: 'equilibria', range: '4' } },
+                { label: 'Equilibria: Van der Pol oscillator', fn: 'y ; (1-x^2)*y - x', opts: { odeType: 'equilibria', range: '3' } },
                 { label: 'Phase portrait: saddle  [[1,2],[3,4]]', fn: '1 2 ; 3 4', opts: { odeType: 'linear2', range: '4' } },
                 { label: 'Phase portrait: stable spiral', fn: '-1 1 ; -1 -1', opts: { odeType: 'linear2', range: '4' } },
                 { label: 'Phase portrait: centre (rotation)', fn: '0 1 ; -4 0', opts: { odeType: 'linear2', range: '4' } },
@@ -862,7 +867,7 @@
                 preview.innerHTML = `<span class="preview-tex plain">${esc(lines[0] || '')}</span><span class="preview-meta">${lines.length} line${lines.length === 1 ? '' : 's'}</span>`;
                 return true;
             }
-            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur', 'gf'].includes(currentValues().op)) || (state.mode === 'applications' && currentValues().op === 'curvature' && src.includes(';')) || (state.mode === 'ode' && currentValues().odeType === 'linear2') || (state.mode === 'laplace' && /\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src))) {
+            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur', 'gf'].includes(currentValues().op)) || (state.mode === 'applications' && currentValues().op === 'curvature' && src.includes(';')) || (state.mode === 'ode' && ['linear2', 'equilibria'].includes(currentValues().odeType)) || (state.mode === 'laplace' && /\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src))) {
                 preview.className = 'preview-box valid';
                 const n = src.split(/[\n;]+/).filter(x => x.trim()).length;
                 preview.innerHTML = `<span class="preview-tex plain">${esc(src.length > 160 ? src.slice(0, 160) + '…' : src)}</span><span class="preview-meta">${state.mode === 'stats' ? (src.split(/[\s,;]+/).filter(Boolean).length + ' values') : state.mode === 'vector' ? (n + ' component' + (n === 1 ? '' : 's')) : 'ready'}</span>`;

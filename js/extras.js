@@ -1797,7 +1797,62 @@
         r.plot = { generic: { title: `Phase portrait: ${kind}`, xTitle: 'x', yTitle: 'y', equal: true, xRange: [-R, R], yRange: [-R, R], traces } };
         return I.finalizeText(r);
     }
-    register({ ode: (src, opt) => (opt.odeType === 'heat' || opt.odeType === 'wave') ? runPDE(src, opt) : opt.odeType === 'linear2' ? runLinear2(src, opt) : prevOde(src, opt) });
+
+    // ---- equilibria of a nonlinear 2-D system, classified by the Jacobian ----
+    function classify2(a, b, c, d) {
+        const tr = a + d, det = a * d - b * c, disc = tr * tr - 4 * det, eps = 1e-9 * Math.max(1, Math.abs(tr), Math.abs(det));
+        if (Math.abs(det) <= eps) return { kind: 'degenerate (det J = 0)', stab: 'linearisation inconclusive', hyper: false, cat: 'inc', tr, det, disc };
+        if (det < 0) return { kind: 'saddle', stab: 'unstable', hyper: true, cat: 'saddle', tr, det, disc };
+        if (Math.abs(tr) <= eps && disc < 0) return { kind: 'centre of the linearisation', stab: 'linearisation inconclusive (the true system may spiral in or out)', hyper: false, cat: 'inc', tr, det, disc };
+        if (Math.abs(disc) <= eps) { const star = Math.abs(b) < 1e-12 && Math.abs(c) < 1e-12 && Math.abs(a - d) < 1e-12; return { kind: (tr < 0 ? 'stable ' : 'unstable ') + (star ? 'star node' : '(degenerate) node'), stab: tr < 0 ? 'asymptotically stable' : 'unstable', hyper: true, cat: tr < 0 ? 'stable' : 'unstable', tr, det, disc }; }
+        if (false) return { kind: tr < 0 ? 'stable (degenerate) node' : 'unstable (degenerate) node', stab: tr < 0 ? 'asymptotically stable' : 'unstable', hyper: true, cat: tr < 0 ? 'stable' : 'unstable', tr, det, disc };
+        if (disc > 0) return { kind: tr < 0 ? 'stable node' : 'unstable node', stab: tr < 0 ? 'asymptotically stable' : 'unstable', hyper: true, cat: tr < 0 ? 'stable' : 'unstable', tr, det, disc };
+        return { kind: tr < 0 ? 'stable spiral' : 'unstable spiral', stab: tr < 0 ? 'asymptotically stable' : 'unstable', hyper: true, cat: tr < 0 ? 'stable' : 'unstable', tr, det, disc };
+    }
+    function runEquilibria(src, opt) {
+        const comps = String(src).split(/[;\n]+/).map(x => x.trim()).filter(Boolean); if (comps.length !== 2) throw new CalcError('Enter the two right-hand sides separated by ;  for example  y ; -sin(x) - 0.3*y');
+        const nodes = comps.map(c => engine.parse(c)); nodes.forEach(n => engine.freeVars(n).forEach(q => { if (q === 't') throw new CalcError('Only autonomous systems (no t on the right) are supported.'); if (q !== 'x' && q !== 'y') throw new CalcError(`Unknown symbol “${q}”. Use x and y.`); }));
+        const F = nodes.map(n => engine.compile(n, ['x', 'y'])), J = nodes.map(n => ['x', 'y'].map(v => engine.compile(engine.diff(n, v), ['x', 'y'])));
+        const R = Math.max(0.5, Math.min(100, +opt.range || 4)); const f = (x, y) => [F[0](x, y), F[1](x, y)];
+        const jac = (x, y) => [[J[0][0](x, y), J[0][1](x, y)], [J[1][0](x, y), J[1][1](x, y)]];
+        const found = []; const G = 15;
+        for (let i = 0; i < G; i++) for (let j = 0; j < G; j++) {
+            let p = [-R * 1.2 + 2.4 * R * (i + 0.37) / G, -R * 1.2 + 2.4 * R * (j + 0.61) / G], ok = false;
+            for (let it = 0; it < 60; it++) { const v = f(p[0], p[1]); if (!v.every(Number.isFinite)) break; if (Math.hypot(...v) < 1e-13) { ok = true; break; } const M = jac(p[0], p[1]); const dt = M[0][0] * M[1][1] - M[0][1] * M[1][0]; if (!Number.isFinite(dt) || Math.abs(dt) < 1e-14) break; let st = [-(M[1][1] * v[0] - M[0][1] * v[1]) / dt, -(-M[1][0] * v[0] + M[0][0] * v[1]) / dt]; const mg = Math.hypot(...st); if (mg > 2) st = st.map(q => q * 2 / mg); p = [p[0] + st[0], p[1] + st[1]]; if (Math.abs(p[0]) > 1e4 || Math.abs(p[1]) > 1e4) break; }
+            if (ok && Math.abs(p[0]) <= R * 1.0000001 && Math.abs(p[1]) <= R * 1.0000001 && Math.hypot(...f(p[0], p[1])) < 1e-9) { p = p.map(q => (Math.abs(q) < 1e-12 ? 0 : q)); if (!found.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 1e-6)) found.push(p); }
+            if (found.length > 40) break;
+        }
+        found.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+        if (!found.length) throw new CalcError('No equilibria were found in the window. Try a larger window half-width.');
+        // checks: analytic Jacobian vs finite differences at each equilibrium; residuals
+        let jerr = 0, resid = 0; found.forEach(([x, y]) => { const M = jac(x, y), h = 1e-6 * Math.max(1, Math.abs(x), Math.abs(y)); const fd = [[0, 0], [0, 0]]; const fx1 = f(x + h, y), fx0 = f(x - h, y), fy1 = f(x, y + h), fy0 = f(x, y - h); for (let r = 0; r < 2; r++) { fd[r][0] = (fx1[r] - fx0[r]) / (2 * h); fd[r][1] = (fy1[r] - fy0[r]) / (2 * h); } for (let r = 0; r < 2; r++) for (let q = 0; q < 2; q++) jerr = Math.max(jerr, Math.abs(M[r][q] - fd[r][q]) / Math.max(1, Math.abs(M[r][q]))); resid = Math.max(resid, Math.hypot(...f(x, y))); });
+        if (jerr > 1e-4) throw new CalcError('The Jacobian check failed for this system.');
+        const rk = (v, hh) => { const k1 = f(v[0], v[1]), k2 = f(v[0] + hh / 2 * k1[0], v[1] + hh / 2 * k1[1]), k3 = f(v[0] + hh / 2 * k2[0], v[1] + hh / 2 * k2[1]), k4 = f(v[0] + hh * k3[0], v[1] + hh * k3[1]); return [v[0] + hh / 6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]), v[1] + hh / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1])]; };
+        const info = found.map(([x, y]) => { const M = jac(x, y), c = classify2(M[0][0], M[0][1], M[1][0], M[1][1]); const lam = c.disc >= 0 ? [(c.tr + Math.sqrt(c.disc)) / 2, (c.tr - Math.sqrt(c.disc)) / 2].map(q => ({ re: q, im: 0 })) : [{ re: c.tr / 2, im: Math.sqrt(-c.disc) / 2 }, { re: c.tr / 2, im: -Math.sqrt(-c.disc) / 2 }]; return { x, y, M, c, lam }; });
+        // behaviour check: a small push from a stable / unstable equilibrium moves the way the classification says
+        let behaviour = 0, behaviourTotal = 0; info.forEach(e => { if (e.c.cat !== 'stable' && e.c.cat !== 'unstable') return; behaviourTotal++; const d0 = 1e-3; let v = [e.x + d0 * 0.6, e.y + d0 * 0.8], moved = true; const dir = e.c.cat === 'stable' ? 1 : 1; void dir; const T = 6 / Math.max(0.05, Math.abs(Math.min(...e.lam.map(z => Math.abs(z.re))))); const steps = Math.min(4000, Math.max(200, Math.ceil(T / 0.01))); const hh = T / steps; for (let i = 0; i < steps; i++) { v = rk(v, hh); if (!v.every(Number.isFinite) || Math.hypot(v[0] - e.x, v[1] - e.y) > 50) break; } const d1 = Math.hypot(v[0] - e.x, v[1] - e.y); moved = e.c.cat === 'stable' ? d1 < d0 : d1 > d0; if (moved) behaviour++; });
+        if (behaviourTotal && behaviour < behaviourTotal) throw new CalcError('A numerical check of the classification disagreed; the system may be too stiff for the check window.');
+        const N8 = x => nice(x, 6, 1e-8).text; const r = I.makeResult('ode', 'Equilibria and stability'); const lamTxt = lam => lam.map(z => Math.abs(z.im) < 1e-12 ? N8(z.re) : `${N8(z.re)} ${z.im < 0 ? '−' : '+'} ${N8(Math.abs(z.im))}i`).join(', ');
+        r.title = 'Equilibria and stability'; r.main = { label: `${found.length} equilibri${found.length === 1 ? 'um' : 'a'} in the window:`, text: info.map(e => `(${N8(e.x)}, ${N8(e.y)}): ${e.c.kind}`).join(';   '), tex: '' };
+        r.items.push({ label: 'System:', text: `x′ = ${engine.strOf(nodes[0])},   y′ = ${engine.strOf(nodes[1])}`, tex: `x'=${engine.texOf(nodes[0])},\\quad y'=${engine.texOf(nodes[1])}` });
+        r.items.push({ label: 'Jacobian J(x, y):', text: `[[${engine.strOf(engine.diff(nodes[0], 'x'))}, ${engine.strOf(engine.diff(nodes[0], 'y'))}], [${engine.strOf(engine.diff(nodes[1], 'x'))}, ${engine.strOf(engine.diff(nodes[1], 'y'))}]]`, tex: '' });
+        info.forEach((e, i) => r.items.push({ label: `Equilibrium ${i + 1} (${N8(e.x)}, ${N8(e.y)}):`, text: `${e.c.kind}; ${e.c.stab}.  eigenvalues ${lamTxt(e.lam)},  tr = ${N8(e.c.tr)}, det = ${N8(e.c.det)}`, tex: '' }));
+        r.meta.push(`Verified: every equilibrium satisfies f = 0 (largest residual ${resid.toExponential(1)}); the analytic Jacobian matches finite differences (largest difference ${jerr.toExponential(1)})${behaviourTotal ? `; a small push from each of the ${behaviourTotal} stable / unstable equilibri${behaviourTotal === 1 ? 'um' : 'a'} behaves as classified` : ''}`);
+        r.meta.push('Method: Newton iteration from a grid of starting points to find the equilibria, then the eigenvalues of the Jacobian there (linearisation). The linearisation decides the type of a hyperbolic equilibrium (no eigenvalue with zero real part); centres and degenerate cases need other tools, and only equilibria inside the window are listed.');
+        r.steps.push({ title: 'Find the equilibria', text: 'Solve x′ = 0 and y′ = 0 together.', tex: '' }); r.steps.push({ title: 'Linearise', text: 'Near an equilibrium the system behaves like u′ = J·u where J is the matrix of partial derivatives there.', tex: '' }); r.steps.push({ title: 'Classify', text: 'The trace and determinant of J (or its eigenvalues) give saddle, node or spiral, and stable or unstable.', tex: '' });
+        // portrait
+        const traces = []; const gx = [], gy = []; const GG = 17; for (let i = 0; i < GG; i++) for (let j = 0; j < GG; j++) { const x = -R + 2 * R * i / (GG - 1), y = -R + 2 * R * j / (GG - 1), v = f(x, y); if (!v.every(Number.isFinite)) continue; const m = Math.hypot(...v); if (m < 1e-12) continue; const len = 0.5 * 2 * R / (GG - 1); gx.push(x - v[0] / m * len / 2, x + v[0] / m * len / 2, null); gy.push(y - v[1] / m * len / 2, y + v[1] / m * len / 2, null); }
+        traces.push({ x: gx, y: gy, mode: 'lines', type: 'scatter', name: 'direction field', line: { width: 1 }, hoverinfo: 'skip' });
+        const traj = (sgn, st) => { let v = st.slice(); const X = [v[0]], Y = [v[1]]; for (let i = 0; i < 3000; i++) { v = rk(v, sgn * 0.01); if (!v.every(Number.isFinite) || Math.abs(v[0]) > 2 * R || Math.abs(v[1]) > 2 * R) break; X.push(v[0]); Y.push(v[1]); } return [X, Y]; };
+        for (let k = 0; k < 12; k++) { const th = 2 * Math.PI * k / 12 + 0.31, rad = (k % 2 ? 0.45 : 0.85) * R, st = [rad * Math.cos(th), rad * Math.sin(th)]; const [fx, fy] = traj(1, st), [bx, by] = traj(-1, st); traces.push({ x: bx.reverse().concat(fx), y: by.reverse().concat(fy), mode: 'lines', type: 'scatter', name: 'trajectories', showlegend: k === 0, line: { width: 2 } }); }
+        const nc = 60, xs = [], ys = []; for (let i = 0; i < nc; i++) { xs.push(-R + 2 * R * i / (nc - 1)); ys.push(-R + 2 * R * i / (nc - 1)); }
+        [0, 1].forEach(k => traces.push({ x: xs, y: ys, z: ys.map(y => xs.map(x => { const v = F[k](x, y); return Number.isFinite(v) ? v : null; })), type: 'contour', name: k ? 'y′ = 0 (nullcline)' : 'x′ = 0 (nullcline)', showscale: false, contours: { type: 'constraint', value: 0, operation: '=' }, line: { width: 2, dash: k ? 'dot' : 'dash' }, showlegend: true }));
+        const grp = { stable: ['stable', 'circle'], unstable: ['unstable', 'x'], saddle: ['saddle', 'diamond'], inc: ['inconclusive', 'circle-open'] };
+        Object.keys(grp).forEach(cat => { const es = info.filter(e => e.c.cat === cat); if (es.length) traces.push({ x: es.map(e => e.x), y: es.map(e => e.y), mode: 'markers', type: 'scatter', name: grp[cat][0], marker: { size: 12, symbol: grp[cat][1], line: { width: 2 } } }); });
+        r.plot = { generic: { title: 'Phase portrait with nullclines and equilibria', xTitle: 'x', yTitle: 'y', equal: true, xRange: [-R, R], yRange: [-R, R], traces } };
+        return I.finalizeText(r);
+    }
+    register({ ode: (src, opt) => (opt.odeType === 'heat' || opt.odeType === 'wave') ? runPDE(src, opt) : opt.odeType === 'linear2' ? runLinear2(src, opt) : opt.odeType === 'equilibria' ? runEquilibria(src, opt) : prevOde(src, opt) });
 
 
     // ======================================================================

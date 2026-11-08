@@ -1,6 +1,7 @@
 const test = require('node:test'), assert = require('node:assert');
 const NL = require('../js/nlp.js');
 const cases = [
+  ['equilibria of y ; -sin(x)-0.3*y', { mode: 'ode', opts: { odeType: 'equilibria' } }],
   ['kruskal wallis 1 2 3 ; 4 5 6 ; 7 8 9', { mode: 'stats', opts: { op: 'kruskal' } }],
   ['phase portrait of 1 2 ; 3 4', { mode: 'ode', opts: { odeType: 'linear2' } }],
   ['generating function of a(n)=a(n-1)+a(n-2) with a(0)=0, a(1)=1', { mode: 'algebra', opts: { op: 'gf', init: '0, 1' } }],

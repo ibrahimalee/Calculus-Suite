@@ -164,3 +164,12 @@ test('phase portraits, Wilcoxon, Kruskal-Wallis and generating functions verify 
   const g = E.run.algebra('a(n) = a(n-1) + a(n-2)', { op: 'gf', init: '0, 1' }); assert.equal(g.main.text, '(x) / (−x^2 − x + 1)'); assert.ok(g.meta.some(m => /^Verified/.test(m)));
   assert.equal(E.run.algebra('a(n) = 3*a(n-1)', { op: 'gf', init: '2' }).main.text, '(2) / (−3·x + 1)');
 });
+test('nonlinear equilibria are found, classified by the Jacobian and cross-checked', () => {
+  const eq = (s, range) => E.run.ode(s, { odeType: 'equilibria', range: range || '4' });
+  const pend = eq('y ; -sin(x) - 0.3*y'); assert.match(pend.main.label, /^3 equilibria/); assert.match(pend.main.text, /\(0, 0\): stable spiral/); assert.match(pend.main.text, /saddle/); assert.ok(pend.meta.some(m => /^Verified.*Jacobian/.test(m)));
+  const comp = eq('x*(3-x-2*y) ; y*(2-x-y)'); assert.match(comp.main.label, /^4 equilibria/); assert.match(comp.main.text, /\(1, 1\): saddle/); assert.match(comp.main.text, /\(0, 2\): stable node/); assert.match(comp.main.text, /\(3, 0\): stable node/);
+  assert.match(eq('x*(1-0.5*y) ; y*(0.5*x-1)').main.text, /\(2, 2\): centre of the linearisation/);
+  assert.match(eq('y ; (1-x^2)*y - x', '3').main.text, /unstable spiral/); assert.match(eq('x ; y', '2').main.text, /unstable star node/);
+  assert.throws(() => eq('x^2+1 ; y', '2'), /No equilibria/); assert.throws(() => eq('x ; t', '2'), /autonomous/); assert.throws(() => eq('x ; y ; x', '2'), /two right-hand sides/);
+  const circ = eq('x^2+y^2-1 ; x-y', '3'); assert.match(circ.main.label, /^2 equilibria/);
+});
