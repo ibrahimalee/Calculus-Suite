@@ -1496,7 +1496,7 @@
     function applyPlotDescription(r) {
         const desc = describePlot(r), div = $('plot2d'); let el = $('plotDesc');
         if (!el) { el = document.createElement('p'); el.id = 'plotDesc'; el.className = 'sr-only'; div.parentNode.insertBefore(el, div); }
-        el.textContent = desc; div.setAttribute('role', 'img'); div.setAttribute('aria-label', desc || 'Plot'); div.setAttribute('aria-describedby', 'plotDesc');
+        el.textContent = desc; div.setAttribute('role', 'group'); div.setAttribute('aria-label', desc || 'Plot'); div.setAttribute('aria-describedby', 'plotDesc');
     }
     function initEmbed() {
         if (!/[?&]embed=1\b/.test(location.search)) return;
@@ -2113,6 +2113,14 @@
 
     function init() {
         initEmbed();
+        // sideways-scrolling formulas and tables must be reachable by keyboard
+        (function focusScrollers() {
+            const SEL = '.katex-display, .tex.rendered, .tex-display.rendered, .result-row, .step-tex, .preview-tex, .result-content table, .result-card pre';
+            let raf = 0;
+            const scan = () => { raf = 0; document.querySelectorAll(SEL).forEach(el => { const wide = el.scrollWidth > el.clientWidth + 1; if (wide && !el.hasAttribute('tabindex')) { el.tabIndex = 0; el.setAttribute('role', 'region'); el.setAttribute('aria-label', 'Scrollable content'); el.dataset.scrollFocus = '1'; } else if (!wide && el.dataset.scrollFocus) { el.removeAttribute('tabindex'); el.removeAttribute('role'); el.removeAttribute('aria-label'); delete el.dataset.scrollFocus; } }); };
+            const queue = () => { if (!raf) raf = requestAnimationFrame(scan); };
+            new MutationObserver(queue).observe(document.body, { childList: true, subtree: true }); window.addEventListener('resize', queue); queue();
+        })();
         initPhoneLayout();
         initNotebook();
         initPractice();
