@@ -81,6 +81,15 @@
         if (!cur.title) cur.title = P.TOPICS.find(t => t[0] === $('genTopic').value)[1] + ' practice'; persist(); renderBuilder();
     });
     $('newBtn').addEventListener('click', () => { cur = blank(); sheets.push(cur); persist(); renderBuilder(); $('linkBox').hidden = true; $('wsTitle').focus(); });
+    $('exampleBtn').addEventListener('click', () => {
+        const w = { id: C.uid(), title: 'Example: derivatives with your own numbers', instructions: 'Every student gets different numbers, made from their name. Answers in any equivalent form are accepted.', partial: true, shuffleC: true, created: Date.now(), questions: [
+            { type: 'expr', prompt: 'Differentiate $@{a}x^3 @{+b}x^2$', key: '@{3*a}*x^2 + @{2*b}*x', rand: 'a = 2..9\nb = -5..5 except 0', points: 2, hint: 'Use the power rule on each term.' },
+            { type: 'number', prompt: 'What is the slope of $y = @{a}x^2$ at $x = @{c}$?', key: '@{2*a*c}', rand: 'a = 2..9\nc = 1..5', points: 1 },
+            { type: 'choice', prompt: 'The derivative of $e^{@{k}x}$ is', options: ['$@{k}e^{@{k}x}$', '$e^{@{k}x}$', '$@{k}x\\,e^{@{k}x-1}$', '$\\dfrac{e^{@{k}x}}{@{k}}$'], key: '0', rand: 'k = 2..6', points: 1 },
+            { type: 'list', prompt: 'Find both roots of $x^2 - @{r1+r2}x + @{r1*r2}$ (any order).', key: '@{r1}, @{r2}', rand: 'r1 = 1..4\nr2 = 5..9', points: 2 }] };
+        try { C.normalise(w); } catch (e) { toast('Could not build the example: ' + e.message); return; }
+        sheets.push(w); cur = w; persist(); renderBuilder(); $('linkBox').hidden = true; toast('Example loaded. Press “Create the student link”, then open it in two private windows with different names to see different numbers.');
+    });
     $('dupBtn').addEventListener('click', () => { const c = JSON.parse(JSON.stringify(cur)); c.id = C.uid(); c.title = (c.title || 'Worksheet') + ' (copy)'; c.created = Date.now(); cur = c; sheets.push(cur); persist(); renderBuilder(); $('linkBox').hidden = true; });
     $('delBtn').addEventListener('click', () => { if (!confirm(`Delete “${cur.title || 'Untitled worksheet'}” and its saved submissions from this browser? Export a file first if you may need it again.`)) return; try { localStorage.removeItem(SUBS(cur.id)); localStorage.removeItem('cs_classroom_ov_' + cur.id); localStorage.removeItem('cs_classroom_roster_' + cur.id); } catch (e) { /* ignore */ } sheets = sheets.filter(s => s.id !== cur.id); if (!sheets.length) sheets.push(blank()); cur = sheets[0]; save(KEY, sheets); refreshPickers(); renderBuilder(); $('linkBox').hidden = true; });
     $('wsPick').addEventListener('change', e => use(e.target.value));

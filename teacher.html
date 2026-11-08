@@ -43,6 +43,7 @@
                 <div class="row">
                     <label class="field grow" style="margin:0"><span>Worksheet</span><select id="wsPick" aria-label="Choose a saved worksheet"></select></label>
                     <button class="btn btn-line btn-sm" id="newBtn" type="button">New</button>
+                    <button class="btn btn-line btn-sm" id="exampleBtn" type="button">Try an example</button>
                     <button class="btn btn-line btn-sm" id="dupBtn" type="button">Copy</button>
                     <button class="btn btn-line btn-sm" id="expBtn" type="button">Export file</button>
                     <label class="btn btn-line btn-sm" style="cursor:pointer">Import file<input id="impFile" type="file" accept=".json,application/json" hidden></label>
@@ -70,6 +71,7 @@
                 </div>
             </div>
 
+            <p class="small" style="margin:-4px 0 14px">If you change questions, random numbers or shuffling after you have sent the link, make a new link: students who already opened the old one saw the old version.</p>
             <h2 style="font-size:1.6rem;margin:10px 0 14px">Questions <small id="qCount" class="small"></small></h2>
             <div id="qList"></div>
             <div class="card">

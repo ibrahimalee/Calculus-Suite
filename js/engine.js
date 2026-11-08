@@ -1727,6 +1727,7 @@
             }
             if (nd.type === 'FunctionNode') {
                 const name = nd.fn.name, x = nd.args.map(rec), u = x[0];
+                if (!nd.args.length) throw new CalcError(`${name}() needs an argument, for example ${name}(x).`);
                 switch (name) {
                     case 'exp': return exp(u);
                     case 'log': return log(u);

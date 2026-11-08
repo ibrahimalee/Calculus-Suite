@@ -86,6 +86,10 @@ const BASE = process.env.BASE_ROOT || 'http://localhost:8099';
   await t2.click('#importNew'); ok((await t2.$$('#qList .qcard')).length === 3 && (await t2.inputValue('#wsTitle')) === 'Shared questions', 'the shared questions become a new worksheet');
   ok(!(await t2.url()).includes('#q='), 'the share link is cleared from the address bar after importing');
   const bad2 = await ctx.newPage(); watch(bad2, 'bad link'); await bad2.goto(BASE + '/teacher.html#q=zAAAA'); await bad2.waitForSelector('#toast:not([hidden])'); ok(/could not be opened/.test(await bad2.textContent('#toast')), 'a damaged shared link gives a friendly message');
+  // ---- the one-click example worksheet ----
+  { const ex = await ctx.newPage(); watch(ex, 'example'); await ex.goto(BASE + '/teacher.html'); await ex.waitForSelector('#qList .qcard'); await ex.click('#exampleBtn'); await ex.waitForTimeout(300);
+    ok((await ex.inputValue('#wsTitle')).startsWith('Example') && (await ex.$$('#qList .qcard')).length === 4, 'the example worksheet loads with four questions using random numbers');
+    await ex.click('#linkBtn'); await ex.waitForSelector('#linkBox:not([hidden])'); ok(!(await ex.textContent('#linkErr')).trim(), 'the example worksheet makes a valid student link'); await ex.close(); }
   // ---- phone ----
   const ph = await b.newPage({ viewport: { width: 375, height: 800 } }); await ph.goto(link); await ph.waitForSelector('#sheet:not([hidden])'); ok(await ph.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), 'the name gate fits a phone');
   const pt = await b.newPage({ viewport: { width: 375, height: 800 } }); await pt.goto(BASE + '/teacher.html'); await pt.waitForTimeout(400); ok(await pt.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), 'teacher page with the new cards fits a phone');

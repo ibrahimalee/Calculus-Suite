@@ -99,7 +99,7 @@ const check = (name, ok, extra) => { if (!ok) failed++; console.log((ok ? 'ok   
     for (const hash of ['', '#s=!!!notbase64!!!', '#s=' + Buffer.from('{"m":"nope","f":1}').toString('base64'), '#s=' + Buffer.from('{"m":"integral","f":"<b>x</b>","o":{"lower":{"a":1}}}').toString('base64')]) {
         await bp.goto(BASE + '/app.html' + hash); await bp.waitForFunction(() => window.__calc, null, { timeout: 15000 }); await bp.waitForTimeout(600);
     }
-    check('app starts with corrupted storage and malformed share links', badErrors.length === 0 && (await bp.$$('.mode-btn')).length === 23, badErrors);
+    check('app starts with corrupted storage and malformed share links', badErrors.length === 0 && (await bp.$$('.mode-btn')).length === 26, badErrors);
     await bad.close();
 
     // 10. rapid interaction: hammering Compute and switching tools mid-computation must leave the UI usable

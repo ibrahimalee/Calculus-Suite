@@ -172,3 +172,14 @@ test('review questions and shared question links', async () => {
   const link = await C.encodeQuestions(w.questions); const back = await C.decodeQuestions(link); assert.deepStrictEqual(back.map(q => q.prompt), ['easy', 'hard']); assert.strictEqual(C.qKey(back[0]), C.qKey(w.questions[0]));
   const stuLink = await C.encodeStudent(w); await assert.rejects(() => C.decodeQuestions(stuLink), /shared questions/);
 });
+
+test('property: for 300 different student names, the answers derived from that student\'s own version always earn full marks, and another version does not', async () => {
+  const w = tmpl({ shuffleQ: true, shuffleC: true, partial: true }); const stu = await C.decodeStudent(await C.encodeStudent(w)); const names = Array.from({ length: 300 }, (_, i) => `Student ${i} ${String.fromCharCode(97 + (i % 26))}`);
+  let differ = 0, prev = null; for (const nm of names) {
+    const seed = C.variantSeed(w.id, nm), mine = C.instantiate(w, seed), answers = mine.questions.map(q => q.type === 'choice' ? q.key : q.key); const sub = C.parseSubmission(C.makeSubmission(stu, nm, answers, { seed })); assert.ok(sub.ok);
+    const res = C.gradeAll(w, [sub.sub]); assert.strictEqual(res.rows[0].score, res.rows[0].max, nm); assert.ok(res.rows[0].per.every(p => p.ok), nm);
+    if (prev && prev.questions[0].prompt !== mine.questions[0].prompt) differ++; prev = mine;
+    const other = C.instantiate(w, C.variantSeed(w.id, nm + ' x')); if (other.questions[1].key !== mine.questions[1].key) { const wrong = C.parseSubmission(C.makeSubmission(stu, nm, other.questions.map(q => q.key), { seed })); assert.ok(C.gradeAll(w, [wrong.sub]).rows[0].score < res.rows[0].max); }
+  }
+  assert.ok(differ > 150, 'neighbouring students should usually get different numbers (' + differ + ')');
+});
