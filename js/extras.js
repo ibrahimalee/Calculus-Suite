@@ -2675,5 +2675,186 @@
     const prevOdeLab = engine.run.ode;
     register({ ode: (src, opt) => opt.odeType === 'methods' ? runODELab(src, opt) : prevOdeLab(src, opt) });
 
+    // ======================================================================
+    // Numerical methods: interpolation, cubic splines, Chebyshev nodes, quadrature, finite differences
+    // ======================================================================
+    function parsePoints(src, minN, maxN) {
+        const t = String(src).replace(/[−–]/g, '-').replace(/[\[\]()]/g, ' '); let segs = t.split(/[;\n]+/).map(x => x.trim()).filter(Boolean); let pairs;
+        if (segs.length === 1 && /,/.test(segs[0])) { const nums = segs[0].split(/\s*,\s*|\s+/).filter(Boolean); if (nums.length % 2) throw new CalcError('Give the points as pairs, for example (0,1), (1,3), (2,2).'); pairs = []; for (let i = 0; i < nums.length; i += 2) pairs.push([nums[i], nums[i + 1]]); }
+        else pairs = segs.map(sg => { const q = sg.split(/[\s,]+/).filter(Boolean); if (q.length !== 2) throw new CalcError(`Each point needs exactly two numbers, x and y (got “${sg.slice(0, 30)}”).`); return q; });
+        if (pairs.length < minN) throw new CalcError(`Give at least ${minN} points.`); if (pairs.length > maxN) throw new CalcError(`Up to ${maxN} points are supported.`);
+        let exact = true; const pts = pairs.map(pr => pr.map(tok => { let f = null; try { f = math.fraction(tok); } catch (e) { exact = false; } const v = I.parseLimit(tok, 'A coordinate').value; if (!Number.isFinite(v)) throw new CalcError(`“${tok}” is not a finite number.`); return { v, f }; }));
+        pts.sort((p, q) => p[0].v - q[0].v); for (let i = 1; i < pts.length; i++) if (!(pts[i][0].v > pts[i - 1][0].v)) throw new CalcError('The x-values must all be different.');
+        return { exact: exact && pts.every(p => p[0].f && p[1].f), x: pts.map(p => p[0].v), y: pts.map(p => p[1].v), xf: pts.map(p => p[0].f), yf: pts.map(p => p[1].f) };
+    }
+    const evalPoly = (co, t) => co.reduceRight((s, c) => s * t + c, 0);
+    const fnOf = (src, what) => { const node = engine.parse(src); const vs = engine.freeVars(node); if (vs.length > 1 || (vs.length === 1 && vs[0] !== 'x')) throw new CalcError(`${what || 'The function'} must use only the variable x.`); const f = engine.compile(node, ['x']); return { node, f: x => { const v = f(x); return typeof v === 'number' ? v : NaN; } }; };
+    const parseNum = (t, what, d) => { const v = I.parseLimit(t === undefined || String(t).trim() === '' ? d : t, what).value; if (!Number.isFinite(v)) throw new CalcError(`${what} must be a finite number.`); return v; };
+    const logPlotTraces = list => list.map(([name, hs, es]) => ({ x: hs.filter((_, i) => es[i] > 0 && Number.isFinite(es[i])).map(Math.log10), y: es.filter(e => e > 0 && Number.isFinite(e)).map(Math.log10), mode: 'lines+markers', type: 'scatter', name }));
+
+    function runInterpolate(src, opt) {
+        const P = parsePoints(src, 2, 15), n = P.x.length; const T = P.exact ? (z => math.fraction(z)) : (z => z); const X = P.exact ? P.xf : P.x, Y = P.exact ? P.yf : P.y;
+        const sub = math.subtract, div = math.divide, mul = math.multiply, add = math.add;
+        const dd = [Y.slice()]; for (let k = 1; k < n; k++) dd.push(Array.from({ length: n - k }, (_, i) => div(sub(dd[k - 1][i + 1], dd[k - 1][i]), sub(X[i + k], X[i]))));
+        const c = dd.map(row => row[0]); let poly = [c[n - 1]]; for (let k = n - 2; k >= 0; k--) { const next = new Array(poly.length + 1).fill(T(0)); poly.forEach((a, i) => { next[i + 1] = add(next[i + 1], a); next[i] = sub(next[i], mul(X[k], a)); }); next[0] = add(next[0], c[k]); poly = next; }
+        const co = poly.map(a => Number(a.valueOf())); while (co.length > 1 && Math.abs(co[co.length - 1]) < 1e-14 * Math.max(1, ...co.map(Math.abs))) co.pop();
+        // check 1: passes through every data point (exactly, when the data are fractions)
+        let worst = 0; for (let i = 0; i < n; i++) { if (P.exact) { let s = T(0); for (let k = poly.length - 1; k >= 0; k--) s = add(mul(s, X[i]), poly[k]); if (!math.equal(s, Y[i])) throw new CalcError('Internal check failed: the polynomial misses a data point.'); } else worst = Math.max(worst, Math.abs(evalPoly(co, P.x[i]) - P.y[i]) / Math.max(1, Math.abs(P.y[i]))); }
+        if (worst > 1e-8) throw new CalcError('The interpolating polynomial is badly conditioned for these points (try fewer points or spread them out).');
+        // check 2: the Lagrange form (a different algorithm) agrees at other points
+        const lag = t => P.x.reduce((s, xi, i) => s + P.y[i] * P.x.reduce((p, xj, j) => (j === i ? p : p * (t - xj) / (xi - xj)), 1), 0); const lo = P.x[0], hi = P.x[n - 1], span = hi - lo; let gap = 0;
+        [0.137, 0.52, 0.861, -0.1, 1.1].forEach(u => { const t = lo + u * span; const a = evalPoly(co, t), b = lag(t); gap = Math.max(gap, Math.abs(a - b) / Math.max(1, Math.abs(b))); }); if (gap > 1e-7) throw new CalcError('The Newton and Lagrange forms disagree – the points are too badly conditioned for a reliable polynomial.');
+        const r = I.makeResult('numerical', 'Polynomial interpolation'); const deg = co.length - 1;
+        r.main = { label: `p(x)  (degree ${deg}) =`, text: polyFmt(co, 'x'), tex: `p(x)=${polyFmt(co, 'x', true)}` };
+        r.items.push({ label: 'Points:', text: P.x.map((xx, i) => `(${NZ(xx, 6).text}, ${NZ(P.y[i], 6).text})`).join('  '), tex: '' });
+        const newton = c.map((a, k) => ({ a: Number(a.valueOf()), k })).filter(o => Math.abs(o.a) > 1e-12).map((o, i) => { const prod = P.x.slice(0, o.k).map(xj => (xj === 0 ? 'x' : `(x ${xj < 0 ? '+' : '−'} ${NZ(Math.abs(xj), 6).text})`)).join(''); const coef = NZ(Math.abs(o.a), 6).text; return (i ? (o.a < 0 ? ' − ' : ' + ') : (o.a < 0 ? '−' : '')) + (prod ? (Math.abs(Math.abs(o.a) - 1) < 1e-12 ? '' : (/\//.test(coef) ? `(${coef})` : coef) + '·') + prod : coef); }).join('');
+        r.items.push({ label: 'Newton form:', text: newton || '0', tex: '' });
+        r.items.push({ label: 'Divided differences:', text: dd.map((row, k) => `f[${k ? k + ' step' + (k > 1 ? 's' : '') : 'x'}]: ${row.map(a => NZ(Number(a.valueOf()), 6).text).join(', ')}`).join('   |   '), tex: '' });
+        const at = String(opt.at === undefined ? '' : opt.at).trim(); if (at) { const tv = parseNum(at, 'The evaluation point', '0'); r.items.push({ label: `p(${NZ(tv, 6).text}) =`, text: engine.fmt(evalPoly(co, tv), 10) + (tv < lo || tv > hi ? '   (outside the data: extrapolation is unreliable)' : ''), tex: '' }); }
+        let truthFn = null; const tr = String(opt.truth === undefined ? '' : opt.truth).trim(); if (tr) { truthFn = fnOf(tr, 'The true function'); let mx = 0, at0 = lo; for (let i = 0; i <= 400; i++) { const t = lo + span * i / 400; const e = Math.abs(truthFn.f(t) - evalPoly(co, t)); if (Number.isFinite(e) && e > mx) { mx = e; at0 = t; } } r.items.push({ label: 'Largest gap from the true function on the data range:', text: `${mx.toExponential(2)} near x = ${engine.fmt(at0, 4)}`, tex: '' }); }
+        r.meta.push(`Verified: the polynomial passes through all ${n} points${P.exact ? ' exactly (rational arithmetic)' : ` (largest miss ${worst.toExponential(1)})`}, and the Newton form agrees with the Lagrange form at 5 other x-values (relative gap ${gap.toExponential(1)}).`);
+        r.meta.push(`Exactly one polynomial of degree at most ${n - 1} passes through ${n} points with different x-values. High degree can oscillate between the points (Runge's phenomenon); splines avoid this.`);
+        r.steps.push({ title: 'Divided differences', text: 'f[xᵢ] = yᵢ and f[xᵢ…xᵢ₊ₖ] = (f[xᵢ₊₁…xᵢ₊ₖ] − f[xᵢ…xᵢ₊ₖ₋₁]) / (xᵢ₊ₖ − xᵢ). The top row gives the Newton coefficients.', tex: 'f[x_i,\\dots,x_{i+k}]=\\frac{f[x_{i+1},\\dots,x_{i+k}]-f[x_i,\\dots,x_{i+k-1}]}{x_{i+k}-x_i}' });
+        r.steps.push({ title: 'Newton form', text: 'p(x) = f[x₀] + f[x₀,x₁](x − x₀) + f[x₀,x₁,x₂](x − x₀)(x − x₁) + …, then expanded.', tex: '' });
+        const m = Math.max(0.05 * span, 1e-9), xs = [], py = [], ty = []; for (let i = 0; i <= 400; i++) { const t = lo - m + (span + 2 * m) * i / 400; xs.push(t); py.push(evalPoly(co, t)); if (truthFn) { const v = truthFn.f(t); ty.push(Number.isFinite(v) ? v : null); } }
+        const ys = P.y.concat(py.filter(Number.isFinite)); const ylo = Math.min(...P.y), yhi = Math.max(...P.y), pad = Math.max(1e-9, (yhi - ylo) * 1.2); void ys;
+        r.plot = { generic: { title: 'Interpolating polynomial', xTitle: 'x', yTitle: 'y', yRange: [ylo - pad, yhi + pad], traces: [{ x: xs, y: py, mode: 'lines', type: 'scatter', name: `p(x), degree ${deg}` }].concat(truthFn ? [{ x: xs, y: ty, mode: 'lines', type: 'scatter', name: 'true function', line: { dash: 'dot' } }] : [], [{ x: P.x, y: P.y, mode: 'markers', type: 'scatter', name: 'data', marker: { size: 9 } }]) } };
+        return I.finalizeText(r);
+    }
+
+    function runSpline(src, opt) {
+        const P = parsePoints(src, 3, 20), n = P.x.length, m = n - 1; const bc = ['natural', 'clamped', 'notaknot'].includes(opt.bc) ? opt.bc : 'natural'; if (bc === 'notaknot' && n < 4) throw new CalcError('The not-a-knot condition needs at least 4 points.');
+        const d0 = bc === 'clamped' ? parseNum(opt.d0, 'The starting slope', '0') : 0, d1 = bc === 'clamped' ? parseNum(opt.d1, 'The ending slope', '0') : 0;
+        // unknowns: b_i, c_i, d_i for each piece i = 0..m-1 (a_i = y_i)
+        const U = 3 * m, A = Array.from({ length: U }, () => new Array(U).fill(0)), rhs = new Array(U).fill(0); let row = 0; const h = i => P.x[i + 1] - P.x[i];
+        for (let i = 0; i < m; i++) { A[row][3 * i] = h(i); A[row][3 * i + 1] = h(i) ** 2; A[row][3 * i + 2] = h(i) ** 3; rhs[row] = P.y[i + 1] - P.y[i]; row++; }
+        for (let i = 0; i < m - 1; i++) { A[row][3 * i] = 1; A[row][3 * i + 1] = 2 * h(i); A[row][3 * i + 2] = 3 * h(i) ** 2; A[row][3 * (i + 1)] = -1; row++; A[row][3 * i + 1] = 2; A[row][3 * i + 2] = 6 * h(i); A[row][3 * (i + 1) + 1] = -2; row++; }
+        if (bc === 'natural') { A[row][1] = 2; row++; A[row][3 * (m - 1) + 1] = 2; A[row][3 * (m - 1) + 2] = 6 * h(m - 1); row++; }
+        else if (bc === 'clamped') { A[row][0] = 1; rhs[row] = d0; row++; A[row][3 * (m - 1)] = 1; A[row][3 * (m - 1) + 1] = 2 * h(m - 1); A[row][3 * (m - 1) + 2] = 3 * h(m - 1) ** 2; rhs[row] = d1; row++; }
+        else { A[row][2] = 1; A[row][5] = -1; row++; A[row][3 * (m - 2) + 2] = 1; A[row][3 * (m - 1) + 2] = -1; row++; }
+        let sol; try { sol = math.lusolve(A, rhs.map(v => [v])).map(v => v[0]); } catch (e) { throw new CalcError('The spline system could not be solved for these points.'); }
+        const pieces = Array.from({ length: m }, (_, i) => ({ a: P.y[i], b: sol[3 * i], c: sol[3 * i + 1], d: sol[3 * i + 2], x0: P.x[i], x1: P.x[i + 1] }));
+        const S = (i, t, der) => { const p = pieces[i], u = t - p.x0; return der === 0 ? p.a + u * (p.b + u * (p.c + u * p.d)) : der === 1 ? p.b + u * (2 * p.c + 3 * u * p.d) : der === 2 ? 2 * p.c + 6 * u * p.d : 6 * p.d; };
+        // independent checks, straight from the finished pieces
+        const sc = Math.max(1, ...P.y.map(Math.abs)); let e0 = 0, e1 = 0, e2 = 0; for (let i = 0; i < m; i++) { e0 = Math.max(e0, Math.abs(S(i, P.x[i], 0) - P.y[i]), Math.abs(S(i, P.x[i + 1], 0) - P.y[i + 1])); if (i < m - 1) { e1 = Math.max(e1, Math.abs(S(i, P.x[i + 1], 1) - S(i + 1, P.x[i + 1], 1))); e2 = Math.max(e2, Math.abs(S(i, P.x[i + 1], 2) - S(i + 1, P.x[i + 1], 2))); } }
+        let eb = 0; if (bc === 'natural') eb = Math.max(Math.abs(S(0, P.x[0], 2)), Math.abs(S(m - 1, P.x[n - 1], 2))); else if (bc === 'clamped') eb = Math.max(Math.abs(S(0, P.x[0], 1) - d0), Math.abs(S(m - 1, P.x[n - 1], 1) - d1)); else eb = Math.max(Math.abs(S(0, P.x[1], 3) - S(1, P.x[1], 3)), Math.abs(S(m - 2, P.x[n - 2], 3) - S(m - 1, P.x[n - 2], 3)));
+        const tol = 1e-8 * sc * Math.max(1, ...pieces.map(p => Math.abs(p.d) * 10)); if (Math.max(e0, e1, e2, eb) > Math.max(tol, 1e-8 * sc)) throw new CalcError('The spline did not meet its own conditions (numerical trouble).');
+        const r = I.makeResult('numerical', 'Cubic spline'); const nm = { natural: 'natural (S″ = 0 at both ends)', clamped: `clamped (S′ = ${NZ(d0, 5).text} at the start, ${NZ(d1, 5).text} at the end)`, notaknot: 'not-a-knot (one cubic across the first two and the last two pieces)' }[bc];
+        r.main = { label: `${m} cubic piece${m > 1 ? 's' : ''}:`, text: `S(x) is piecewise cubic, twice continuously differentiable, ${nm}`, tex: '' };
+        pieces.slice(0, 12).forEach((p, i) => r.items.push({ label: `S${i + 1}(x) on [${NZ(p.x0, 6).text}, ${NZ(p.x1, 6).text}]:`, text: `${NZ(p.a, 7).text} + ${NZ(p.b, 7).text}·(x − ${NZ(p.x0, 6).text}) + ${NZ(p.c, 7).text}·(x − ${NZ(p.x0, 6).text})² + ${NZ(p.d, 7).text}·(x − ${NZ(p.x0, 6).text})³`.replace(/\+ -/g, '− '), tex: '' }));
+        if (m > 12) r.items.push({ label: '…', text: `${m - 12} more pieces`, tex: '' });
+        const at = String(opt.at === undefined ? '' : opt.at).trim(); if (at) { const tv = parseNum(at, 'The evaluation point', '0'); const k = Math.max(0, Math.min(m - 1, P.x.findIndex((v, i) => i < m && tv < P.x[i + 1]) < 0 ? m - 1 : P.x.findIndex((v, i) => i < m && tv < P.x[i + 1]))); r.items.push({ label: `S(${NZ(tv, 6).text}) =`, text: `${engine.fmt(S(k, tv, 0), 10)},  S′ = ${engine.fmt(S(k, tv, 1), 8)},  S″ = ${engine.fmt(S(k, tv, 2), 8)}${tv < P.x[0] || tv > P.x[n - 1] ? '   (outside the data: the end cubic is extended)' : ''}`, tex: '' }); }
+        r.meta.push(`Verified: the finished pieces pass through all ${n} points (gap ${e0.toExponential(1)}), have matching first derivatives (${e1.toExponential(1)}) and second derivatives (${e2.toExponential(1)}) at every interior knot, and satisfy the ${bc === 'notaknot' ? 'not-a-knot' : bc} end conditions (${eb.toExponential(1)}).`);
+        r.meta.push('Method: 3 unknown coefficients per piece, solved together from the interpolation, smoothness and end conditions.');
+        r.steps.push({ title: 'Conditions', text: `Each piece is a cubic. Interpolation gives ${m} equations, matching S′ and S″ at the ${m - 1} interior knots gives ${2 * (m - 1)}, and two end conditions complete the ${3 * m} equations.`, tex: 'S_i(x)=a_i+b_i(x-x_i)+c_i(x-x_i)^2+d_i(x-x_i)^3' });
+        const xs = [], ys = []; for (let i = 0; i < m; i++) for (let k = 0; k < 40; k++) { const t = P.x[i] + (P.x[i + 1] - P.x[i]) * k / 40; xs.push(t); ys.push(S(i, t, 0)); } xs.push(P.x[n - 1]); ys.push(P.y[n - 1]);
+        const traces = [{ x: xs, y: ys, mode: 'lines', type: 'scatter', name: 'cubic spline', line: { width: 3 } }]; let ylo = Math.min(...P.y), yhi = Math.max(...P.y), pad = Math.max(1e-9, (yhi - ylo) * 0.6);
+        if (n <= 12) { try { const co = (() => { const Xv = P.x, Yv = P.y; const nn = Xv.length; const d = [Yv.slice()]; for (let k = 1; k < nn; k++) d.push(Array.from({ length: nn - k }, (_, i) => (d[k - 1][i + 1] - d[k - 1][i]) / (Xv[i + k] - Xv[i]))); return (t) => { let s = d[nn - 1][0]; for (let k = nn - 2; k >= 0; k--) s = s * (t - Xv[k]) + d[k][0]; return s; }; })(); traces.push({ x: xs, y: xs.map(co), mode: 'lines', type: 'scatter', name: 'one high-degree polynomial', line: { dash: 'dot' } }); } catch (e) { /* skip */ } }
+        traces.push({ x: P.x, y: P.y, mode: 'markers', type: 'scatter', name: 'data', marker: { size: 9 } });
+        r.plot = { generic: { title: 'Cubic spline through the data', xTitle: 'x', yTitle: 'y', yRange: [ylo - pad, yhi + pad], traces } };
+        return I.finalizeText(r);
+    }
+
+    function runChebyshev(src, opt) {
+        const { node, f } = fnOf(src); const a = parseNum(opt.lo, 'The left end', '-1'), b = parseNum(opt.hi, 'The right end', '1'); if (!(b > a)) throw new CalcError('The right end must be larger than the left end.');
+        const n = Math.max(2, Math.min(60, parseInt(opt.n, 10) || 12));
+        const eq = Array.from({ length: n + 1 }, (_, i) => a + (b - a) * i / n), ch = Array.from({ length: n + 1 }, (_, i) => (a + b) / 2 + (b - a) / 2 * Math.cos(Math.PI * (2 * i + 1) / (2 * n + 2)));
+        const bary = (nodes, w) => { const fv = nodes.map(f); if (fv.some(v => !Number.isFinite(v))) throw new CalcError('The function is not defined at some interpolation nodes. Choose an interval where it is finite.'); return t => { let num = 0, den = 0; for (let i = 0; i < nodes.length; i++) { const d = t - nodes[i]; if (Math.abs(d) < 1e-14 * Math.max(1, Math.abs(t))) return fv[i]; const q = w[i] / d; num += q * fv[i]; den += q; } return num / den; }; };
+        const wEq = eq.map((_, i) => (i % 2 ? -1 : 1) * binom(n, i)), wCh = ch.map((_, i) => (i % 2 ? -1 : 1) * Math.sin(Math.PI * (2 * i + 1) / (2 * n + 2)));
+        function binom(nn, k) { let v = 1; for (let i = 1; i <= k; i++) v = v * (nn - k + i) / i; return v; }
+        const pe = bary(eq, wEq), pc = bary(ch, wCh); const N = 2001; let eE = 0, eC = 0, atE = a, atC = a; const xs = [], fy = [], ey = [], cy = [];
+        for (let i = 0; i < N; i++) { const t = a + (b - a) * i / (N - 1), ft = f(t); xs.push(t); fy.push(Number.isFinite(ft) ? ft : null); const u = pe(t), v = pc(t); ey.push(u); cy.push(v); if (Number.isFinite(ft)) { if (Math.abs(u - ft) > eE) { eE = Math.abs(u - ft); atE = t; } if (Math.abs(v - ft) > eC) { eC = Math.abs(v - ft); atC = t; } } }
+        // independent check: Newton divided differences through the Chebyshev nodes agree with the barycentric value; both interpolants hit their nodes
+        const nd = ch.slice().sort((p, q) => p - q), Yn = nd.map(f); const dd = [Yn.slice()]; for (let k = 1; k <= n; k++) dd.push(Array.from({ length: n + 1 - k }, (_, i) => (dd[k - 1][i + 1] - dd[k - 1][i]) / (nd[i + k] - nd[i]))); const newtonAt = t => { let s = dd[n][0]; for (let k = n - 1; k >= 0; k--) s = s * (t - nd[k]) + dd[k][0]; return s; };
+        let gap = 0; [0.21, 0.5, 0.77].forEach(u => { const t = a + (b - a) * u; gap = Math.max(gap, Math.abs(newtonAt(t) - pc(t)) / Math.max(1, Math.abs(pc(t)))); }); let hit = 0; ch.forEach(t => { hit = Math.max(hit, Math.abs(pc(t) - f(t))); }); eq.forEach(t => { hit = Math.max(hit, Math.abs(pe(t) - f(t))); });
+        if (gap > 1e-6 * Math.pow(2, Math.min(n, 30) / 4) || hit > 1e-9 * Math.max(1, ...fy.filter(v => v !== null).map(Math.abs))) throw new CalcError('The interpolants failed their own checks (numerical trouble at this degree).');
+        const r = I.makeResult('numerical', 'Chebyshev vs equally spaced nodes'); r.main = { label: `Largest error with degree ${n}:`, text: `equally spaced ${eE.toExponential(2)}   vs   Chebyshev ${eC.toExponential(2)}`, tex: '' };
+        r.items.push({ label: 'Function:', text: `f(x) = ${engine.strOf(node)} on [${NZ(a, 5).text}, ${NZ(b, 5).text}]`, tex: `f(x)=${engine.texOf(node)}` });
+        r.items.push({ label: 'Equally spaced nodes:', text: `max error ${eE.toExponential(2)} (near x = ${engine.fmt(atE, 4)})`, tex: '' }); r.items.push({ label: 'Chebyshev nodes:', text: `max error ${eC.toExponential(2)} (near x = ${engine.fmt(atC, 4)})`, tex: '' });
+        if (eC > 0) r.items.push({ label: 'Improvement:', text: eE > eC ? `Chebyshev nodes are ${engine.fmt(eE / eC, 3)} times more accurate here` : 'equally spaced nodes happen to do as well here', tex: '' });
+        r.items.push({ label: 'Chebyshev nodes:', text: ch.slice().sort((p, q) => p - q).map(t => NZ(t, 5).text).join(', '), tex: 'x_k=\\tfrac{a+b}{2}+\\tfrac{b-a}{2}\\cos\\tfrac{(2k+1)\\pi}{2n+2}' });
+        if (eE > 10 * eC && eE > 0.05) r.warnings.push('Runge phenomenon: equally spaced nodes make the polynomial swing wildly near the ends as the degree grows. Chebyshev nodes cluster at the ends and prevent this.');
+        r.meta.push(`Verified: both interpolants reproduce f at every one of their nodes, and the Chebyshev interpolant (barycentric formula) matches an independent Newton divided-difference evaluation (relative gap ${gap.toExponential(1)}).`);
+        r.meta.push('Errors are the maximum over 2,001 sample points. The barycentric formula is used because it stays accurate at high degree.');
+        r.steps.push({ title: 'Why the nodes matter', text: 'The error is f⁽ⁿ⁺¹⁾(ξ)/(n+1)! · Π(x − xᵢ). Chebyshev nodes make the maximum of that product as small as possible, about 2·((b−a)/4)ⁿ⁺¹.', tex: 'f(x)-p(x)=\\frac{f^{(n+1)}(\\xi)}{(n+1)!}\\prod_{i}(x-x_i)' });
+        const fin = fy.filter(v => v !== null).sort((p, q) => p - q); const lo = fin[Math.floor(fin.length * 0.01)], hi = fin[Math.floor(fin.length * 0.99)], pad = Math.max(0.2, (hi - lo) * 0.5);
+        r.plot = { generic: { title: `f and two degree-${n} interpolants`, xTitle: 'x', yTitle: 'y', yRange: [lo - pad, hi + pad], traces: [{ x: xs, y: fy, mode: 'lines', type: 'scatter', name: 'f', line: { width: 3 } }, { x: xs, y: ey, mode: 'lines', type: 'scatter', name: 'equally spaced nodes' }, { x: xs, y: cy, mode: 'lines', type: 'scatter', name: 'Chebyshev nodes' }, { x: eq, y: eq.map(f), mode: 'markers', type: 'scatter', name: 'equal nodes', marker: { size: 6, symbol: 'circle-open' } }, { x: ch, y: ch.map(f), mode: 'markers', type: 'scatter', name: 'Chebyshev nodes', marker: { size: 6 } }] } };
+        return I.finalizeText(r);
+    }
+
+    const glCache = {};
+    function glRule(n) {
+        if (glCache[n]) return glCache[n]; const x = [], w = [];
+        for (let i = 0; i < n; i++) { let z = Math.cos(Math.PI * (i + 0.75) / (n + 0.5)), pp = 1; for (let it = 0; it < 100; it++) { let p1 = 1, p2 = 0; for (let j = 1; j <= n; j++) { const p3 = p2; p2 = p1; p1 = ((2 * j - 1) * z * p2 - (j - 1) * p3) / j; } pp = n * (z * p1 - p2) / (z * z - 1); const dz = p1 / pp; z -= dz; if (Math.abs(dz) < 1e-15) break; } x.push(z); w.push(2 / ((1 - z * z) * pp * pp)); }
+        return (glCache[n] = { x, w });
+    }
+    function runQuadrature(src, opt) {
+        const { node, f } = fnOf(src); const a = parseNum(opt.lo, 'The lower limit', '0'), b = parseNum(opt.hi, 'The upper limit', '1'); if (!(b > a)) throw new CalcError('The upper limit must be larger than the lower limit.');
+        let evals = 0; const g = x => { evals++; const v = f(x); if (!Number.isFinite(v)) throw new CalcError('The integrand is not finite on the whole interval – use a smooth function on a finite interval (endpoint singularities slow every method down).'); return v; };
+        const gauss = (n, lo, hi) => { const R = glRule(n), mid = (lo + hi) / 2, half = (hi - lo) / 2; let s = 0; for (let i = 0; i < n; i++) s += R.w[i] * g(mid + half * R.x[i]); return s * half; };
+        const composite = (n, panels) => { let s = 0; for (let k = 0; k < panels; k++) s += gauss(n, a + (b - a) * k / panels, a + (b - a) * (k + 1) / panels); return s; };
+        const ref1 = composite(16, 24), ref2 = composite(20, 64); let refGap = Math.abs(ref1 - ref2) / Math.max(1, Math.abs(ref2)); let ref = ref2, roughNote = '';
+        if (refGap > 1e-9) { let alt = NaN; try { const q = engine.integrateRobust(x => { const v = f(x); return Number.isFinite(v) ? v : NaN; }, a, b); alt = q && Number.isFinite(q.value) ? q.value : NaN; } catch (e) { alt = NaN; } if (!Number.isFinite(alt) || Math.abs(alt - ref2) > 1e-4 * Math.max(1, Math.abs(alt))) throw new CalcError('Could not compute a trustworthy reference value: the integrand is not smooth enough on this interval, or the integral diverges.'); ref = alt; refGap = Math.abs(alt - ref2) / Math.max(1, Math.abs(alt)); roughNote = 'The integrand is not smooth at an endpoint or inside the interval, so the reference value comes from adaptive integration and every rule converges more slowly than its textbook order.'; } let exactTxt = ''; try { const F = I.runAlgebrite ? null : null; void F; } catch (e) { /* none */ }
+        const trap = N => { const h = (b - a) / N; let s = (g(a) + g(b)) / 2; for (let i = 1; i < N; i++) s += g(a + i * h); return s * h; };
+        const simp = N => { const h = (b - a) / N; let s = g(a) + g(b); for (let i = 1; i < N; i++) s += g(a + i * h) * (i % 2 ? 4 : 2); return s * h / 3; };
+        const mid = N => { const h = (b - a) / N; let s = 0; for (let i = 0; i < N; i++) s += g(a + (i + 0.5) * h); return s * h; };
+        const Ns = [2, 4, 8, 16, 32, 64]; const meths = [['Midpoint', mid, 2], ['Trapezoid', trap, 2], ['Simpson', simp, 4]]; const rows = meths.map(([name, fn, order]) => { const errs = Ns.map(N => Math.abs(fn(N) - ref)); const ords = []; for (let i = 0; i + 1 < errs.length; i++) if (errs[i] > 1e-13 && errs[i + 1] > 1e-14) ords.push(Math.log2(errs[i] / errs[i + 1])); const est = ords.length ? ords[Math.max(0, ords.length - 2)] : NaN; return { name, errs, order, est }; });
+        const gsErr = [1, 2, 3, 4, 5, 6, 8, 10].map(n => ({ n, e: Math.abs(composite(n, 1) - ref) }));
+        // Romberg
+        const Rm = [[trap(1)]]; for (let k = 1; k <= 6; k++) { const row = [trap(Math.pow(2, k))]; for (let j = 1; j <= k; j++) row.push(row[j - 1] + (row[j - 1] - Rm[k - 1][j - 1]) / (Math.pow(4, j) - 1)); Rm.push(row); } const romb = Rm.map(r => r[r.length - 1]);
+        // adaptive Simpson
+        let adEvals = 0; const ad = (lo, hi, fa, fm, fb, whole, tol, depth) => { const m = (lo + hi) / 2, lm = (lo + m) / 2, rm = (m + hi) / 2; const flm = f(lm), frm = f(rm); adEvals += 2; const left = (m - lo) / 6 * (fa + 4 * flm + fm), right = (hi - m) / 6 * (fm + 4 * frm + fb); if (depth <= 0 || Math.abs(left + right - whole) <= 15 * tol) return left + right + (left + right - whole) / 15; return ad(lo, m, fa, flm, fm, left, tol / 2, depth - 1) + ad(m, hi, fm, frm, fb, right, tol / 2, depth - 1); };
+        const fa = f(a), fb = f(b), fm = f((a + b) / 2), whole = (b - a) / 6 * (fa + 4 * fm + fb); adEvals += 3; const adv = ad(a, b, fa, fm, fb, whole, 1e-9, 40);
+        let flagged = 0; rows.forEach(rw => { if (Number.isFinite(rw.est) && Math.abs(rw.est - rw.order) > 0.6) flagged++; });
+        const r = I.makeResult('numerical', 'Numerical integration'); r.main = { label: `∫ from ${NZ(a, 5).text} to ${NZ(b, 5).text} ≈`, text: engine.fmt(ref, 14), tex: `\\int_{${NZ(a, 5).tex}}^{${NZ(b, 5).tex}} ${engine.texOf(node)}\\,dx\\approx ${engine.fmt(ref, 14)}` };
+        r.items.push({ label: 'Subintervals N:', text: Ns.join(', '), tex: '' });
+        rows.forEach(rw => r.items.push({ label: `${rw.name} rule error:`, text: `${rw.errs.map(e => e.toExponential(1)).join('  ')}   →  observed order ≈ ${Number.isFinite(rw.est) ? rw.est.toFixed(2) : 'at rounding level'} (theory ${rw.order})`, tex: '' }));
+        r.items.push({ label: 'Romberg (extrapolated trapezoid) diagonal error:', text: romb.map(v => Math.abs(v - ref).toExponential(1)).join('  ') + '   (uses 1, 2, 4, … 64 panels)', tex: '' });
+        r.items.push({ label: 'Gauss–Legendre error with n nodes (n = 1, 2, 3, 4, 5, 6, 8, 10):', text: gsErr.map(o => o.e.toExponential(1)).join('  '), tex: '' });
+        r.items.push({ label: 'Adaptive Simpson (tolerance 10⁻⁹):', text: `value error ${Math.abs(adv - ref).toExponential(1)} using ${adEvals} evaluations`, tex: '' });
+        r.meta.push(roughNote ? `Reference value: adaptive integration, cross-checked against a Gauss–Legendre rule (they agree to ${refGap.toExponential(1)}). Each rule's order is estimated from how its error shrinks when N doubles.` : `Verified: the reference value comes from two different composite Gauss–Legendre rules (16 nodes × 24 panels, and 20 nodes × 64 panels) that agree to ${refGap.toExponential(1)}; every error above is measured against it, and the order of each rule is estimated from how its error shrinks when N doubles.`); if (roughNote) r.warnings.push(roughNote);
+        if (flagged && !roughNote) r.warnings.push('Some rule did not show its textbook order. That happens when the integrand has a kink, a near-singularity or an oscillation that the coarse grids cannot resolve.');
+        r.meta.push(`An n-node Gauss–Legendre rule is exact for polynomials up to degree ${'2n − 1'}, which is why its error collapses so quickly for smooth functions.`);
+        r.steps.push({ title: 'Compare rules', text: 'Midpoint and trapezoid errors fall like h², Simpson like h⁴. Romberg combines trapezoid values to cancel the h², h⁴, … terms. Gauss–Legendre chooses the nodes as well as the weights.', tex: 'E_{\\text{trap}}\\approx -\\frac{(b-a)h^2}{12}f\'\'(\\xi),\\quad E_{\\text{Simpson}}\\approx -\\frac{(b-a)h^4}{180}f^{(4)}(\\xi)' });
+        void evals; void exactTxt;
+        r.plot = { generic: { title: 'Error versus number of subintervals (log–log)', xTitle: 'log₁₀ N', yTitle: 'log₁₀ error', traces: logPlotTraces(rows.map(rw => [rw.name, Ns, rw.errs]).concat([['Romberg', Ns, romb.slice(1, 7).map(v => Math.abs(v - ref))]])) } };
+        return I.finalizeText(r);
+    }
+
+    function runNumDiff(src, opt) {
+        const { node, f } = fnOf(src); const x0 = parseNum(opt.dat !== undefined && opt.dat !== '' ? opt.dat : opt.at, 'The point', '1'); const dord = String(opt.dord) === '2' ? 2 : 1; const dN = dord === 1 ? engine.diff(node, 'x') : engine.diff(engine.diff(node, 'x'), 'x'); const exact = engine.compile(dN, ['x'])(x0);
+        if (typeof exact !== 'number' || !Number.isFinite(exact)) throw new CalcError(`The ${dord === 1 ? '' : 'second '}derivative is not defined at x = ${x0}.`); if (!Number.isFinite(f(x0))) throw new CalcError('The function is not defined at that point.');
+        const hs = Array.from({ length: 13 }, (_, k) => Math.pow(10, -(k + 1) / 1)); hs.length = 12;
+        const F = {
+            1: [['Forward difference', 1, h => (f(x0 + h) - f(x0)) / h], ['Backward difference', 1, h => (f(x0) - f(x0 - h)) / h], ['Central difference', 2, h => (f(x0 + h) - f(x0 - h)) / (2 * h)], ['Five-point stencil', 4, h => (f(x0 - 2 * h) - 8 * f(x0 - h) + 8 * f(x0 + h) - f(x0 + 2 * h)) / (12 * h)], ['Richardson (central, h and h/2)', 4, h => (4 * ((f(x0 + h / 2) - f(x0 - h / 2)) / h) - (f(x0 + h) - f(x0 - h)) / (2 * h)) / 3]],
+            2: [['Central second difference', 2, h => (f(x0 + h) - 2 * f(x0) + f(x0 - h)) / (h * h)], ['Five-point second difference', 4, h => (-f(x0 - 2 * h) + 16 * f(x0 - h) - 30 * f(x0) + 16 * f(x0 + h) - f(x0 + 2 * h)) / (12 * h * h)], ['Forward second difference', 1, h => (f(x0 + 2 * h) - 2 * f(x0 + h) + f(x0)) / (h * h)]]
+        }[dord];
+        const errs = F.map(([, , fn]) => hs.map(h => { const v = fn(h); return Number.isFinite(v) ? Math.abs(v - exact) : NaN; }));
+        const best = errs.map(es => { let bi = -1; es.forEach((e, i) => { if (Number.isFinite(e) && (bi < 0 || e < es[bi])) bi = i; }); return bi; });
+        const slope = (es, i0, i1) => { const a1 = es[i0], b1 = es[i1]; return a1 > 1e-9 && b1 > 1e-11 ? Math.log10(a1 / b1) / Math.log10(hs[i0] / hs[i1]) : NaN; };
+        const r = I.makeResult('numerical', 'Numerical differentiation'); r.main = { label: `f${dord === 1 ? '′' : '″'}(${NZ(x0, 5).text}) =`, text: engine.fmt(exact, 14) + '   (exact, from the symbolic derivative)', tex: `f${dord === 1 ? "'" : "''"}(${NZ(x0, 5).tex})=${engine.fmt(exact, 12)}` };
+        r.items.push({ label: 'Function:', text: `f(x) = ${engine.strOf(node)}`, tex: `f(x)=${engine.texOf(node)}` }); r.items.push({ label: `Exact ${dord === 1 ? 'derivative' : 'second derivative'}:`, text: engine.strOf(dN), tex: '' });
+        F.forEach(([name, order], k) => { const bi = best[k]; r.items.push({ label: `${name} (order ${order}):`, text: `best h = ${bi >= 0 ? hs[bi].toExponential(0) : '–'} gives error ${bi >= 0 ? errs[k][bi].toExponential(1) : '–'};   at h = 10⁻³ the error is ${Number.isFinite(errs[k][2]) ? errs[k][2].toExponential(1) : '–'}`, tex: '' }); });
+        r.items.push({ label: 'Errors for h = 10⁻¹ … 10⁻¹²:', text: F.map(([name], k) => `${name.split(' ')[0]} ${errs[k].map(e => (Number.isFinite(e) ? e.toExponential(0) : '–')).join(' ')}`).join('   |   '), tex: '' });
+        let flagged = 0; F.forEach(([, order], k) => { const s = slope(errs[k], 0, 1); if (Number.isFinite(s) && Math.abs(s - order) > 0.8) flagged++; });
+        r.meta.push(`Verified: the reference derivative comes from symbolic differentiation (a method that shares no code with the finite differences), and each formula's order of accuracy was measured from how its error falls between h = 10⁻¹ and h = 10⁻².`);
+        if (flagged) r.warnings.push('At least one formula did not show its textbook order for h between 10⁻¹ and 10⁻² (the function may be too rough, or the error is already at rounding level).');
+        r.meta.push('Two errors compete: truncation error shrinks as h gets smaller, but rounding error grows like (machine precision)/h. The best h is where they balance, so smaller h is not always better.');
+        r.steps.push({ title: 'Truncation versus rounding', text: `Taylor expansion shows the truncation error of an order-p formula is about C·h^p, while subtracting nearly equal numbers gives a rounding error of about ε/h${dord === 2 ? '²' : ''}, with ε ≈ 2.2·10⁻¹⁶.`, tex: '\\text{error}\\approx C\\,h^{p}+\\frac{\\varepsilon}{h}' });
+        r.plot = { generic: { title: 'Error versus step size h (log–log)', xTitle: 'log₁₀ h', yTitle: 'log₁₀ error', traces: logPlotTraces(F.map(([name], k) => [name, hs, errs[k]])) } };
+        return I.finalizeText(r);
+    }
+
+    function runNumerical(src, opt) {
+        switch (opt.op) {
+            case 'spline': return runSpline(src, opt);
+            case 'chebyshev': return runChebyshev(src, opt);
+            case 'quadrature': return runQuadrature(src, opt);
+            case 'diff': return runNumDiff(src, opt);
+            default: return runInterpolate(src, opt);
+        }
+    }
+    register({ numerical: runNumerical });
+
     return engine;
 });

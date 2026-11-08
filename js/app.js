@@ -635,18 +635,51 @@
     // Mode names arrive from links, history and imported files: make lookups of inherited names (constructor, __proto__, toString) impossible.
     Object.setPrototypeOf(MODES, null);
 
+    MODES.numerical = {
+        label: 'Numerical methods', icon: '≈',
+        input: v => ({ lagrange: { label: 'Data points  (x, y)', placeholder: 'e.g. (0,1), (1,3), (2,2), (3,5)', hint: 'Finds the one polynomial through your points, with the divided-difference table and Newton form. Fractions stay exact.' }, spline: { label: 'Data points  (x, y)', placeholder: 'e.g. (0,0), (1,2), (2,1), (3,3), (4,0)', hint: 'A cubic spline: smooth piecewise cubics that avoid the wiggles of a single high-degree polynomial. Natural, clamped or not-a-knot ends.' }, chebyshev: { label: 'f(x)', placeholder: 'e.g. 1/(1+25*x^2)', hint: 'Interpolates f at equally spaced nodes and at Chebyshev nodes and compares the error (Runge’s phenomenon).' }, quadrature: { label: 'f(x)', placeholder: 'e.g. exp(-x^2)', hint: 'Compares the midpoint, trapezoid and Simpson rules, Romberg extrapolation, Gauss–Legendre and adaptive Simpson, with the order each really achieves.' }, diff: { label: 'f(x)', placeholder: 'e.g. sin(x)', hint: 'Finite-difference derivatives at a point for h = 10⁻¹ … 10⁻¹²: truncation versus rounding error, and the best step size.' } }[v.op || 'lagrange']),
+        fields: [
+            { key: 'op', label: 'Method', type: 'select', def: 'lagrange', options: [['lagrange', 'Polynomial interpolation (Newton / Lagrange)'], ['spline', 'Cubic spline'], ['chebyshev', 'Chebyshev vs equally spaced nodes'], ['quadrature', 'Numerical integration (rules compared)'], ['diff', 'Numerical differentiation (finite differences)']] },
+            { key: 'at', label: 'Evaluate at x  (optional)', type: 'text', def: '', placeholder: 'e.g. 1.5', show: v => v.op === 'lagrange' || v.op === 'spline' },
+            { key: 'truth', label: 'True function to compare with (optional)', type: 'text', def: '', placeholder: 'e.g. sin(x)', show: v => v.op === 'lagrange' },
+            { key: 'bc', label: 'End conditions', type: 'select', def: 'natural', options: [['natural', 'Natural  (S″ = 0 at the ends)'], ['clamped', 'Clamped  (given end slopes)'], ['notaknot', 'Not-a-knot']], show: v => v.op === 'spline' },
+            { key: 'd0', label: 'Slope at the first point', type: 'text', def: '0', show: v => v.op === 'spline' && v.bc === 'clamped' },
+            { key: 'd1', label: 'Slope at the last point', type: 'text', def: '0', show: v => v.op === 'spline' && v.bc === 'clamped' },
+            { key: 'lo', label: 'Left end a', type: 'text', def: '-1', show: v => v.op === 'chebyshev' || v.op === 'quadrature' },
+            { key: 'hi', label: 'Right end b', type: 'text', def: '1', show: v => v.op === 'chebyshev' || v.op === 'quadrature' },
+            { key: 'n', label: 'Degree n (2–60)', type: 'number', def: '12', min: 2, max: 60, show: v => v.op === 'chebyshev' },
+            { key: 'dat', label: 'Point x₀', type: 'text', def: '1', show: v => v.op === 'diff' },
+            { key: 'dord', label: 'Derivative', type: 'select', def: '1', options: [['1', 'First derivative f′'], ['2', 'Second derivative f″']], show: v => v.op === 'diff' }
+        ],
+        examples: [
+            { label: 'Interpolation: 4 points, exact fractions', fn: '(0,1), (1,3), (2,2), (3,5)', opts: { op: 'lagrange', at: '1.5' } },
+            { label: 'Interpolation: points on x³', fn: '0 0; 1 1; 2 8; 3 27', opts: { op: 'lagrange' } },
+            { label: 'Interpolation of cos x at 4 points', fn: '0 1; 0.5 0.8776; 1 0.5403; 2 -0.4161', opts: { op: 'lagrange', at: '0.7', truth: 'cos(x)' } },
+            { label: 'Spline: natural, 5 points', fn: '(0,0), (1,2), (2,1), (3,3), (4,0)', opts: { op: 'spline', bc: 'natural', at: '2.5' } },
+            { label: 'Spline: clamped slopes 1 and −1', fn: '(0,0), (1,2), (2,1), (3,3), (4,0)', opts: { op: 'spline', bc: 'clamped', d0: '1', d1: '-1' } },
+            { label: 'Spline: not-a-knot', fn: '(0,0), (1,2), (2,1), (3,3), (4,0)', opts: { op: 'spline', bc: 'notaknot' } },
+            { label: 'Runge phenomenon: 1/(1+25x²), degree 14', fn: '1/(1+25*x^2)', opts: { op: 'chebyshev', lo: '-1', hi: '1', n: '14' } },
+            { label: 'Chebyshev nodes for eˣ on [0, 2]', fn: 'exp(x)', opts: { op: 'chebyshev', lo: '0', hi: '2', n: '6' } },
+            { label: 'Integration rules: ∫ sin x from 0 to π', fn: 'sin(x)', opts: { op: 'quadrature', lo: '0', hi: 'pi' } },
+            { label: 'Integration rules: Gaussian ∫ e^(−x²) on [−2, 2]', fn: 'exp(-x^2)', opts: { op: 'quadrature', lo: '-2', hi: '2' } },
+            { label: 'Integration with an endpoint singularity: ∫ √x', fn: 'sqrt(x)', opts: { op: 'quadrature', lo: '0', hi: '1' } },
+            { label: 'Differentiation: sin x at x = 1', fn: 'sin(x)', opts: { op: 'diff', dat: '1', dord: '1' } },
+            { label: 'Second derivative of eˣ at 0.5', fn: 'exp(x)', opts: { op: 'diff', dat: '0.5', dord: '2' } }
+        ]
+    };
+
     const MODE_GROUPS = [
         ['Core calculus', ['derivative', 'integral', 'limit', 'series', 'analysis']],
         ['Explore & visualise', ['graph', 'riemann', 'applications', 'root', 'fourier']],
         ['Algebra & sums', ['calc', 'solve', 'algebra', 'sums', 'number', 'units', 'stats']],
-        ['Advanced', ['ode', 'multivariable', 'vector', 'matrix', 'laplace', 'complex']]
+        ['Advanced', ['ode', 'multivariable', 'vector', 'matrix', 'laplace', 'complex', 'numerical']]
     ];
     const MODE_ORDER = MODE_GROUPS.flatMap(g => g[1]);
     const MODE_DESC = {
         derivative: 'Rules, steps, tangent', integral: 'Symbolic, definite, improper', limit: 'Two-sided & at ∞', series: 'Taylor / Maclaurin', analysis: 'Roots, extrema, asymptotes',
         graph: 'Sliders & intersections', riemann: 'Left, mid, trap, Simpson', applications: 'Area, volume, arc length', root: 'Newton, bisection, secant', fourier: 'Coefficients & Gibbs',
         calc: 'Variables, exact, ans', solve: 'Equations & inequalities', sums: 'Convergence tests', ode: 'Closed form + RK45', multivariable: '∇, Hessian, ∬, curl', matrix: 'det, inverse, eigen, SVD, LU, QR',
-        laplace: 'Laplace, inverse, Fourier', vector: 'Jacobian, ∮, work, ∭', stats: 'Describe, fit, distributions', number: 'Factor, gcd, mod, CRT', units: 'Convert anything', complex: 'Domain colouring, roots'
+        laplace: 'Laplace, inverse, Fourier', vector: 'Jacobian, ∮, work, ∭', stats: 'Describe, fit, distributions', number: 'Factor, gcd, mod, CRT', units: 'Convert anything', complex: 'Domain colouring, roots', numerical: 'Splines, quadrature, errors'
     };
 
     const TEMPLATES = [
@@ -950,7 +983,7 @@
                 preview.innerHTML = `<span class="preview-tex plain">${esc(lines[0] || '')}</span><span class="preview-meta">${lines.length} line${lines.length === 1 ? '' : 's'}</span>`;
                 return true;
             }
-            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur', 'gf', 'lp'].includes(currentValues().op)) || (state.mode === 'applications' && currentValues().op === 'curvature' && src.includes(';')) || (state.mode === 'ode' && ['linear2', 'equilibria'].includes(currentValues().odeType)) || (state.mode === 'laplace' && ['ztrans', 'iztrans', 'zdiff'].includes(currentValues().op)) || (state.mode === 'complex' && currentValues().op === 'mobius') || (state.mode === 'laplace' && (/\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src) || /(^|[\s;)])(for|if|when|otherwise)(\s|$|(?=[-+(\d]))/i.test(src)))) {
+            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur', 'gf', 'lp'].includes(currentValues().op)) || (state.mode === 'applications' && currentValues().op === 'curvature' && src.includes(';')) || (state.mode === 'ode' && ['linear2', 'equilibria'].includes(currentValues().odeType)) || (state.mode === 'laplace' && ['ztrans', 'iztrans', 'zdiff'].includes(currentValues().op)) || (state.mode === 'complex' && currentValues().op === 'mobius') || (state.mode === 'numerical' && ['lagrange', 'spline'].includes(currentValues().op || 'lagrange')) || (state.mode === 'laplace' && (/\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src) || /(^|[\s;)])(for|if|when|otherwise)(\s|$|(?=[-+(\d]))/i.test(src)))) {
                 preview.className = 'preview-box valid';
                 const n = src.split(/[\n;]+/).filter(x => x.trim()).length;
                 preview.innerHTML = `<span class="preview-tex plain">${esc(src.length > 160 ? src.slice(0, 160) + '…' : src)}</span><span class="preview-meta">${state.mode === 'stats' ? (src.split(/[\s,;]+/).filter(Boolean).length + ' values') : state.mode === 'vector' ? (n + ' component' + (n === 1 ? '' : 's')) : 'ready'}</span>`;

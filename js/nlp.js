@@ -69,6 +69,8 @@
         }
 
         // ---- ODEs ----------------------------------------------------------
+        const ndM = s.match(/^(?:numerical|finite[- ]difference) (?:derivative|differentiation)(?: of)? (.+?) at (?:x ?= ?)?(-?[\d.]+|pi[^ ]*)$/);
+        if (ndM) return { mode: 'numerical', fn: mathify(ndM[1]), opts: { op: 'diff', dat: ndM[2], dord: '1' }, say: 'Numerical differentiation' };
         const cmpM = s.match(/^compare (?:the )?(?:numerical |ode )?(?:methods|solvers)(?: for| on| of)? (?:y'? ?= ?|dy\/dx ?= ?)(.+?)(?: with y\(0\) ?= ?(-?[\d.]+))?(?: (?:from 0 )?(?:to|until|on \[0,) ?([\d.]+)\]?)?$/);
         if (cmpM) return { mode: 'ode', fn: mathify(cmpM[1]), opts: { odeType: 'methods', x0: '0', xEnd: cmpM[3] || '2', y0: cmpM[2] || '1' }, say: 'Numerical methods lab' };
         let m = s.match(/(?:solve |ode |differential equation )?(?:the )?(?:dy\/dx|y')\s*=\s*(.+)$/);
@@ -175,6 +177,14 @@
         if (m) return { mode: 'complex', fn: m[1].replace(/\s*,\s*(?=[^,]*->)/g, ' ; ').replace(/→/g, '->').trim(), opts: { op: 'mobius', region: 'grid', extent: '2' }, say: 'Möbius transformation' };
         m = s.match(/^(?:the )?(?:conformal map|conformal mapping|image of (?:a |the )?(?:square |polar )?grid under)(?: of| by| given by)? (?:w ?= ?|f\(z\) ?= ?)?(.+)$/);
         if (m) return { mode: 'complex', fn: mathify(m[1]), opts: { op: 'map', region: /polar/.test(s) ? 'polar' : 'grid', extent: '2' }, say: 'Conformal map' };
+        m = s.match(/^(?:fit |draw |find )?(?:the )?(not[- ]a[- ]knot |natural |clamped )?cubic spline (?:through|for|of)(?: the points| the data)? (.+)$/);
+        if (m && /\d/.test(m[2])) return { mode: 'numerical', fn: m[2].trim(), opts: { op: 'spline', bc: m[1] ? m[1].replace(/[- ]/g, '').trim() : 'natural' }, say: 'Cubic spline' };
+        m = s.match(/^(?:the )?(?:interpolating polynomial|lagrange (?:interpolation|polynomial)|newton interpolation|interpolate)(?: through| for| of| the points)? (.+\d.*)$/);
+        if (m) return { mode: 'numerical', fn: m[1].trim(), opts: { op: 'lagrange' }, say: 'Polynomial interpolation' };
+        m = s.match(/^(?:the )?(?:runge phenomenon|chebyshev nodes|chebyshev interpolation)(?: for| of| with)? (.+?)(?: (?:with )?(?:degree|n) ?=? ?(\d+))?(?: (?:on|over) \[?(-?[\d.]+)[, ]+(-?[\d.]+)\]?)?$/);
+        if (m) return { mode: 'numerical', fn: mathify(m[1]), opts: { op: 'chebyshev', n: m[2] || '12', lo: m[3] || '-1', hi: m[4] || '1' }, say: 'Chebyshev nodes' };
+        m = s.match(/^compare (?:the )?(?:numerical )?(?:integration|quadrature)(?: rules| methods)?(?: for| of)? (?:the integral of )?(.+?) (?:from|on|over) (-?[\d.]+|pi[^ ]*) to (-?[\d.]+|pi[^ ]*)$/);
+        if (m) return { mode: 'numerical', fn: mathify(m[1]), opts: { op: 'quadrature', lo: m[2], hi: m[3] }, say: 'Numerical integration' };
         m = s.match(/^(?:run |do )?(?:a )?mann[- ]?whitney(?: u)?(?: test)?(?: (?:of|on|for))? ([\d.,;\s-]+)$/);
         if (m) return { mode: 'stats', fn: m[1].trim(), opts: { op: 'mannwhitney', alpha: '0.05' }, say: 'Mann–Whitney U test' };
         m = s.match(/^(?:run |do )?(?:a )?(?:one[- ]?way )?anova(?: test)?(?: (?:of|on|for))? ([\d.,;\s-]+)$/);

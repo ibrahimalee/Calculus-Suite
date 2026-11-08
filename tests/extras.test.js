@@ -288,3 +288,33 @@ test('numerical methods lab: observed orders match theory and stiffness is expos
   const stiff = E.run.ode('-15*y', { odeType: 'methods', x0: '0', xEnd: '1', y0: '1' }); assert.match(txt(stiff), /Euler: error at x = 1:\s+5\.7e\+1/); assert.ok(stiff.warnings.length > 0);
   assert.throws(() => E.run.ode('y^2', { odeType: 'methods', x0: '0', xEnd: '5', y0: '1' }), /blows up|trustworthy/); assert.throws(() => E.run.ode('x+t', { odeType: 'methods' }), /only x and y/); assert.throws(() => E.run.ode('x', { odeType: 'methods', x0: '3', xEnd: '1' }), /larger end/);
 });
+
+// ---------- batch B: numerical methods ----------
+const NM = (src, opt) => E.run.numerical(src, opt);
+test('interpolation: exact rational polynomial, Newton form and the two built-in checks', () => {
+  const r = NM('(0,1),(1,3),(2,2),(3,5)', { op: 'lagrange', at: '1.5' }); assert.equal(r.main.text, '(7/6)·x^3 − 5·x^2 + (35/6)·x + 1'); assert.match(txt(r), /p\(3\/2\) = 2\.4375/); assert.ok(r.meta.some(m => /exactly \(rational arithmetic\)/.test(m)));
+  assert.equal(NM('0 0; 1 1; 2 8; 3 27', { op: 'lagrange' }).main.text, 'x^3');
+  assert.match(NM('0 1; 0.5 0.8776; 1 0.5403; 2 -0.4161', { op: 'lagrange', truth: 'cos(x)' }).items.map(i => i.label).join('|'), /Largest gap/);
+  assert.throws(() => NM('0 0; 0 1; 1 2', { op: 'lagrange' }), /different/); assert.throws(() => NM('1 2 3', { op: 'lagrange' }), /two numbers/); assert.throws(() => NM('(0,1)', { op: 'lagrange' }), /at least 2/);
+  assert.equal(NM('1 1; 2 4', { op: 'lagrange' }).main.text, '3·x − 2');
+});
+test('cubic splines: continuity of S, S′ and S″ and the three end conditions', () => {
+  for (const bc of ['natural', 'clamped', 'notaknot']) { const r = NM('(0,0),(1,2),(2,1),(3,3),(4,0)', { op: 'spline', bc, d0: '1', d1: '-1' }); assert.ok(r.meta.some(m => new RegExp(`satisfy the ${bc === 'notaknot' ? 'not-a-knot' : bc} end conditions`).test(m)), bc); assert.equal(r.plot.generic.traces.length, 3); }
+  const nat = NM('(0,0),(1,2),(2,1),(3,3),(4,0)', { op: 'spline', at: '2.5' }); assert.match(txt(nat), /S1\(x\) on \[0, 1\]: 0 \+ 87\/28/); assert.match(txt(nat), /S\(5\/2\) = 2\.06696/);
+  assert.throws(() => NM('(0,0),(1,1)', { op: 'spline' }), /at least 3/); assert.throws(() => NM('(0,0),(1,1),(2,0)', { op: 'spline', bc: 'notaknot' }), /at least 4/);
+});
+test('Chebyshev nodes beat equally spaced nodes on the Runge function', () => {
+  const r = NM('1/(1+25*x^2)', { op: 'chebyshev', lo: '-1', hi: '1', n: '14' }); const eE = +/equally spaced ([\d.e+-]+)/.exec(r.main.text)[1], eC = +/Chebyshev ([\d.e+-]+)/.exec(r.main.text)[1]; assert.ok(eE > 1 && eC < 0.1); assert.ok(r.warnings.some(w => /Runge/.test(w)));
+  const ok = NM('exp(x)', { op: 'chebyshev', lo: '0', hi: '2', n: '6' }); assert.ok(ok.warnings.length === 0 && ok.meta.some(m => /Verified/.test(m)));
+  assert.throws(() => NM('1/x', { op: 'chebyshev', lo: '-1', hi: '1', n: '6' }), /not defined|failed/); assert.throws(() => NM('x', { op: 'chebyshev', lo: '2', hi: '1' }), /larger/);
+});
+test('quadrature comparison: textbook orders, Gauss–Legendre accuracy and rough integrands', () => {
+  const r = NM('sin(x)', { op: 'quadrature', lo: '0', hi: 'pi' }); assert.equal(r.main.text, '2'); const t = txt(r); assert.match(t, /Trapezoid rule error:[^|]*observed order ≈ 2\.0/); assert.match(t, /Simpson rule error:[^|]*observed order ≈ 4\.0/); assert.ok(r.meta.some(m => /two different composite Gauss/.test(m)));
+  const sq = NM('sqrt(x)', { op: 'quadrature', lo: '0', hi: '1' }); assert.ok(sq.warnings.length && Math.abs(+sq.main.text - 2 / 3) < 1e-6); assert.throws(() => NM('1/x', { op: 'quadrature', lo: '0', hi: '1' }), /trustworthy|finite/);
+  assert.throws(() => NM('x', { op: 'quadrature', lo: '2', hi: '1' }), /larger/);
+});
+test('numerical differentiation: exact reference, best step sizes, second derivatives', () => {
+  const r = NM('sin(x)', { op: 'diff', dat: '1', dord: '1' }); assert.match(r.main.text, /^0\.5403023058/); const central = /Central difference \(order 2\): best h = (1e-\d+)/.exec(txt(r)); assert.ok(central && /1e-[4-6]/.test(central[1])); assert.equal(r.warnings.length, 0);
+  const s2 = NM('exp(x)', { op: 'diff', dat: '0.5', dord: '2' }); assert.match(s2.main.text, /^1\.6487212707/); assert.equal(r.plot.generic.traces.length, 5);
+  assert.throws(() => NM('log(x)', { op: 'diff', dat: '-1' }), /not defined/); assert.throws(() => NM('x+y', { op: 'diff' }), /only the variable x/);
+});

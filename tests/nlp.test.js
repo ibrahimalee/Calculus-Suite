@@ -1,6 +1,11 @@
 const test = require('node:test'), assert = require('node:assert');
 const NL = require('../js/nlp.js');
 const cases = [
+  ['natural cubic spline through (0,0), (1,2), (2,1), (3,3)', { mode: 'numerical', opts: { op: 'spline', bc: 'natural' } }],
+  ['interpolating polynomial through (0,1), (1,3), (2,2)', { mode: 'numerical', fn: '(0,1), (1,3), (2,2)', opts: { op: 'lagrange' } }],
+  ['runge phenomenon for 1/(1+25x^2) degree 14', { mode: 'numerical', opts: { op: 'chebyshev', n: '14' } }],
+  ['compare numerical integration rules for sin(x) from 0 to pi', { mode: 'numerical', fn: 'sin(x)', opts: { op: 'quadrature', lo: '0', hi: 'pi' } }],
+  ['numerical derivative of sin(x) at 1', { mode: 'numerical', fn: 'sin(x)', opts: { op: 'diff', dat: '1' } }],
   ['z transform of 0.5^n', { mode: 'laplace', fn: '0.5^n', opts: { op: 'ztrans' } }],
   ['inverse z transform of z/(z-0.5)', { mode: 'laplace', fn: 'z/(z-0.5)', opts: { op: 'iztrans' } }],
   ['solve the difference equation y(n) = 0.9*y(n-1) + x(n) with input step', { mode: 'laplace', opts: { op: 'zdiff', xin: 'step' } }],
