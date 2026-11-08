@@ -230,3 +230,61 @@ test('gradient descent and Newton find critical points, flag divergence and sadd
   const flat = D('x^4 + y^4', { method: 'newton', start: '1, 1' }); assert.ok(flat.warnings.some(w => /very flat/.test(w)));
   assert.throws(() => D('x^2 + y^2 + z', {}), /exactly two variables/); assert.throws(() => D('x^2 + y^2', { start: '1' }), /two numbers/); assert.throws(() => D('x^2 + y^2', { lr: '-1' }), /positive/);
 });
+
+// ---------- batch A: Z-transforms, difference equations, Padé, conformal maps, numerical methods lab ----------
+const txt = r => r.items.map(i => i.label + ' ' + i.text).join(' | ');
+const LZ = (src, opt) => E.run.laplace(src, opt);
+test('Z-transform: standard pairs, region of convergence and the built-in direct-summation check', () => {
+  assert.strictEqual(LZ('0.5^n', { op: 'ztrans' }).main.text, 'z / (z − 1/2)');
+  assert.strictEqual(LZ('1', { op: 'ztrans' }).main.text, 'z / (z − 1)');
+  assert.strictEqual(LZ('n', { op: 'ztrans' }).main.text, 'z / (z^2 − 2·z + 1)');
+  assert.strictEqual(LZ('(-1)^n', { op: 'ztrans' }).main.text, 'z / (z + 1)');
+  assert.strictEqual(LZ('n*2^n', { op: 'ztrans' }).main.text, '2·z / (z^2 − 4·z + 4)');
+  const r = LZ('0.8^n*cos(pi*n/3)', { op: 'ztrans' }); assert.match(r.main.text, /z\^2 − \(2\/5\)·z/); assert.ok(r.meta.some(m => /^Verified: summing/.test(m)));
+  assert.match(txt(LZ('2^n', { op: 'ztrans' })), /excludes the unit circle/); assert.match(txt(LZ('0.5^n', { op: 'ztrans' })), /includes the unit circle/);
+  assert.throws(() => LZ('sqrt(n)', { op: 'ztrans' }), /Z-transform table/); assert.throws(() => LZ('0^n', { op: 'ztrans' }), /nonzero/); assert.throws(() => LZ('x', { op: 'ztrans' }), /in terms of n/);
+});
+test('inverse Z-transform: partial fractions, repeated and complex poles, deltas, and the long-division check', () => {
+  assert.match(LZ('z/(z-0.5)', { op: 'iztrans' }).main.text, /^\(1\/2\)\^n/);
+  assert.match(LZ('z/((z-1)*(z-0.5))', { op: 'iztrans' }).main.text, /^2 − 2·\(1\/2\)\^n/);
+  assert.match(LZ('z/(z-1)^2', { op: 'iztrans' }).main.text, /^n\s/);
+  assert.match(LZ('z/(z^2-z+0.5)', { op: 'iztrans' }).main.text, /cos\(π\/4·n − π\/2\)/);
+  assert.match(LZ('1/(z-0.5)', { op: 'iztrans' }).main.text, /δ\[n\]/); assert.match(LZ('(z+1)/z^2', { op: 'iztrans' }).main.text, /^δ\[n−1\] \+ δ\[n−2\]/);
+  assert.match(LZ('1/(1-0.5*z^-1)', { op: 'iztrans' }).main.text, /^\(1\/2\)\^n/); assert.ok(LZ('z/(z-0.5)', { op: 'iztrans' }).meta.some(m => /long division/.test(m)));
+  assert.throws(() => LZ('z^3/(z-1)', { op: 'iztrans' }), /numerator degree/); assert.throws(() => LZ('sin(z)', { op: 'iztrans' }), /rational/);
+  // round trip: Z then inverse gives back the original sequence
+  const X = LZ('3*0.5^n - 2*(-0.25)^n + n', { op: 'ztrans' }).main.text.replace(/·/g, '*').replace(/−/g, '-'); const back = LZ(X, { op: 'iztrans' }); assert.ok(back.meta.some(m => /Verified/.test(m)));
+});
+test('difference equations: response, transfer function, stability, resonance, initial values', () => {
+  const a = LZ('y(n) - 0.9*y(n-1) = x(n)', { op: 'zdiff', xin: 'step' }); assert.match(a.main.text, /^10 − 9·\(9\/10\)\^n/); assert.match(txt(a), /BIBO stable/); assert.match(txt(a), /z \/ \(z − 9\/10\)/);
+  const fib = LZ('y(n) = y(n-1) + y(n-2)', { op: 'zdiff', xin: 'impulse', init: '1, 0' }); assert.match(fib.main.text, /1\.618034\^n/); assert.match(txt(fib), /unstable/); assert.match(txt(fib), /1, 2, 3, 5, 8/);
+  const res = LZ('y(n) = 0.5*y(n-1) + x(n)', { op: 'zdiff', xin: '0.5^n' }); assert.ok(res.meta.some(m => /Resonance/.test(m))); assert.match(res.main.text, /·n/);
+  assert.match(LZ('y[n] = x[n] + 2*x[n-1] + x[n-2]', { op: 'zdiff', xin: 'impulse' }).main.text, /δ\[n\]/);
+  assert.throws(() => LZ('y(n) = y(n+1)', { op: 'zdiff' }), /delays only/); assert.throws(() => LZ('y(n) = y(n-1)^2', { op: 'zdiff' }), /linear/); assert.throws(() => LZ('y(n) = 0.5*y(n-1) + 3', { op: 'zdiff' }), /constant term/);
+  assert.throws(() => LZ('y(n) = y(n-1) + x(n)', { op: 'zdiff', init: '1, 2' }), /order 1/);
+});
+const PD = (f, o) => E.run.series(f, Object.assign({ task: 'pade' }, o));
+test('Padé approximants: known results, the singular case and the verification note', () => {
+  assert.match(PD('exp(x)', { pm: '2', pn: '2' }).main.text, /^\(\(1\/12\)·x\^2 \+ \(1\/2\)·x \+ 1\) \/ \(\(1\/12\)·x\^2 − \(1\/2\)·x \+ 1\)$/);
+  assert.match(PD('log(1+x)', { pm: '2', pn: '2' }).main.text, /^\(\(1\/2\)·x\^2 \+ x\) \/ \(\(1\/6\)·x\^2 \+ x \+ 1\)$/);
+  assert.match(PD('tan(x)', { pm: '3', pn: '2' }).main.text, /\(−\(1\/15\)·x\^3 \+ x\) \/ \(−\(2\/5\)·x\^2 \+ 1\)/);
+  assert.match(PD('sqrt(x)', { point: '1', pm: '2', pn: '2' }).main.text, /t\^2/); assert.ok(PD('exp(x)', { pm: '1', pn: '1' }).meta.some(m => /^Verified/.test(m)));
+  const tan = PD('tan(x)', { pm: '3', pn: '2', prange: '1.5' }); assert.equal(tan.plot.generic.traces.length, 3);
+  assert.throws(() => PD('cos(x)', { pm: '1', pn: '1' }), /does not exist|singular/); assert.throws(() => PD('exp(x)', { pm: '0', pn: '0' }), /at least 1/); assert.throws(() => PD('x+y', {}), /single variable/);
+  assert.equal(PD('1/(1+x^2)', { pm: '2', pn: '2' }).main.text, '1 / (x^2 + 1)');
+});
+test('conformal maps: derivative, critical points, angle check and Möbius transformations', () => {
+  const m = E.run.complex('z^2', { op: 'map', region: 'polar', extent: '1.5' }); assert.match(txt(m), /f′\(z\) = 2 \* z/); assert.match(txt(m), /Not conformal where f′\(z\) = 0: 0/); assert.ok(m.meta.some(x => /perpendicular/.test(x))); assert.equal(m.plot.generic.traces.length, 2);
+  assert.match(txt(E.run.complex('(z-1)/(z+1)', { op: 'map' })), /nowhere/); assert.match(txt(E.run.complex('sin(z)', { op: 'map', extent: '3' })), /π\/2/);
+  assert.match(txt(E.run.complex('z^3-3*z', { op: 'map', extent: '2' })), /1,\s+-1/);
+  const mo = E.run.complex('0 -> -1 ; 1 -> 0 ; inf -> 1', { op: 'mobius' }); assert.match(mo.main.text, /^\(z − 1\) \/ \(z \+ 1\)$/); assert.match(txt(mo), /elliptic/); assert.match(txt(mo), /i,\s+−i/);
+  const hy = E.run.complex('1 -> 1 ; 2 -> 2 ; 3 -> 4', { op: 'mobius' }); assert.match(txt(hy), /hyperbolic/); assert.match(txt(hy), /Fixed points: 1,\s+2/); assert.ok(hy.meta.some(x => /cross-ratio/.test(x)));
+  assert.throws(() => E.run.complex('0 -> 1 ; 0 -> 2 ; 1 -> 3', { op: 'mobius' }), /distinct/); assert.throws(() => E.run.complex('0 -> 1 ; 1 -> 2', { op: 'mobius' }), /three pairs/); assert.throws(() => E.run.complex('z^2+w', { op: 'map' }), /single complex variable/);
+});
+test('numerical methods lab: observed orders match theory and stiffness is exposed', () => {
+  const r = E.run.ode('y - x^2 + 1', { odeType: 'methods', x0: '0', xEnd: '2', y0: '0.5' }); assert.ok(Math.abs(+r.main.text - 5.30547195) < 1e-7);
+  const ord = name => +new RegExp(`${name}:[^]*?observed order ≈ ([\\d.]+)`).exec(txt(r))[1]; assert.ok(Math.abs(ord('Euler') - 1) < 0.2 && Math.abs(ord('Midpoint') - 2) < 0.2 && Math.abs(ord('Runge–Kutta 4') - 4) < 0.3 && Math.abs(ord('Kutta \\(3rd order\\)') - 3) < 0.3);
+  assert.ok(r.meta.some(m => /Verified/.test(m))); assert.equal(r.plot.generic.traces.length, 7);
+  const stiff = E.run.ode('-15*y', { odeType: 'methods', x0: '0', xEnd: '1', y0: '1' }); assert.match(txt(stiff), /Euler: error at x = 1:\s+5\.7e\+1/); assert.ok(stiff.warnings.length > 0);
+  assert.throws(() => E.run.ode('y^2', { odeType: 'methods', x0: '0', xEnd: '5', y0: '1' }), /blows up|trustworthy/); assert.throws(() => E.run.ode('x+t', { odeType: 'methods' }), /only x and y/); assert.throws(() => E.run.ode('x', { odeType: 'methods', x0: '3', xEnd: '1' }), /larger end/);
+});

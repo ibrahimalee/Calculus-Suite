@@ -69,6 +69,8 @@
         }
 
         // ---- ODEs ----------------------------------------------------------
+        const cmpM = s.match(/^compare (?:the )?(?:numerical |ode )?(?:methods|solvers)(?: for| on| of)? (?:y'? ?= ?|dy\/dx ?= ?)(.+?)(?: with y\(0\) ?= ?(-?[\d.]+))?(?: (?:from 0 )?(?:to|until|on \[0,) ?([\d.]+)\]?)?$/);
+        if (cmpM) return { mode: 'ode', fn: mathify(cmpM[1]), opts: { odeType: 'methods', x0: '0', xEnd: cmpM[3] || '2', y0: cmpM[2] || '1' }, say: 'Numerical methods lab' };
         let m = s.match(/(?:solve |ode |differential equation )?(?:the )?(?:dy\/dx|y')\s*=\s*(.+)$/);
         if (m) return { mode: 'ode', fn: mathify(m[1]), opts: { odeType: 'first', x0: '0', xEnd: '10', y0: '1' }, say: 'First-order ODE (y(0)=1 assumed)' };
         m = s.match(/(?:solve )?(?:the )?(?:d2y\/dx2|y'')\s*=\s*(.+)$/);
@@ -159,6 +161,20 @@
         if (m) return { mode: 'ode', fn: `${m[1]} ${m[2]} ; ${m[3]} ${m[4]}`, opts: { odeType: 'linear2', range: '4' }, say: 'Phase portrait of a linear system' };
         m = s.match(/^(?:the )?generating function (?:of|for) (?:the )?(?:recurrence |sequence )?(a\s*\(\s*n\s*\)\s*=\s*[^,;]+?)(?:\s*(?:,|;|with|where)\s*(?:a\s*\(\s*0\s*\)\s*=\s*[^,;]+(?:\s*,\s*a\s*\(\s*1\s*\)\s*=\s*[^,;]+)*))?$/);
         if (m) { const init = [...s.matchAll(/a\s*\(\s*(\d)\s*\)\s*=\s*(-?[\d.]+)/g)].sort((a, b) => a[1] - b[1]).map(x => x[2]); return { mode: 'algebra', fn: m[1].replace(/\s+/g, ''), opts: { op: 'gf', init: init.join(', ') || '0, 1' }, say: 'Generating function' }; }
+        m = s.match(/^(?:the )?(?:inverse z[- ]?transform|z[- ]?transform inverse|inverse z)(?: of| for)? (.+)$/);
+        if (m) return { mode: 'laplace', fn: mathify(m[1]).replace(/\s+/g, ' ').trim(), opts: { op: 'iztrans' }, say: 'Inverse Z-transform' };
+        m = s.match(/^(?:the )?z[- ]?transform (?:of |for )?(?:the )?(?:sequence |signal )?(?:x\s*[(\[]n[)\]]\s*=\s*)?(.+)$/);
+        if (m) return { mode: 'laplace', fn: mathify(m[1]).replace(/\s+/g, ' ').trim(), opts: { op: 'ztrans' }, say: 'Z-transform' };
+        m = s.match(/^(?:solve |analy[sz]e |find the response of )?(?:the )?(?:difference equation|recursion|digital filter|filter) (y\s*[(\[]\s*n\s*[)\]].+?)(?:\s+(?:with|and|for) (?:the )?(?:input|x ?=)\s*(impulse|step|[^,;]+?))?(?:\s+(?:with|and|starting from|initial(?: values?)?)\s+(y\s*[(\[]\s*-\s*1\s*[)\]]\s*=\s*[^;]+))?$/);
+        if (m) { const ini = m[3] ? [...m[3].matchAll(/y\s*[(\[]\s*-\s*\d\s*[)\]]\s*=\s*(-?[\d.]+)/g)].map(x => x[1]).join(', ') : ''; return { mode: 'laplace', fn: m[1].replace(/\s+/g, ' ').trim(), opts: { op: 'zdiff', xin: (m[2] || 'step').trim(), init: ini }, say: 'Difference equation' }; }
+        m = s.match(/^(?:the )?pad[eé](?: approximants?| approximations?)?(?: of order| \[| of)?\s*\[?\s*(\d+)\s*[\/,]\s*(\d+)\s*\]?\s*(?:approximant |approximation )?(?:of|for) (.+?)(?: (?:about|around|at) (?:x ?= ?)?(-?[\d.]+))?$/);
+        if (m) return { mode: 'series', fn: mathify(m[3]), opts: { task: 'pade', pm: m[1], pn: m[2], point: m[4] || '0', prange: '3' }, say: `Padé approximant [${m[1]}/${m[2]}]` };
+        m = s.match(/^(?:the )?pad[eé](?: approximants?| approximations?)? (?:of|for) (.+?)(?: (?:about|around|at) (?:x ?= ?)?(-?[\d.]+))?$/);
+        if (m) return { mode: 'series', fn: mathify(m[1]), opts: { task: 'pade', pm: '2', pn: '2', point: m[2] || '0', prange: '3' }, say: 'Padé approximant [2/2]' };
+        m = s.match(/^(?:the )?m[oö]bius (?:transformation|map)(?: through| sending| taking| mapping| with)? (.+->.+)$/);
+        if (m) return { mode: 'complex', fn: m[1].replace(/\s*,\s*(?=[^,]*->)/g, ' ; ').replace(/→/g, '->').trim(), opts: { op: 'mobius', region: 'grid', extent: '2' }, say: 'Möbius transformation' };
+        m = s.match(/^(?:the )?(?:conformal map|conformal mapping|image of (?:a |the )?(?:square |polar )?grid under)(?: of| by| given by)? (?:w ?= ?|f\(z\) ?= ?)?(.+)$/);
+        if (m) return { mode: 'complex', fn: mathify(m[1]), opts: { op: 'map', region: /polar/.test(s) ? 'polar' : 'grid', extent: '2' }, say: 'Conformal map' };
         m = s.match(/^(?:run |do )?(?:a )?mann[- ]?whitney(?: u)?(?: test)?(?: (?:of|on|for))? ([\d.,;\s-]+)$/);
         if (m) return { mode: 'stats', fn: m[1].trim(), opts: { op: 'mannwhitney', alpha: '0.05' }, say: 'Mann–Whitney U test' };
         m = s.match(/^(?:run |do )?(?:a )?(?:one[- ]?way )?anova(?: test)?(?: (?:of|on|for))? ([\d.,;\s-]+)$/);

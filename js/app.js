@@ -68,8 +68,12 @@
             label: 'Taylor series', icon: 'Σ',
             input: () => ({ label: 'f(x)', placeholder: 'e.g. sin(x)', hint: 'Taylor polynomial about a point (Maclaurin series when a = 0).' }),
             fields: [
+                { key: 'task', label: 'Approximation', type: 'select', def: 'taylor', options: [['taylor', 'Taylor polynomial'], ['pade', 'Padé approximant (rational function)']] },
                 { key: 'point', label: 'Expansion point a', type: 'text', def: '0', placeholder: '0' },
-                { key: 'terms', label: 'Degree n (1–20)', type: 'number', def: '5', min: 1, max: 20 },
+                { key: 'terms', label: 'Degree n (1–20)', type: 'number', def: '5', min: 1, max: 20, show: v => v.task !== 'pade' },
+                { key: 'pm', label: 'Numerator degree L', type: 'number', def: '2', min: 0, max: 10, show: v => v.task === 'pade' },
+                { key: 'pn', label: 'Denominator degree M', type: 'number', def: '2', min: 0, max: 10, show: v => v.task === 'pade' },
+                { key: 'prange', label: 'Plot half-width', type: 'text', def: '3', show: v => v.task === 'pade' },
                 { key: 'variable', label: 'Variable (blank = auto)', type: 'text', def: '', placeholder: 'x' }
             ],
             examples: [
@@ -77,7 +81,11 @@
                 { label: 'eˣ about x = 1', fn: 'e^x', opts: { point: '1', terms: '5' } },
                 { label: '1/(1−x) (geometric series)', fn: '1/(1-x)', opts: { point: '0', terms: '6' } },
                 { label: 'ln(x) about x = 1', fn: 'log(x)', opts: { point: '1', terms: '6' } },
-                { label: 'cos(x) about π/2', fn: 'cos(x)', opts: { point: 'pi/2', terms: '5' } }
+                { label: 'cos(x) about π/2', fn: 'cos(x)', opts: { point: 'pi/2', terms: '5' } },
+                { label: 'Padé [2/2] of eˣ', fn: 'exp(x)', opts: { task: 'pade', point: '0', pm: '2', pn: '2', prange: '5' } },
+                { label: 'Padé [3/2] of tan x (beats the Taylor polynomial)', fn: 'tan(x)', opts: { task: 'pade', point: '0', pm: '3', pn: '2', prange: '1.5' } },
+                { label: 'Padé [2/2] of ln(1+x) out to x = 4', fn: 'log(1+x)', opts: { task: 'pade', point: '0', pm: '2', pn: '2', prange: '4' } },
+                { label: 'Padé [2/2] of √x about x = 1', fn: 'sqrt(x)', opts: { task: 'pade', point: '1', pm: '2', pn: '2', prange: '3' } }
             ]
         },
         limit: {
@@ -128,10 +136,11 @@
                 linear2: { label: 'Matrix A  (rows separated by ;)', placeholder: 'e.g. 1 2 ; 3 4     or     0 1 ; -1 0', hint: 'Classifies the equilibrium (node, saddle, spiral, centre), gives eigenvalues and eigenvectors, and draws the phase portrait.' },
                 heat: { label: 'Initial temperature u(x, 0)', placeholder: 'e.g. sin(x)   or   x*(pi-x)', hint: 'Heat equation uₜ = α·uₓₓ on [0, L] with both ends held at 0. The profile must be 0 at both ends.' },
                 wave: { label: 'Initial shape u(x, 0)', placeholder: 'e.g. sin(x)   or   x*(pi-x)', hint: 'Wave equation uₜₜ = c²·uₓₓ on [0, L] with both ends fixed at 0 (a plucked string).' },
+                methods: { label: "y′ = f(x, y)", placeholder: 'e.g. y - x^2 + 1', hint: 'Compares Euler, midpoint, Heun, Kutta, Runge–Kutta 4, Dormand–Prince and backward Euler: error against step size, and the order of accuracy each really achieves.' },
                 system: { label: 'System  x′, y′, (z′) = …  (separate with ;)', placeholder: 'e.g. y ; -x      or      x*(1-0.5*y) ; y*(0.5*x-1)', hint: 'State variables are x, y, z and time is t.' }
             }[v.odeType || 'first']),
             fields: [
-                { key: 'odeType', label: 'Equation type', type: 'select', def: 'first', options: [['first', 'First order  y′ = f(x, y)'], ['second', 'Second order  y″ = f(x, y, y′)'], ['system', 'System of ODEs (2–3 equations)'], ['heat', 'Heat equation  uₜ = α·uₓₓ  (PDE)'], ['wave', 'Wave equation  uₜₜ = c²·uₓₓ  (PDE)'], ['linear2', 'Phase portrait of a 2×2 linear system  x′ = Ax'], ['equilibria', 'Equilibria & stability of a nonlinear 2-D system']] },
+                { key: 'odeType', label: 'Equation type', type: 'select', def: 'first', options: [['first', 'First order  y′ = f(x, y)'], ['second', 'Second order  y″ = f(x, y, y′)'], ['system', 'System of ODEs (2–3 equations)'], ['heat', 'Heat equation  uₜ = α·uₓₓ  (PDE)'], ['wave', 'Wave equation  uₜₜ = c²·uₓₓ  (PDE)'], ['linear2', 'Phase portrait of a 2×2 linear system  x′ = Ax'], ['equilibria', 'Equilibria & stability of a nonlinear 2-D system'], ['methods', 'Numerical methods lab  (Euler … RK4: error and order)']] },
                 { key: 'x0', label: 'Start x₀ (or t₀)', type: 'text', def: '0', show: v => v.odeType !== 'heat' && v.odeType !== 'wave' && v.odeType !== 'linear2' && v.odeType !== 'equilibria' },
                 { key: 'xEnd', label: 'End', type: 'text', def: '10', show: v => v.odeType !== 'heat' && v.odeType !== 'wave' && v.odeType !== 'linear2' && v.odeType !== 'equilibria' },
                 { key: 'range', label: 'Plot window half-width', type: 'text', def: '4', show: v => v.odeType === 'linear2' || v.odeType === 'equilibria' },
@@ -140,7 +149,7 @@
                 { key: 'pdeT', label: 'Final time T', type: 'text', def: '1', show: v => v.odeType === 'heat' || v.odeType === 'wave' },
                 { key: 'pdeK', label: 'Diffusivity α (heat) or wave speed c', type: 'text', def: '1', show: v => v.odeType === 'heat' || v.odeType === 'wave' },
                 { key: 'pdeV', label: 'Initial velocity uₜ(x, 0)  (wave only)', type: 'text', def: '0', show: v => v.odeType === 'wave' },
-                { key: 'y0', label: 'Initial y(x₀)', type: 'text', def: '1', show: v => v.odeType === 'first' || v.odeType === 'second' },
+                { key: 'y0', label: 'Initial y(x₀)', type: 'text', def: '1', show: v => v.odeType === 'first' || v.odeType === 'second' || v.odeType === 'methods' },
                 { key: 'v0', label: "Initial y′(x₀)", type: 'text', def: '0', show: v => v.odeType === 'second' },
                 { key: 'series', label: 'Solution method', type: 'select', def: 'no', options: [['no', 'Closed form / numerical (RK45)'], ['yes', 'Power series about x₀']], show: v => v.odeType === 'first' || v.odeType === 'second' },
                 { key: 'terms', label: 'Series degree (2–14)', type: 'number', def: '8', min: 2, max: 14, show: v => (v.odeType === 'first' || v.odeType === 'second') && v.series === 'yes' },
@@ -173,7 +182,10 @@
                 { label: 'Heat: insulated rod, u(x,0) = x on [0,1]', fn: 'x', opts: { odeType: 'heat', pdeBC: 'neumann', pdeL: '1', pdeT: '0.3', pdeK: '1' } },
                 { label: 'Wave: free-end string, 1 + cos 2x', fn: '1+cos(2*x)', opts: { odeType: 'wave', pdeBC: 'neumann', pdeL: 'pi', pdeT: '3', pdeK: '1', pdeV: '0' } },
                 { label: 'Wave: standing wave sin x', fn: 'sin(x)', opts: { odeType: 'wave', pdeL: 'pi', pdeT: '6', pdeK: '1', pdeV: '0' } },
-                { label: 'Predator–prey (Lotka–Volterra)', fn: 'x*(1-0.5*y) ; y*(0.5*x-1)', opts: { odeType: 'system', x0: '0', xEnd: '30', initial: '3, 1' } }
+                { label: 'Predator–prey (Lotka–Volterra)', fn: 'x*(1-0.5*y) ; y*(0.5*x-1)', opts: { odeType: 'system', x0: '0', xEnd: '30', initial: '3, 1' } },
+                { label: 'Methods lab: y′ = y − x² + 1, y(0) = 0.5', fn: 'y - x^2 + 1', opts: { odeType: 'methods', x0: '0', xEnd: '2', y0: '0.5' } },
+                { label: 'Methods lab: y′ = x·y (growth)', fn: 'x*y', opts: { odeType: 'methods', x0: '0', xEnd: '2', y0: '1' } },
+                { label: 'Methods lab: a stiff problem y′ = −15y', fn: '-15*y', opts: { odeType: 'methods', x0: '0', xEnd: '1', y0: '1' } }
             ]
         },
         multivariable: {
@@ -397,9 +409,11 @@
 
     MODES.laplace = {
         label: 'Transforms', icon: 'ℒ',
-        input: v => ({ laplace: { label: 'f(t)', placeholder: 'e.g. t^2*exp(-3t)*cos(2t)', hint: 'Laplace transform of sums and products of polynomials, exponentials, sin, cos, sinh and cosh. Piecewise functions work too: write each piece as  expression for condition,  separated by ;' }, inverse: { label: 'F(s)', placeholder: 'e.g. (s+3)/(s^2+2s+5)', hint: 'A proper rational function of s: partial fractions with complex and repeated poles.' }, fourier: { label: 'f(t)', placeholder: 'e.g. exp(-abs(t))', hint: 'Fourier transform F(ω) = ∫ f(t)e^(−iωt) dt of an absolutely integrable function.' }, ode: { label: 'Forcing function f(t)', placeholder: 'e.g. exp(-t)   (0 for a homogeneous equation)', hint: 'Solves y″ + a·y′ + b·y = f(t) (or y′ + a·y = f(t)) with initial values, using the Laplace transform.' } }[v.op || 'laplace']),
+        input: v => ({ laplace: { label: 'f(t)', placeholder: 'e.g. t^2*exp(-3t)*cos(2t)', hint: 'Laplace transform of sums and products of polynomials, exponentials, sin, cos, sinh and cosh. Piecewise functions work too: write each piece as  expression for condition,  separated by ;' }, inverse: { label: 'F(s)', placeholder: 'e.g. (s+3)/(s^2+2s+5)', hint: 'A proper rational function of s: partial fractions with complex and repeated poles.' }, fourier: { label: 'f(t)', placeholder: 'e.g. exp(-abs(t))', hint: 'Fourier transform F(ω) = ∫ f(t)e^(−iωt) dt of an absolutely integrable function.' }, ztrans: { label: 'Sequence x[n]  (n ≥ 0)', placeholder: 'e.g. 0.5^n*cos(pi*n/3) + 2', hint: 'Z-transform of sums and products of polynomials in n, powers aⁿ (a a constant, even negative), sin and cos of multiples of n. Gives X(z), the region of convergence, poles and zeros.' }, iztrans: { label: 'X(z)', placeholder: 'e.g. z/((z-1)*(z-0.5))   or   1/(1-0.5*z^-1)', hint: 'A rational function of z (numerator degree at most the denominator degree). Gives the causal sequence x[n] by partial fractions.' }, zdiff: { label: 'Difference equation', placeholder: 'e.g. y(n) = 0.9*y(n-1) + x(n)', hint: 'Linear, constant coefficients, written with delays: y(n-1), y(n-2), x(n-1)… Choose the input signal and initial values below.' }, ode: { label: 'Forcing function f(t)', placeholder: 'e.g. exp(-t)   (0 for a homogeneous equation)', hint: 'Solves y″ + a·y′ + b·y = f(t) (or y′ + a·y = f(t)) with initial values, using the Laplace transform.' } }[v.op || 'laplace']),
         fields: [
-            { key: 'op', label: 'Transform', type: 'select', def: 'laplace', options: [['laplace', 'Laplace  ℒ{f(t)}  (u(t−a) and dirac(t−a) allowed)'], ['inverse', 'Inverse Laplace  ℒ⁻¹{F(s)}'], ['fourier', 'Fourier transform'], ['ode', 'Solve an ODE with Laplace']] },
+            { key: 'op', label: 'Transform', type: 'select', def: 'laplace', options: [['laplace', 'Laplace  ℒ{f(t)}  (u(t−a) and dirac(t−a) allowed)'], ['inverse', 'Inverse Laplace  ℒ⁻¹{F(s)}'], ['fourier', 'Fourier transform'], ['ode', 'Solve an ODE with Laplace'], ['ztrans', 'Z-transform  Z{x[n]}  (sequences)'], ['iztrans', 'Inverse Z-transform  Z⁻¹{X(z)}'], ['zdiff', 'Difference equation (Z-transform method)']] },
+            { key: 'xin', label: 'Input x[n]  (impulse, step, or a formula in n)', type: 'text', def: 'step', show: v => v.op === 'zdiff', placeholder: 'step' },
+            { key: 'init', label: 'Initial values y(−1), y(−2), … (blank = at rest)', type: 'text', def: '', show: v => v.op === 'zdiff', placeholder: 'e.g. 1, 0' },
             { key: 'order', label: 'Order of the ODE', type: 'select', def: '2', options: [['2', 'Second order  y″ + a y′ + b y = f'], ['1', 'First order  y′ + a y = f']], show: v => v.op === 'ode' },
             { key: 'a', label: 'a (coefficient of y′)', type: 'text', def: '3', show: v => v.op === 'ode' },
             { key: 'b', label: 'b (coefficient of y)', type: 'text', def: '2', show: v => v.op === 'ode' && v.order !== '1' },
@@ -426,7 +440,16 @@
             { label: 'Piecewise Fourier: one-sided decay', fn: 'e^(-2t) for t > 0', opts: { op: 'fourier' } },
             { label: 'ODE: y″ + 3y′ + 2y = 0, y(0)=1', fn: '0', opts: { op: 'ode', order: '2', a: '3', b: '2', y0: '1', v0: '0' } },
             { label: 'ODE: resonance y″ + 4y = cos 2t', fn: 'cos(2t)', opts: { op: 'ode', order: '2', a: '0', b: '4', y0: '0', v0: '0' } },
-            { label: 'ODE: y′ + 2y = 1, y(0)=3', fn: '1', opts: { op: 'ode', order: '1', a: '2', b: '0', y0: '3', v0: '0' } }
+            { label: 'ODE: y′ + 2y = 1, y(0)=3', fn: '1', opts: { op: 'ode', order: '1', a: '2', b: '0', y0: '3', v0: '0' } },
+            { label: 'Z{0.5ⁿ}', fn: '0.5^n', opts: { op: 'ztrans' } },
+            { label: 'Z{n·2ⁿ}', fn: 'n*2^n', opts: { op: 'ztrans' } },
+            { label: 'Z{0.8ⁿ cos(πn/3)}', fn: '0.8^n*cos(pi*n/3)', opts: { op: 'ztrans' } },
+            { label: 'Z⁻¹{z / ((z−1)(z−½))}', fn: 'z/((z-1)*(z-0.5))', opts: { op: 'iztrans' } },
+            { label: 'Z⁻¹: complex poles z/(z²−z+½)', fn: 'z/(z^2-z+0.5)', opts: { op: 'iztrans' } },
+            { label: 'Z⁻¹{1/(1 − 0.5z⁻¹)}', fn: '1/(1-0.5*z^-1)', opts: { op: 'iztrans' } },
+            { label: 'Difference eq: y(n) = 0.9y(n−1) + x(n), step input', fn: 'y(n) = 0.9*y(n-1) + x(n)', opts: { op: 'zdiff', xin: 'step', init: '' } },
+            { label: 'Difference eq: Fibonacci y(n) = y(n−1) + y(n−2)', fn: 'y(n) = y(n-1) + y(n-2)', opts: { op: 'zdiff', xin: 'impulse', init: '1, 0' } },
+            { label: 'Difference eq: resonance, input 0.5ⁿ', fn: 'y(n) = 0.5*y(n-1) + x(n)', opts: { op: 'zdiff', xin: '0.5^n', init: '' } }
         ]
     };
     MODES.vector = {
@@ -541,11 +564,13 @@
     };
     MODES.complex = {
         label: 'Complex', icon: 'ℂ',
-        input: v => ({ residue: { label: 'Rational function f(z)', placeholder: 'e.g. 1/(z^2*(z-1))', hint: 'Finds every pole with its order and residue, checked two independent ways.' }, contour: { label: 'Rational function f(z)', placeholder: 'e.g. 1/(z^2+1)', hint: 'The integral around a counter-clockwise circle is 2πi times the sum of the residues inside; checked by integrating directly.' }, realint: { label: 'Rational function f(x)', placeholder: 'e.g. 1/(x^4+1)', hint: 'Needs no poles on the real axis and degree(denominator) ≥ degree(numerator) + 2. Closes the contour in the upper half-plane.' }, domain: { label: 'f(z)', placeholder: 'e.g. (z^2-1)/(z^2+1)', hint: 'Domain colouring shows the argument of f(z) as hue; zeros and poles are marked for rational functions.' }, roots: { label: 'Polynomial p(z)', placeholder: 'e.g. z^4 - 1', hint: 'All complex roots with multiplicity, plotted in the complex plane.' }, arith: { label: 'Complex expression', placeholder: 'e.g. (3+4i)*(1-2i)/(2+i)', hint: 'Use i for the imaginary unit. Gives rectangular and polar form, roots and the Argand diagram.' } }[v.op || 'domain']),
+        input: v => ({ map: { label: 'Analytic function f(z)', placeholder: 'e.g. (z-1)/(z+1)   or   z^2   or   exp(z)', hint: 'Draws the image of a grid under w = f(z). Angles between grid lines are preserved wherever f′(z) ≠ 0 (that is what conformal means), and the tool checks this numerically.' }, mobius: { label: 'Three points  z → w  (separated by ;)', placeholder: 'e.g. 0 -> -1 ; 1 -> 0 ; inf -> 1', hint: 'Finds the unique Möbius transformation (az+b)/(cz+d) through three point pairs. Use inf for ∞ and i for the imaginary unit.' }, residue: { label: 'Rational function f(z)', placeholder: 'e.g. 1/(z^2*(z-1))', hint: 'Finds every pole with its order and residue, checked two independent ways.' }, contour: { label: 'Rational function f(z)', placeholder: 'e.g. 1/(z^2+1)', hint: 'The integral around a counter-clockwise circle is 2πi times the sum of the residues inside; checked by integrating directly.' }, realint: { label: 'Rational function f(x)', placeholder: 'e.g. 1/(x^4+1)', hint: 'Needs no poles on the real axis and degree(denominator) ≥ degree(numerator) + 2. Closes the contour in the upper half-plane.' }, domain: { label: 'f(z)', placeholder: 'e.g. (z^2-1)/(z^2+1)', hint: 'Domain colouring shows the argument of f(z) as hue; zeros and poles are marked for rational functions.' }, roots: { label: 'Polynomial p(z)', placeholder: 'e.g. z^4 - 1', hint: 'All complex roots with multiplicity, plotted in the complex plane.' }, arith: { label: 'Complex expression', placeholder: 'e.g. (3+4i)*(1-2i)/(2+i)', hint: 'Use i for the imaginary unit. Gives rectangular and polar form, roots and the Argand diagram.' } }[v.op || 'domain']),
         fields: [
-            { key: 'op', label: 'Tool', type: 'select', def: 'domain', options: [['domain', 'Domain colouring of f(z)'], ['roots', 'Roots of a polynomial'], ['arith', 'Complex arithmetic & polar form'], ['residue', 'Poles and residues of a rational function'], ['contour', 'Contour integral around a circle (residue theorem)'], ['realint', 'Real integral from −∞ to ∞ by residues']] },
+            { key: 'op', label: 'Tool', type: 'select', def: 'domain', options: [['domain', 'Domain colouring of f(z)'], ['roots', 'Roots of a polynomial'], ['arith', 'Complex arithmetic & polar form'], ['residue', 'Poles and residues of a rational function'], ['contour', 'Contour integral around a circle (residue theorem)'], ['map', 'Conformal map: image of a grid under f(z)'], ['mobius', 'Möbius transformation through three points'], ['realint', 'Real integral from −∞ to ∞ by residues']] },
             { key: 'cc', label: 'Circle centre (a number, or  re, im)', type: 'text', def: '0', placeholder: '0   or   1, 2', show: v => v.op === 'contour' },
             { key: 'rad', label: 'Circle radius', type: 'text', def: '2', placeholder: '2', show: v => v.op === 'contour' },
+            { key: 'region', label: 'Grid', type: 'select', def: 'grid', options: [['grid', 'Square grid  (vertical and horizontal lines)'], ['polar', 'Polar grid  (circles and rays)']], show: v => v.op === 'map' || v.op === 'mobius' },
+            { key: 'extent', label: 'Grid half-width / radius', type: 'text', def: '1.5', show: v => v.op === 'map' || v.op === 'mobius' },
             { key: 'range', label: 'Window half-width', type: 'text', def: '2', show: v => v.op === 'domain' },
             { key: 'nth', label: 'Show n-th roots, n =', type: 'number', def: '3', min: 2, max: 12, show: v => v.op === 'arith' }
         ],
@@ -563,7 +588,13 @@
             { label: 'Domain colouring: eᶻ', fn: 'exp(z)', opts: { op: 'domain', range: '4' } },
             { label: 'Roots of z⁴ − 1', fn: 'z^4-1', opts: { op: 'roots' } },
             { label: 'Roots of z⁵ + 3z + 1', fn: 'z^5+3z+1', opts: { op: 'roots' } },
-            { label: '(3+4i)(1−2i)/(2+i)', fn: '(3+4i)*(1-2i)/(2+i)', opts: { op: 'arith', nth: '3' } }
+            { label: '(3+4i)(1−2i)/(2+i)', fn: '(3+4i)*(1-2i)/(2+i)', opts: { op: 'arith', nth: '3' } },
+            { label: 'Conformal map: (z−1)/(z+1)', fn: '(z-1)/(z+1)', opts: { op: 'map', region: 'grid', extent: '2' } },
+            { label: 'Conformal map: z² (polar grid, fold at 0)', fn: 'z^2', opts: { op: 'map', region: 'polar', extent: '1.5' } },
+            { label: 'Conformal map: eᶻ', fn: 'exp(z)', opts: { op: 'map', region: 'grid', extent: '3' } },
+            { label: 'Conformal map: Joukowski z + 1/z (polar)', fn: 'z+1/z', opts: { op: 'map', region: 'polar', extent: '2' } },
+            { label: 'Möbius: 0→−1, 1→0, ∞→1', fn: '0 -> -1 ; 1 -> 0 ; inf -> 1', opts: { op: 'mobius', region: 'grid', extent: '2' } },
+            { label: 'Möbius: 1→1, 2→2, 3→4 (hyperbolic)', fn: '1 -> 1 ; 2 -> 2 ; 3 -> 4', opts: { op: 'mobius', region: 'polar', extent: '3' } }
         ]
     };
 
@@ -919,7 +950,7 @@
                 preview.innerHTML = `<span class="preview-tex plain">${esc(lines[0] || '')}</span><span class="preview-meta">${lines.length} line${lines.length === 1 ? '' : 's'}</span>`;
                 return true;
             }
-            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur', 'gf', 'lp'].includes(currentValues().op)) || (state.mode === 'applications' && currentValues().op === 'curvature' && src.includes(';')) || (state.mode === 'ode' && ['linear2', 'equilibria'].includes(currentValues().odeType)) || (state.mode === 'laplace' && (/\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src) || /(^|[\s;)])(for|if|when|otherwise)(\s|$|(?=[-+(\d]))/i.test(src)))) {
+            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur', 'gf', 'lp'].includes(currentValues().op)) || (state.mode === 'applications' && currentValues().op === 'curvature' && src.includes(';')) || (state.mode === 'ode' && ['linear2', 'equilibria'].includes(currentValues().odeType)) || (state.mode === 'laplace' && ['ztrans', 'iztrans', 'zdiff'].includes(currentValues().op)) || (state.mode === 'complex' && currentValues().op === 'mobius') || (state.mode === 'laplace' && (/\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src) || /(^|[\s;)])(for|if|when|otherwise)(\s|$|(?=[-+(\d]))/i.test(src)))) {
                 preview.className = 'preview-box valid';
                 const n = src.split(/[\n;]+/).filter(x => x.trim()).length;
                 preview.innerHTML = `<span class="preview-tex plain">${esc(src.length > 160 ? src.slice(0, 160) + '…' : src)}</span><span class="preview-meta">${state.mode === 'stats' ? (src.split(/[\s,;]+/).filter(Boolean).length + ' values') : state.mode === 'vector' ? (n + ' component' + (n === 1 ? '' : 's')) : 'ready'}</span>`;

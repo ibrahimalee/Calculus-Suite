@@ -2299,5 +2299,381 @@
 
 
 
+    // ======================================================================
+    // Z-transforms and difference equations
+    // ======================================================================
+    const NZ = (x, d) => nice(x, d || 8, 1e-9);
+    const polyFmt = (p, v, tex) => {
+        const parts = [];
+        for (let i = p.length - 1; i >= 0; i--) {
+            const c = p[i]; if (Math.abs(c) < 1e-12) continue; const a = NZ(Math.abs(c)); const one = Math.abs(Math.abs(c) - 1) < 1e-12 && i > 0;
+            const cs = tex ? a.tex : a.text; const mono = i === 0 ? '' : i === 1 ? v : tex ? `${v}^{${i}}` : `${v}^${i}`;
+            const body = i === 0 ? cs : one ? mono : ((!tex && /[+\-/]/.test(a.text)) ? `(${cs})` : cs) + (tex ? '' : '·') + mono; parts.push({ neg: c < 0, body });
+        }
+        return parts.length ? parts.map((q, k) => (k ? (q.neg ? (tex ? ' - ' : ' − ') : ' + ') : (q.neg ? (tex ? '-' : '−') : '')) + q.body).join('') : '0';
+    };
+    const wrapT = t => (/[ +−-]/.test(String(t).replace(/^[−-]/, '')) ? `(${t})` : String(t));
+    const eqSide = (co, nm) => { const o = co.map((c, k) => ({ c, k })).filter(x => Math.abs(x.c) > 1e-12).map((x, i) => { const mag = Math.abs(x.c), mt = NZ(mag, 6).text, ms = Math.abs(mag - 1) < 1e-12 ? '' : (/\//.test(mt) ? `(${mt})` : mt) + '·'; return (i ? (x.c < 0 ? ' − ' : ' + ') : (x.c < 0 ? '−' : '')) + `${ms}${nm}[n${x.k ? '−' + x.k : ''}]`; }).join(''); return o || '0'; };
+    const cpEval = (p, z) => p.reduceRight((a, c) => cadd(cmul(a, z), c), Cx());
+    const cStr = z => { const re = NZ(z.re, 7).text; if (Math.abs(z.im) < 1e-9) return re; return `${Math.abs(z.re) < 1e-9 ? '' : re + ' '}${z.im < 0 ? '−' : (Math.abs(z.re) < 1e-9 ? '' : '+ ')}${Math.abs(Math.abs(z.im) - 1) < 1e-9 ? '' : NZ(Math.abs(z.im), 7).text}i`.trim(); };
+    const piText = (th, tex) => { for (let m = 1; m <= 12; m++) { const k = Math.round(th * m / Math.PI); if (Math.abs(th - k * Math.PI / m) < 1e-9) { if (k === 0) return '0'; const a = Math.abs(k); return `${k < 0 ? (tex ? '-' : '−') : ''}${a === 1 ? '' : a}${tex ? '\\pi ' : 'π'}${m === 1 ? '' : '/' + m}`.trim(); } } return NZ(th, 6).text; };
+
+    /** Sum of terms c·nᵏ·aⁿ (a possibly negative or complex) → the exponential-polynomial table used by the Laplace code. */
+    function seqTerms(node, v) {
+        const dep = nd => { let d = false; nd.traverse(m => { if (m.type === 'SymbolNode' && m.name === v) d = true; }); return d; };
+        const bad = () => new CalcError('The Z-transform table handles sums and products of polynomials in n, powers aⁿ with a constant base, and sin / cos of multiples of n, for example n*0.5^n*cos(pi*n/3) + 2.');
+        const conv = node.transform(nd => {
+            if (nd.type === 'OperatorNode' && nd.fn === 'pow' && dep(nd.args[1]) && !dep(nd.args[0])) {
+                let b; try { b = engine.compile(nd.args[0], [])(); } catch (e) { throw bad(); }
+                if (typeof b !== 'number' || !Number.isFinite(b) || b === 0) throw new CalcError('Use a nonzero constant base, like 0.5^n or (-1)^n.');
+                return math.parse(`exp((${Math.log(Math.abs(b))}${b < 0 ? ' + pi*i' : ''})*(${nd.args[1].toString()}))`);
+            }
+            return nd;
+        });
+        let terms; try { terms = toExpPoly(conv, v); } catch (e) { throw bad(); }
+        return [...terms.values()].map(t => ({ k: t.n, p: cexp(t.z), c: t.c }));
+    }
+    const groupPoles = terms => { const poles = []; terms.forEach(t => { let q = poles.find(x => Math.hypot(x.p.re - t.p.re, x.p.im - t.p.im) < 1e-7); if (!q) { q = { p: t.p, m: 0 }; poles.push(q); } q.m = Math.max(q.m, t.k + 1); }); return poles; };
+    const zPlot = (poles, zeros, title) => {
+        const th = Array.from({ length: 181 }, (_, i) => i * 2 * Math.PI / 180); const R = Math.max(1.3, ...poles.map(p => cabs(p) * 1.15), ...zeros.map(p => cabs(p) * 1.15));
+        return { generic: { title: title || 'Poles and zeros in the z-plane', xTitle: 'Re z', yTitle: 'Im z', equal: true, xRange: [-R, R], yRange: [-R, R], traces: [{ x: th.map(Math.cos), y: th.map(Math.sin), mode: 'lines', type: 'scatter', name: 'unit circle', line: { dash: 'dot' } }, { x: poles.map(p => p.re), y: poles.map(p => p.im), mode: 'markers', type: 'scatter', name: 'poles ×', marker: { symbol: 'x', size: 11 } }, { x: zeros.map(p => p.re), y: zeros.map(p => p.im), mode: 'markers', type: 'scatter', name: 'zeros ○', marker: { symbol: 'circle-open', size: 11 } }] } };
+    };
+    const stemPlot = (series, title) => ({ generic: { title: title || 'Sequence', xTitle: 'n', yTitle: 'value', traces: series.map(s => ({ x: s.y.map((_, i) => i), y: s.y, type: 'bar', name: s.name })) } });
+
+    /** Closed form of a sequence from its first terms: exponential columns (poles of Q) plus Kronecker deltas, fitted then verified on later terms. */
+    function fitSequence(vals, q, nDelta) {
+        q = q.slice(); while (q.length > 1 && Math.abs(q[q.length - 1]) < 1e-12 * Math.max(1, ...q.map(Math.abs))) q.pop(); const Keff = q.length - 1; const poly = []; for (let i = 0; i <= Keff; i++) poly[Keff - i] = q[i] / q[0];
+        const roots = Keff ? I.polyRootsMult(poly.slice()) : []; if (roots.reduce((a, z) => a + z.mult, 0) !== Keff) throw new CalcError('Could not find the poles reliably.');
+        const cols = []; roots.forEach(z => { for (let m = 0; m < z.mult; m++) cols.push({ z: Cx(z.re, Math.abs(z.im) < 1e-9 * Math.max(1, Math.abs(z.re)) ? 0 : z.im), q: m }); }); for (let j = 0; j < nDelta; j++) cols.push({ delta: j });
+        const M = cols.length; if (vals.length < M + 25) throw new CalcError('Not enough terms to fit.'); if (M > 14) throw new CalcError('The order is too high for a reliable closed form (limit 14).');
+        const basis = (c, n) => { if (c.delta !== undefined) return n === c.delta ? Cx(1) : Cx(); let pw = Cx(1); for (let i = 0; i < n; i++) pw = cmul(pw, c.z); return cmul(pw, Cx(n === 0 && c.q === 0 ? 1 : Math.pow(n, c.q))); };
+        let C; try { C = math.lusolve(math.matrix(Array.from({ length: M }, (_, n) => cols.map(c => { const b = basis(c, n); return math.complex(b.re, b.im); }))), math.matrix(vals.slice(0, M).map(x => [x]))).toArray().map(row => { const z = math.complex(row[0]); return Cx(z.re, z.im); }); } catch (e) { throw new CalcError('The fit was singular; closed form not found.'); }
+        const closed = n => { let t = Cx(); cols.forEach((c, i) => { t = cadd(t, cmul(C[i], basis(c, n))); }); return t.re; };
+        let worst = 0; for (let n = 0; n < M + 25; n++) worst = Math.max(worst, Math.abs(closed(n) - vals[n]) / Math.max(1, Math.abs(vals[n]))); if (!(worst < 1e-6)) throw new CalcError('The closed form did not reproduce the sequence (numerical trouble).');
+        return { cols, C, roots, worst, closed, M };
+    }
+    /** Real closed form, with complex-conjugate pairs written as rⁿ·cos(θn + φ). */
+    function closedText(fit, v) {
+        const { cols, C } = fit; const scale = Math.max(1e-300, ...C.map(cabs)); const used = new Array(cols.length).fill(false), parts = [];
+        const rep = (x, tex) => { const a = NZ(x, 7); return tex ? a.tex : a.text; };
+        cols.forEach((c, i) => {
+            if (used[i]) return; used[i] = true; const co = C[i]; if (cabs(co) < 1e-9 * scale) return; let t, tt, neg;
+            const npow = (tex, q) => (q ? (tex ? `${v}${q > 1 ? '^{' + q + '}' : ''}` : `${v}${q > 1 ? '^' + q : ''}`) : '');
+            if (c.delta !== undefined) { neg = co.re < 0; const a = Math.abs(co.re), d = c.delta ? `\\delta[${v}-${c.delta}]` : `\\delta[${v}]`; t = `${Math.abs(a - 1) < 1e-9 ? '' : rep(a) + '·'}δ[${v}${c.delta ? '−' + c.delta : ''}]`; tt = `${Math.abs(a - 1) < 1e-9 ? '' : rep(a, 1)}${d}`; }
+            else if (Math.abs(c.z.im) < 1e-9) {
+                neg = co.re < 0; const a = Math.abs(co.re), p = c.z.re, isOne = Math.abs(p - 1) < 1e-9; const rp = rep(p), pt = (p < 0 || /[/+]/.test(rp)) ? `(${rp})` : rp, ptex = (p < 0 || /[/+]/.test(rp)) ? `\\left(${rep(p, 1)}\\right)` : rep(p, 1);
+                const lead = (Math.abs(a - 1) < 1e-9 && (c.q || !isOne)) ? [] : [rep(a)], leadT = (Math.abs(a - 1) < 1e-9 && (c.q || !isOne)) ? [] : [rep(a, 1)];
+                const f = lead.concat(isOne ? [] : [`${pt}^${v}`], c.q ? [npow(false, c.q)] : []); t = f.length ? f.join('·') : '1'; tt = leadT.concat(isOne ? [] : [`${ptex}^{${v}}`], c.q ? [npow(true, c.q)] : []).join('\\,') || '1';
+            } else {
+                const j = cols.findIndex((d, k) => !used[k] && d.q === c.q && d.delta === undefined && Math.abs(d.z.re - c.z.re) < 1e-7 && Math.abs(d.z.im + c.z.im) < 1e-7); if (j >= 0) used[j] = true;
+                const amp = 2 * cabs(co), ph = Math.atan2(co.im, co.re), r = cabs(c.z), th = Math.atan2(c.z.im, c.z.re); const sgn = th < 0 ? -1 : 1; const thP = Math.abs(th), phi = ph * sgn;
+                neg = false; const sg = phi < 0 ? ' − ' : ' + ', sgT = phi < 0 ? ' - ' : ' + ';
+                const ang = `${piText(thP)}·${v}${Math.abs(phi) < 1e-9 ? '' : sg + piText(Math.abs(phi))}`, angT = `${piText(thP, 1)}\\,${v}${Math.abs(phi) < 1e-9 ? '' : sgT + piText(Math.abs(phi), 1)}`;
+                const rr = Math.abs(r - 1) < 1e-9 ? '' : `${rep(r)}^${v}·`;
+                t = `${rep(amp)}·${rr}${c.q ? npow(false, c.q) + '·' : ''}cos(${ang})`; tt = `${rep(amp, 1)}\\,${Math.abs(r - 1) < 1e-9 ? '' : `${rep(r, 1)}^{${v}}\\,`}${c.q ? npow(true, c.q) + '\\,' : ''}\\cos\\left(${angT}\\right)`;
+            }
+            parts.push({ neg, t, tt });
+        });
+        const join = (key, minus, plus) => parts.length ? parts.map((p, k) => (k ? (p.neg ? minus : plus) : (p.neg ? (key === 't' ? '−' : '-') : '')) + p[key]).join('') : '0';
+        return { text: join('t', ' − ', ' + '), tex: join('tt', ' - ', ' + ') };
+    }
+    const zsteps = (r, kind) => {
+        if (kind === 'forward') { r.steps.push({ title: 'Definition', text: 'X(z) = Σ x[n]·z⁻ⁿ for n ≥ 0, valid where the series converges (the region of convergence).', tex: 'X(z)=\\sum_{n=0}^{\\infty}x[n]\\,z^{-n}' }); r.steps.push({ title: 'Table pairs used', text: 'aⁿ ↔ z/(z−a);  n·aⁿ ↔ a·z/(z−a)²;  n²aⁿ ↔ a·z(z+a)/(z−a)³ (in general multiply by −z·d/dz for each factor n);  cos and sin combine aⁿe^{±iωn}.', tex: 'a^n\\leftrightarrow\\frac{z}{z-a},\\quad n\\,a^n\\leftrightarrow\\frac{az}{(z-a)^2}' }); }
+        else r.steps.push({ title: 'Partial fractions in z', text: 'Write X(z)/z in partial fractions. A term A/(z−p)ᵐ gives A·C(n, m−1)·pⁿ⁻ᵐ⁺¹·z / z; a factor zᵐ in the denominator gives shifted unit impulses δ[n−k].', tex: '\\frac{X(z)}{z}=\\sum\\frac{A_k}{(z-p)^k}' });
+    };
+
+    function runZTrans(src, opt) {
+        const node = engine.parse(src); const vs = engine.freeVars(node); if (vs.length > 1 || (vs.length === 1 && vs[0] !== 'n')) throw new CalcError('Write the sequence in terms of n only, for example 0.5^n*cos(pi*n/3).');
+        const terms = seqTerms(node, 'n'); const xf = engine.compile(node, ['n']); const xv = n => { const v = xf(n); return typeof v === 'number' && Number.isFinite(v) ? v : NaN; };
+        const r = I.makeResult('laplace', 'Z-transform');
+        if (!terms.length) { r.main = { label: 'X(z) =', text: '0', tex: 'X(z)=0' }; return I.finalizeText(r); }
+        const poles = groupPoles(terms); let D = [Cx(1)]; poles.forEach(q => { D = cpMul(D, cpPow([Cx(-q.p.re, -q.p.im), Cx(1)], q.m)); }); const d = D.length - 1;
+        const worstI = Math.max(...D.map(c => Math.abs(c.im))), magD = Math.max(1, ...D.map(c => Math.abs(c.re))); if (worstI > 1e-8 * magD) throw new CalcError('This sequence is complex-valued, so its transform has complex coefficients. Use a real sequence.');
+        const Dr = D.map(c => c.re); const NN = d + 60; const vals = Array.from({ length: NN }, (_, n) => xv(n)); if (vals.some(x => !Number.isFinite(x))) throw new CalcError('The sequence is not defined for some n ≥ 0.');
+        const scale = Math.max(1, ...vals.slice(0, 40).map(Math.abs));
+        const Nasc = new Array(d + 1).fill(0); for (let j = 0; j <= d; j++) { let s = 0; for (let i = 0; i <= j; i++) s += Dr[d - i] * vals[j - i]; Nasc[d - j] = s; }
+        // independent check 1: the sequence really obeys the recurrence that this denominator implies (so no term was lost)
+        let rec = 0; for (let j = d + 1; j < NN; j++) { let s = 0; for (let i = 0; i <= d; i++) s += Dr[d - i] * vals[j - i]; rec = Math.max(rec, Math.abs(s)); }
+        if (rec > 1e-7 * scale * Math.max(1, magD)) throw new CalcError('Could not identify the poles of this sequence reliably.');
+        // independent check 2: sum the defining series at test points outside the region of convergence
+        const R = Math.max(...poles.map(q => cabs(q.p))); let worstS = 0; const tests = [Cx(R + 0.7, 0), cmul(Cx(R + 0.4, 0), Cx(Math.cos(0.9), Math.sin(0.9)))];
+        for (const z0 of tests) { const M = Math.min(6000, Math.ceil(36 / Math.max(1e-3, Math.log(cabs(z0) / R))) + 40); let S = Cx(), zi = Cx(1); const inv = cdiv(Cx(1), z0); for (let n = 0; n < M; n++) { S = cadd(S, cmul(Cx(n < vals.length ? vals[n] : xv(n)), zi)); zi = cmul(zi, inv); } const X = cdiv(cpEval(Nasc.map(c => Cx(c)), z0), cpEval(Dr.map(c => Cx(c)), z0)); worstS = Math.max(worstS, cabs(cadd(S, Cx(-X.re, -X.im))) / Math.max(1, cabs(X))); }
+        if (!(worstS < 1e-6)) throw new CalcError('The transform did not match direct summation of the series, so it was discarded.');
+        const zeros = Nasc.length > 1 ? I.polyRoots(I.polyTrim(Nasc.slice())).map(z => Cx(z.re, z.im)) : [];
+        const plain = polyFmt(Nasc, 'z'), den = polyFmt(Dr, 'z'); r.title = 'Z-transform';
+        r.items.push({ label: 'x[n] =', text: engine.strOf(node), tex: `x[n]=${engine.texOf(node)}` });
+        r.main = { label: 'X(z) =', text: `${wrapT(plain)} / ${wrapT(den)}`, tex: `X(z)=\\dfrac{${polyFmt(Nasc, 'z', true)}}{${polyFmt(Dr, 'z', true)}}` };
+        r.items.push({ label: 'Region of convergence:', text: `|z| > ${NZ(R, 7).text}${R < 1 - 1e-9 ? '  (includes the unit circle, so the sequence has a Fourier transform)' : R > 1 + 1e-9 ? '  (excludes the unit circle: the sequence grows)' : '  (the unit circle is the boundary)'}`, tex: `|z|>${NZ(R, 7).tex}` });
+        r.items.push({ label: 'Poles:', text: poles.map(q => cStr(q.p) + (q.m > 1 ? ` (×${q.m})` : '')).join(',  '), tex: '' });
+        if (zeros.length) r.items.push({ label: 'Zeros:', text: zeros.map(cStr).join(',  '), tex: '' });
+        r.items.push({ label: 'First terms:', text: vals.slice(0, 10).map(x => NZ(x, 7).text).join(', ') + ', …', tex: '' });
+        r.meta.push(`Verified: summing x[n]·z⁻ⁿ directly at two test points outside the region of convergence matches X(z) (relative gap ${worstS.toExponential(1)}), and the sequence obeys the recurrence implied by the denominator for 60 further terms.`);
+        r.meta.push('Assumes a causal sequence (x[n] = 0 for n < 0). A delay of k samples multiplies the transform by z⁻ᵏ.');
+        zsteps(r, 'forward'); r.plot = zPlot(poles.map(q => q.p).concat(poles.filter(q => Math.abs(q.p.im) > 1e-9).map(q => Cx(q.p.re, -q.p.im)).filter(c => !poles.some(q => Math.hypot(q.p.re - c.re, q.p.im - c.im) < 1e-7))), zeros);
+        return I.finalizeText(r);
+    }
+
+    function parseXz(src) {
+        let t = String(src).replace(/[−–]/g, '-').replace(/z\s*\^\s*\{?\s*-\s*(\d+)\s*\}?/g, '(1/z^$1)').replace(/z\s*\^\s*\(\s*-\s*(\d+)\s*\)/g, '(1/z^$1)');
+        const node = engine.parse(t); const vs = engine.freeVars(node); if (vs.length > 1 || (vs.length === 1 && vs[0] !== 'z')) throw new CalcError('Write X(z) as a rational function of z only, for example z/(z-0.5) or 1/(1-0.5*z^-1).');
+        const rat = I.toRational(node, 'z'); if (!rat) throw new CalcError('Enter X(z) as a rational function of z, e.g. z/((z-1)*(z-0.5)).'); return { node, rat };
+    }
+    function runIZTrans(src, opt) {
+        const { node, rat } = parseXz(src); let N = rat.n.slice(), D = rat.d.slice(); const dl = D[D.length - 1]; N = N.map(x => x / dl); D = D.map(x => x / dl); const d = D.length - 1;
+        if (d < 1) throw new CalcError('The denominator must contain z.'); if (N.length - 1 > d) throw new CalcError('X(z) must have numerator degree at most the denominator degree (a causal sequence); otherwise the inverse has terms before n = 0.');
+        const nj = k => (k >= 0 && k < N.length ? N[k] : 0); const NN = d + 60; const x = [];
+        for (let j = 0; j < NN; j++) { let s = nj(d - j); for (let i = 1; i <= Math.min(j, d); i++) s -= D[d - i] * x[j - i]; x.push(s); }
+        if (x.some(v => !Number.isFinite(v))) throw new CalcError('The sequence overflowed.');
+        const lowN = N.findIndex(c => Math.abs(c) > 1e-12), lowD = D.findIndex(c => Math.abs(c) > 1e-12); if (lowN < 0) { const r0 = I.makeResult('laplace', 'Inverse Z-transform'); r0.main = { label: 'x[n] =', text: '0', tex: 'x[n]=0' }; return I.finalizeText(r0); }
+        const q = []; for (let i = 0; i <= d - lowD; i++) q.push(D[d - i]); const nDelta = Math.max(0, (d - lowN) - (d - lowD) + 1);
+        const fit = fitSequence(x, q, nDelta); const ct = closedText(fit, 'n');
+        const r = I.makeResult('laplace', 'Inverse Z-transform'); r.main = { label: 'x[n] =', text: ct.text + '   (n ≥ 0)', tex: `x[n]=${ct.tex}\\quad(n\\ge 0)` };
+        r.items.unshift({ label: 'X(z) =', text: engine.strOf(node), tex: `X(z)=${engine.texOf(node)}` });
+        const R = fit.roots.length ? Math.max(...fit.roots.map(z => Math.hypot(z.re, z.im))) : 0; r.items.push({ label: 'Region of convergence:', text: `|z| > ${NZ(R, 7).text}`, tex: '' });
+        r.items.push({ label: 'Poles:', text: fit.roots.map(z => cStr(Cx(z.re, z.im)) + (z.mult > 1 ? ` (×${z.mult})` : '')).join(',  ') || 'none (a finite-length sequence)', tex: '' });
+        r.items.push({ label: 'First terms (long division in z⁻¹):', text: x.slice(0, 12).map(v => NZ(v, 7).text).join(', ') + ', …', tex: '' });
+        r.meta.push(`Verified: the closed form reproduces the first ${fit.M + 25} terms obtained independently by long division of X(z) in powers of z⁻¹ (largest relative gap ${fit.worst.toExponential(1)}).`);
+        r.meta.push('Assumes the right-sided (causal) inverse, i.e. the region of convergence lies outside the outermost pole.');
+        if (fit.cols.some(c => c.z && Math.abs(c.z.im) > 1e-9)) r.meta.push('Complex poles come in conjugate pairs, combined above into a damped cosine.');
+        zsteps(r, 'inverse');
+        r.plot = stemPlot([{ name: 'x[n]', y: x.slice(0, 24) }], 'The sequence x[n]');
+        return I.finalizeText(r);
+    }
+
+    /** y[n] equation → coefficient arrays a (for y[n−k]) and b (for x[n−j]) with Σ aₖ y[n−k] = Σ bⱼ x[n−j]. */
+    function parseDiffEq(src) {
+        const t = String(src).replace(/[−–]/g, '-').replace(/\s+/g, ' ').trim(); const eq = t.split('='); if (eq.length !== 2 || !eq[0].trim() || !eq[1].trim()) throw new CalcError('Write the difference equation with an equals sign, e.g. y(n) = 0.9*y(n-1) + x(n).');
+        const names = new Set(); let fwd = false;
+        const conv = s => s.replace(/\b([yx])\s*[([]\s*n\s*(?:([+-])\s*(\d+))?\s*[)\]]/g, (m, f, sg, k) => { if (sg === '+' && +k > 0) fwd = true; const kk = sg === '-' ? +k : 0; names.add(`${f}_${kk}`); return `${f}_${kk}`; });
+        const L = conv(eq[0]), Rr = conv(eq[1]); if (fwd) throw new CalcError('Write the equation with delays only (y(n-1), x(n-2) …). Shift the equation so the newest term is y(n).');
+        if (![...names].some(s => s.startsWith('y_'))) throw new CalcError('The equation needs y(n) terms, for example y(n) = 0.5*y(n-1) + x(n).');
+        let node; try { node = math.parse(`(${L})-(${Rr})`); } catch (e) { throw new CalcError('Could not read that equation.'); }
+        const syms = new Set(); node.traverse(n => { if (n.type === 'SymbolNode') { if (!/^[yx]_\d+$/.test(n.name) && !['pi', 'e'].includes(n.name)) throw new CalcError(`Unknown symbol “${n.name}”. Use only y(n−k), x(n−k) and numbers.`); if (n.name !== 'pi' && n.name !== 'e') syms.add(n.name); } });
+        const code = node.compile(); const ev = sc => { const v = code.evaluate(Object.assign({}, ...[...syms].map(s => ({ [s]: 0 })), sc)); if (typeof v !== 'number' || !Number.isFinite(v)) throw new CalcError('The equation must be linear with numeric coefficients.'); return v; };
+        const f0 = ev({}); if (Math.abs(f0) > 1e-12) throw new CalcError('The equation has a constant term. Put every term on y or x (use x(n) for the input).');
+        const coef = {}; syms.forEach(s => { coef[s] = ev({ [s]: 1 }) - f0; }); const rnd = {}; let pred = 0; [...syms].forEach((s, i) => { rnd[s] = 0.7 + i * 0.37; pred += coef[s] * rnd[s]; }); if (Math.abs(ev(rnd) - pred) > 1e-9 * Math.max(1, Math.abs(pred))) throw new CalcError('The equation must be linear in y and x with constant coefficients.');
+        const K = Math.max(0, ...[...syms].filter(s => s[0] === 'y').map(s => +s.slice(2))), J = Math.max(0, ...[...syms].filter(s => s[0] === 'x').map(s => +s.slice(2)));
+        const a = Array.from({ length: K + 1 }, (_, k) => coef[`y_${k}`] || 0), b = Array.from({ length: J + 1 }, (_, j) => -(coef[`x_${j}`] || 0));
+        if (Math.abs(a[0]) < 1e-12) throw new CalcError('The coefficient of y(n) must be nonzero.'); if (K > 8 || J > 8) throw new CalcError('Up to 8 delays are supported.');
+        return { a, b, K, J };
+    }
+    function runZDiff(src, opt) {
+        const { a, b, K, J } = parseDiffEq(src); const r = I.makeResult('laplace', 'Difference equation');
+        const xinText = String(opt.xin === undefined || opt.xin === '' ? 'impulse' : opt.xin).trim(); let impulse = false, xNode = null, xterms = [];
+        if (/^(impulse|delta|dirac|unit impulse)$/i.test(xinText)) impulse = true; else if (/^(step|u|unit step)$/i.test(xinText)) { xNode = engine.parse('1'); } else { xNode = engine.parse(xinText); const vs = engine.freeVars(xNode); if (vs.some(v => v !== 'n')) throw new CalcError('Write the input in terms of n only, e.g. 0.5^n, 1, or sin(pi*n/4). Use “impulse” or “step” for the standard inputs.'); }
+        let xf = n => (n === 0 ? 1 : 0); if (xNode) { xterms = seqTerms(xNode, 'n'); const f = engine.compile(xNode, ['n']); xf = n => { const v = f(n); if (typeof v !== 'number' || !Number.isFinite(v)) throw new CalcError('The input is not defined for some n ≥ 0.'); return v; }; }
+        const icText = String(opt.init === undefined ? '' : opt.init).split(/[,;\s]+/).filter(Boolean); const ic = Array.from({ length: K }, (_, i) => { const t = icText[i]; if (t === undefined || t === '') return 0; const v = I.parseLimit(t, 'Initial value').value; if (!Number.isFinite(v)) throw new CalcError('Initial values must be finite numbers.'); return v; });
+        if (icText.length > K) throw new CalcError(`This equation has order ${K}: give ${K} initial value${K === 1 ? '' : 's'} y(−1)${K > 1 ? '…y(−' + K + ')' : ''}, or leave it empty for rest.`);
+        const NN = 70 + 3 * (K + J); const x = Array.from({ length: NN }, (_, n) => xf(n)); const y = []; const yAt = n => (n >= 0 ? y[n] : ic[-n - 1] === undefined ? 0 : ic[-n - 1]);
+        for (let n = 0; n < NN; n++) { let s = 0; for (let j = 0; j <= J; j++) if (n - j >= 0) s += b[j] * x[n - j]; for (let k = 1; k <= K; k++) s -= a[k] * yAt(n - k); y.push(s / a[0]); }
+        if (y.some(v => !Number.isFinite(v)) || Math.max(...y.map(Math.abs)) > 1e150) throw new CalcError('The response overflowed – the system is strongly unstable for this input.');
+        // denominator Q(u) = A(u)·Dx(u) in u = z⁻¹
+        let Q = a.map(c => Cx(c)); const xp = groupPoles(xterms); xp.forEach(p => { Q = cpMul(Q, cpPow([Cx(1), Cx(-p.p.re, -p.p.im)], p.m)); }); const magQ = Math.max(1, ...Q.map(c => Math.abs(c.re))); if (Math.max(...Q.map(c => Math.abs(c.im))) > 1e-8 * magQ) throw new CalcError('The input must be a real sequence.');
+        const q = Q.map(c => c.re); let KeffA = K; while (KeffA > 0 && Math.abs(a[KeffA]) < 1e-12) KeffA--;
+        const nDelta = Math.max(0, Math.max(J, K - 1) - KeffA + 1) + 1; let fit = null, fitErr = '';
+        try { fit = fitSequence(y, q, nDelta); } catch (e) { fitErr = e.message; }
+        // transfer function H(z) = B(z)/A(z)
+        const Hp = a.slice().reverse(), Hn = b.slice().reverse(); const poleRoots = (K > 0 ? I.polyRootsMult(I.polyTrim(Hp.slice())) : []).map(z => ({ z: Cx(z.re, z.im), m: z.mult })); const zRoots = (J > 0 ? I.polyRoots(I.polyTrim(Hn.slice())) : []).map(z => Cx(z.re, z.im));
+        const padA = Array.from({ length: Math.max(K, J) + 1 }, (_, i) => a[i] || 0).reverse(), padB = Array.from({ length: Math.max(K, J) + 1 }, (_, i) => b[i] || 0).reverse();
+        const poles = padA.length > 1 ? I.polyRootsMult(I.polyTrim(padA.slice())).map(z => ({ z: Cx(z.re, z.im), m: z.mult })) : []; const zeros = I.polyTrim(padB.slice()).length > 1 ? I.polyRoots(I.polyTrim(padB.slice())).map(z => Cx(z.re, z.im)) : [];
+        void poleRoots; void zRoots; const rho = poles.length ? Math.max(...poles.map(p => cabs(p.z))) : 0;
+        r.title = 'Difference equation (Z-transform method)';
+        if (fit) { const ct = closedText(fit, 'n'); r.main = { label: 'y[n] =', text: ct.text + '   (n ≥ 0)', tex: `y[n]=${ct.tex}\\quad(n\\ge 0)` }; }
+        else r.main = { label: 'y[n] =', text: 'no closed form fitted – see the computed terms', tex: '' };
+        r.items.push({ label: 'Equation:', text: `${eqSide(a, 'y')} = ${eqSide(b, 'x')}`, tex: '' });
+        r.items.push({ label: 'Transfer function H(z) = Y/X:', text: `${wrapT(polyFmt(padB, 'z'))} / ${wrapT(polyFmt(padA, 'z'))}`, tex: `H(z)=\\dfrac{${polyFmt(padB, 'z', true)}}{${polyFmt(padA, 'z', true)}}` });
+        r.items.push({ label: 'Poles of H:', text: poles.map(p => cStr(p.z) + (p.m > 1 ? ` (×${p.m})` : '')).join(',  ') || 'none (a finite impulse response)', tex: '' });
+        if (zeros.length) r.items.push({ label: 'Zeros of H:', text: zeros.map(cStr).join(',  '), tex: '' });
+        const stable = rho < 1 - 1e-9; r.items.push({ label: 'Stability:', text: poles.length === 0 ? 'always stable (finite impulse response)' : stable ? `BIBO stable: every pole is inside the unit circle (largest |p| = ${NZ(rho, 6).text})` : Math.abs(rho - 1) <= 1e-9 ? `marginally stable or unstable: a pole lies on the unit circle (|p| = 1)` : `unstable: a pole lies outside the unit circle (largest |p| = ${NZ(rho, 6).text})`, tex: '' });
+        r.items.push({ label: `Input x[n]:`, text: impulse ? 'unit impulse δ[n]' : xNode ? engine.strOf(xNode) : '', tex: '' });
+        if (ic.some(v => v !== 0)) r.items.push({ label: 'Initial values:', text: ic.map((v, i) => `y[−${i + 1}] = ${NZ(v, 6).text}`).join(',  '), tex: '' }); else r.items.push({ label: 'Initial state:', text: K ? 'at rest (all earlier values zero)' : 'none needed', tex: '' });
+        r.items.push({ label: 'First outputs:', text: y.slice(0, 12).map(v => NZ(v, 7).text).join(', ') + ', …', tex: '' });
+        if (fit) r.meta.push(`Verified: the closed form reproduces ${fit.M + 25} outputs obtained independently by running the recursion y[n] = (Σ bⱼx[n−j] − Σ aₖy[n−k])/a₀ from the initial values (largest relative gap ${fit.worst.toExponential(1)}).`); else r.warnings.push(`A closed form could not be fitted (${fitErr}); the outputs below come from running the recursion directly.`);
+        if (xp.some(p => poles.some(q => Math.hypot(q.z.re - p.p.re, q.z.im - p.p.im) < 1e-7))) r.meta.push('Resonance: the input has a pole in common with the system, so powers of n appear in the response.');
+        r.meta.push(stable ? 'Because the system is stable, the output settles to the forced (steady-state) response.' : 'A pole on or outside the unit circle means the natural response does not die out.');
+        r.steps.push({ title: 'Transform the equation', text: 'Using Z{y[n−k]} = z⁻ᵏ Y(z) + (terms from the initial values): A(z)Y(z) = B(z)X(z) + initial-value terms.', tex: 'A(z)Y(z)=B(z)X(z)+\\text{(initial values)}' });
+        r.steps.push({ title: 'Solve and invert', text: 'Y(z) = [B(z)X(z) + …]/A(z), then partial fractions give y[n] as a sum of pⁿ terms, one for each pole of the system and of the input.', tex: '' });
+        r.plot = stemPlot([{ name: 'y[n]', y: y.slice(0, 30) }, { name: 'x[n]', y: x.slice(0, 30) }], 'Input x[n] and output y[n]');
+        return I.finalizeText(r);
+    }
+    const prevLaplaceZ = engine.run.laplace;
+    register({ laplace: (src, opt) => opt.op === 'ztrans' ? runZTrans(src, opt) : opt.op === 'iztrans' ? runIZTrans(src, opt) : opt.op === 'zdiff' ? runZDiff(src, opt) : prevLaplaceZ(src, opt) });
+
+    // ======================================================================
+    // Padé approximants
+    // ======================================================================
+    const prevSeries = engine.run.series;
+    function runPade(src, opt) {
+        const node = engine.parse(src); const fv = engine.freeVars(node); const v = (opt.variable && String(opt.variable).trim()) || fv[0] || 'x';
+        if (fv.some(n => n !== v)) throw new CalcError(`Use a single variable (${v}).`);
+        const a = I.parseLimit(opt.point === undefined || opt.point === '' ? '0' : opt.point, 'Expansion point').value; if (!Number.isFinite(a)) throw new CalcError('The expansion point must be a finite number.');
+        const pick = (x, d) => { const k = parseInt(x, 10); return Number.isFinite(k) && k >= 0 ? Math.min(10, k) : d; }; const L = pick(opt.pm, 2), M = pick(opt.pn, 2); if (L + M < 1) throw new CalcError('Use L + M of at least 1.');
+        let c; try { c = I.taylorCoeffs(node, v, a, L + M + 1); } catch (e) { throw new CalcError(e.message || 'The Taylor series could not be computed at that point.'); }
+        if (!c || c.some(x => !Number.isFinite(x))) throw new CalcError('The function has no Taylor series at that point (it is not smooth there).');
+        const ck = k => (k >= 0 && k < c.length ? c[k] : 0); let q = [1];
+        if (M > 0) {
+            const A = Array.from({ length: M }, (_, r) => Array.from({ length: M }, (_, j) => ck(L + r - j))), b = Array.from({ length: M }, (_, r) => [-ck(L + 1 + r)]); let sol = null;
+            try { const det = math.det(A); const sc = Math.max(1e-300, ...A.flat().map(Math.abs)); if (Math.abs(det) > 1e-10 * Math.pow(sc, M)) sol = math.lusolve(A, b).map(x => (typeof x === 'object' && x.length ? x[0] : x)); } catch (e) { sol = null; }
+            if (!sol || sol.some(x => !Number.isFinite(x))) throw new CalcError(`The [${L}/${M}] Padé approximant does not exist for this function (its defining system is singular – often because the function is even or odd). Try [${L + 1}/${M}] or [${L}/${M - 1}].`);
+            q = [1].concat(sol);
+        }
+        const p = Array.from({ length: L + 1 }, (_, i) => { let s = 0; for (let j = 0; j <= Math.min(i, M); j++) s += q[j] * ck(i - j); return s; });
+        const scale = Math.max(1, ...c.map(Math.abs)); let resid = 0; for (let k = 0; k <= L + M; k++) { let s = 0; for (let j = 0; j <= Math.min(k, M); j++) s += q[j] * ck(k - j); resid = Math.max(resid, Math.abs(s - (k <= L ? p[k] : 0))); }
+        if (resid > 1e-8 * scale) throw new CalcError('The Padé system was not solved accurately (ill-conditioned). Try lower orders.');
+        const Rs = []; for (let k = 0; k <= L + M + 1; k++) { let s = k <= L ? p[k] : 0; for (let j = 1; j <= Math.min(k, M); j++) s -= q[j] * Rs[k - j]; Rs.push(s); } const errConst = ck(L + M + 1) - Rs[L + M + 1];
+        const f = engine.compile(node, [v]); const pe = (co, t) => co.reduceRight((s, x) => s * t + x, 0); const Rat = t => pe(p, t) / pe(q, t); const Tay = t => pe(c.slice(0, L + M + 1), t); const F = t => { const y = f(a + t); return typeof y === 'number' ? y : NaN; };
+        const tv = a === 0 ? v : 't', poles = (M > 0 ? I.polyRoots(I.polyTrim(q.slice())) : []).map(z => Cx(z.re + a, z.im)); const zeros = (L > 0 ? I.polyRoots(I.polyTrim(p.slice())) : []).map(z => Cx(z.re + a, z.im));
+        const r = I.makeResult('series', `Padé approximant [${L}/${M}]`); const num = polyFmt(p, tv), den = polyFmt(q, tv);
+        r.main = { label: `[${L}/${M}] =`, text: M === 0 ? num : `${wrapT(num)} / ${wrapT(den)}`, tex: M === 0 ? polyFmt(p, tv, true) : `\\dfrac{${polyFmt(p, tv, true)}}{${polyFmt(q, tv, true)}}` };
+        if (a !== 0) r.items.push({ label: 'with', text: `t = ${v} − ${NZ(a, 8).text}`, tex: '' });
+        r.items.push({ label: `Taylor coefficients (to order ${L + M + 1}):`, text: c.slice(0, L + M + 2).map(x => NZ(x, 7).text).join(',  '), tex: '' });
+        r.items.push({ label: 'Poles of the approximant:', text: poles.length ? poles.map(cStr).join(',  ') : 'none (a polynomial)', tex: '' });
+        const spur = poles.filter(z => zeros.some(w => cabs(cadd(z, Cx(-w.re, -w.im))) < 1e-6)); if (spur.length) r.warnings.push('A pole and a zero coincide: the approximant has a removable (spurious) pole, so a lower order gives the same function.');
+        r.items.push({ label: `Next error term:`, text: Math.abs(errConst) < 1e-10 * Math.max(1, scale) ? `the ${tv}^${L + M + 1} term vanishes (symmetry or luck), so the approximant is even better than its order suggests` : `f − [${L}/${M}] ≈ ${NZ(errConst, 6).text}·${tv}^${L + M + 1}`, tex: '' });
+        const hs = [0.25, 0.5, 1, 2].map(h => h * (Math.abs(a) > 1 ? Math.abs(a) / 2 : 1)); const cmp = hs.map(h => ({ h, fv: F(h), pd: Rat(h), ty: Tay(h) })).filter(o => Number.isFinite(o.fv) && Number.isFinite(o.pd));
+        cmp.forEach(o => r.items.push({ label: `${v} = ${NZ(a + o.h, 6).text}:`, text: `f = ${engine.fmt(o.fv, 8)},  Padé = ${engine.fmt(o.pd, 8)} (error ${Math.abs(o.pd - o.fv).toExponential(1)}),  Taylor of the same order = ${engine.fmt(o.ty, 8)} (error ${Math.abs(o.ty - o.fv).toExponential(1)})`, tex: '' }));
+        const hS = 0.02 * (Math.abs(a) > 1 ? Math.abs(a) / 2 : 1); const e1 = Math.abs(Rat(hS) - F(hS)), pred = Math.abs(errConst) * Math.pow(hS, L + M + 1);
+        if (Number.isFinite(e1) && Number.isFinite(pred) && e1 <= 20 * pred + 1e-13 * Math.max(1, Math.abs(F(hS)))) r.meta.push(`Verified: the series of P/Q reproduces the Taylor series of f through order ${L + M} (largest coefficient gap ${resid.toExponential(1)}), and at ${v} = ${NZ(a + hS, 5).text} the actual error ${e1.toExponential(1)} matches the predicted leading term ${pred.toExponential(1)}.`);
+        else r.meta.push(`Verified: the series of P/Q reproduces the Taylor series of f through order ${L + M} (largest coefficient gap ${resid.toExponential(1)}).`);
+        r.meta.push('Method: solve Σ qⱼ c(k−j) = 0 for k = L+1…L+M, then read the numerator from the product Q·T.');
+        r.steps.push({ title: 'Match the series', text: `Require f(x)·Q(x) − P(x) = O(x^${L + M + 1}) with Q(0) = 1. The denominator coefficients come from a ${M}×${M} linear system built from the Taylor coefficients.`, tex: 'f(x)\\,Q(x)-P(x)=O(x^{L+M+1})' });
+        r.steps.push({ title: 'Why it helps', text: 'A rational function can model poles, so a Padé approximant often stays accurate where the Taylor polynomial has already diverged.', tex: '' });
+        const W = Math.max(0.2, I.parseLimit(opt.prange === undefined || opt.prange === '' ? '3' : opt.prange, 'Plot half-width').value || 3), N = 600; const xs = [], fy = [], py = [], ty = []; for (let i = 0; i <= N; i++) { const t = -W + 2 * W * i / N; xs.push(a + t); const fval = F(t), pval = Rat(t), tval = Tay(t); fy.push(Number.isFinite(fval) ? fval : null); py.push(Number.isFinite(pval) ? pval : null); ty.push(Number.isFinite(tval) ? tval : null); }
+        const fin = fy.filter(x => x !== null).sort((u, w) => u - w); let yr; if (fin.length > 10) { const lo = fin[Math.floor(fin.length * 0.03)], hi = fin[Math.floor(fin.length * 0.97)], pad = Math.max(0.5, (hi - lo) * 0.4); yr = [lo - pad, hi + pad]; }
+        r.plot = { generic: { title: `f, Padé [${L}/${M}] and Taylor degree ${L + M}`, xTitle: v, yTitle: 'y', xRange: [a - W, a + W], yRange: yr, traces: [{ x: xs, y: fy, mode: 'lines', type: 'scatter', name: 'f', line: { width: 3 } }, { x: xs, y: py, mode: 'lines', type: 'scatter', name: `Padé [${L}/${M}]` }, { x: xs, y: ty, mode: 'lines', type: 'scatter', name: `Taylor ${L + M}`, line: { dash: 'dot' } }] } };
+        return I.finalizeText(r);
+    }
+    register({ series: (src, opt) => opt.task === 'pade' ? runPade(src, opt) : prevSeries(src, opt) });
+
+    // ======================================================================
+    // Conformal maps and Möbius transformations
+    // ======================================================================
+    const cOf = z => { const c = math.complex(z); return Cx(c.re, c.im); };
+    function parseCpx(t) {
+        const s = String(t).trim(); if (/^(inf|infinity|∞|oo)$/i.test(s)) return null;
+        let v; try { v = math.evaluate(s.replace(/∞/g, 'Infinity').replace(/π/g, 'pi')); } catch (e) { throw new CalcError(`Could not read the point “${s}”. Use numbers like 1, -2i, 1+i, or inf.`); }
+        const c = cOf(v); if (!Number.isFinite(c.re) || !Number.isFinite(c.im)) throw new CalcError(`The point “${s}” is not a finite complex number (write inf for ∞).`); return c;
+    }
+    const mm = (A, B) => [[cadd(cmul(A[0][0], B[0][0]), cmul(A[0][1], B[1][0])), cadd(cmul(A[0][0], B[0][1]), cmul(A[0][1], B[1][1]))], [cadd(cmul(A[1][0], B[0][0]), cmul(A[1][1], B[1][0])), cadd(cmul(A[1][0], B[0][1]), cmul(A[1][1], B[1][1]))]];
+    const csub = (a, b) => Cx(a.re - b.re, a.im - b.im);
+    const mobFrom3 = (z1, z2, z3) => {   // matrix of the map sending z1,z2,z3 to 0,1,∞
+        const one = Cx(1), zero = Cx(), neg = a => Cx(-a.re, -a.im);
+        if (z1 === null) return [[zero, csub(z2, z3)], [one, neg(z3)]]; if (z2 === null) return [[one, neg(z1)], [one, neg(z3)]]; if (z3 === null) return [[one, neg(z1)], [zero, csub(z2, z1)]];
+        const A = csub(z2, z3), B = csub(z2, z1); return [[A, cmul(neg(z1), A)], [B, cmul(neg(z3), B)]];
+    };
+    const mobInv = M => [[M[1][1], Cx(-M[0][1].re, -M[0][1].im)], [Cx(-M[1][0].re, -M[1][0].im), M[0][0]]];
+    const mobApply = (M, z) => { if (z === null) return cabs(M[1][0]) < 1e-14 ? null : cdiv(M[0][0], M[1][0]); const num = cadd(cmul(M[0][0], z), M[0][1]), den = cadd(cmul(M[1][0], z), M[1][1]); return cabs(den) < 1e-13 * Math.max(1, cabs(num)) ? null : cdiv(num, den); };
+    function lineSet(segments) { const x = [], y = []; segments.forEach(seg => { seg.forEach(pt => { x.push(pt ? pt.re : null); y.push(pt ? pt.im : null); }); x.push(null); y.push(null); }); return { x, y }; }
+    function gridImage(f, region, R, clip) {
+        const fam1 = [], fam2 = [], pre1 = [], pre2 = [], n = 240; const ok = w => w && Number.isFinite(w.re) && Number.isFinite(w.im) && cabs(w) < clip;
+        const path = (g) => { const out = []; let prev = null; for (let i = 0; i <= n; i++) { const w = g(i / n); if (!ok(w)) { out.push(null); prev = null; continue; } if (prev && cabs(csub(w, prev)) > clip * 0.4) out.push(null); out.push(w); prev = w; } return out; };
+        if (region === 'polar') { for (let k = 1; k <= 6; k++) { const rr = R * k / 6; fam1.push(path(t => f(rr * Math.cos(2 * Math.PI * t), rr * Math.sin(2 * Math.PI * t)))); pre1.push(path(t => Cx(rr * Math.cos(2 * Math.PI * t), rr * Math.sin(2 * Math.PI * t)))); } for (let k = 0; k < 12; k++) { const th = Math.PI * k / 6; fam2.push(path(t => f(R * t * Math.cos(th), R * t * Math.sin(th)))); pre2.push(path(t => Cx(R * t * Math.cos(th), R * t * Math.sin(th)))); } }
+        else { for (let k = -5; k <= 5; k++) { const c0 = R * k / 5; fam1.push(path(t => f(c0, -R + 2 * R * t))); fam2.push(path(t => f(-R + 2 * R * t, c0))); pre1.push(path(t => Cx(c0, -R + 2 * R * t))); pre2.push(path(t => Cx(-R + 2 * R * t, c0))); } }
+        return { fam1: lineSet(fam1), fam2: lineSet(fam2), pre1: lineSet(pre1), pre2: lineSet(pre2) };
+    }
+    function runConformal(src, opt) {
+        const op = opt.op; const r = I.makeResult('complex', op === 'mobius' ? 'Möbius transformation' : 'Conformal map');
+        const Rr = Math.max(0.2, Math.min(50, +I.parseLimit(opt.extent === undefined || opt.extent === '' ? '1.5' : opt.extent, 'Extent').value || 1.5)); const region = opt.region === 'polar' ? 'polar' : 'grid';
+        let f, M = null, info = [];
+        if (op === 'mobius') {
+            const pairs = String(src).split(/[;\n]+/).map(t => t.trim()).filter(Boolean); if (pairs.length !== 3) throw new CalcError('Give three pairs  z → w  separated by ;  e.g.  0 -> -1 ; 1 -> 0 ; inf -> 1');
+            const zs = [], ws = []; pairs.forEach(pr => { const m = pr.split(/->|→|=>|\|->|↦/); if (m.length !== 2) throw new CalcError(`Write each pair as  z -> w  (got “${pr}”).`); zs.push(parseCpx(m[0])); ws.push(parseCpx(m[1])); });
+            const same = (A, B) => A === null ? B === null : B !== null && cabs(csub(A, B)) < 1e-12; if (same(zs[0], zs[1]) || same(zs[0], zs[2]) || same(zs[1], zs[2]) || same(ws[0], ws[1]) || same(ws[0], ws[2]) || same(ws[1], ws[2])) throw new CalcError('The three input points must be distinct, and so must the three output points.');
+            M = mm(mobInv(mobFrom3(ws[0], ws[1], ws[2])), mobFrom3(zs[0], zs[1], zs[2]));
+            const det = csub(cmul(M[0][0], M[1][1]), cmul(M[0][1], M[1][0])); if (cabs(det) < 1e-12) throw new CalcError('These points do not define a Möbius transformation.');
+            // normalise: make the largest entry real positive 1 …
+            const big = [M[0][0], M[0][1], M[1][0], M[1][1]].reduce((u, w) => (cabs(w) > cabs(u) + 1e-12 ? w : u)); const sc = cdiv(Cx(1), big); M = M.map(row => row.map(e => { const z = cmul(e, sc); return Cx(Math.abs(z.re) < 1e-12 ? 0 : z.re, Math.abs(z.im) < 1e-12 ? 0 : z.im); }));
+            f = (x, y) => { const w = mobApply(M, Cx(x, y)); return w || Cx(NaN, NaN);};
+            let worst = 0; zs.forEach((z, i) => { const w = mobApply(M, z); const e = w === null || ws[i] === null ? (w === null && ws[i] === null ? 0 : 1) : cabs(csub(w, ws[i])); worst = Math.max(worst, e); }); if (worst > 1e-9) throw new CalcError('The transformation did not map the given points correctly (numerical trouble).');
+            const crossOf = (a, b, c, d) => { const fin = z => z; void fin; return cdiv(cmul(csub(a, c), csub(b, d)), cmul(csub(a, d), csub(b, c))); }; const probes = [Cx(0.37, 0.81), Cx(-1.3, 0.2), Cx(2.1, -1.4)]; let worstCR = 0;
+            probes.forEach(zq => { if (zs.every(z => z !== null) && ws.every(w => w !== null)) { const wq = mobApply(M, zq); if (wq) { const c1 = crossOf(zs[0], zs[1], zs[2], zq), c2 = crossOf(ws[0], ws[1], ws[2], wq); worstCR = Math.max(worstCR, cabs(csub(c1, c2)) / Math.max(1, cabs(c1))); } } });
+            const [a, b, c, d] = [M[0][0], M[0][1], M[1][0], M[1][1]]; const dtm = csub(cmul(a, d), cmul(b, c)); const sq = math.sqrt(math.complex(dtm.re, dtm.im)); const nrm = cdiv(Cx(1), Cx(sq.re, sq.im)); const tr = cmul(cadd(a, d), nrm); const tr2 = cmul(tr, tr);
+            const texC = z => { const s = cStr(z); return /[+−]/.test(s.slice(1)) ? `(${s})` : s; };
+            const lin = (p, q, tex) => { const isR = z => Math.abs(z.im) < 1e-12, one = z => isR(z) && Math.abs(Math.abs(z.re) - 1) < 1e-12; const par = z => { const t = tex ? cStr(z).replace(/−/g, '-') : cStr(z); return isR(z) || Math.abs(z.re) < 1e-12 ? t : `(${t})`; }; let head; if (cabs(p) < 1e-12) head = ''; else if (one(p)) head = p.re < 0 ? '-z' : 'z'; else head = `${par(p)}${tex ? '' : '·'}z`; if (cabs(q) < 1e-12) return head || '0'; const pureI = Math.abs(q.re) < 1e-12; const neg = isR(q) ? q.re < 0 : pureI ? q.im < 0 : false; const qs = isR(q) ? NZ(Math.abs(q.re), 7)[tex ? 'tex' : 'text'] : pureI ? (Math.abs(Math.abs(q.im) - 1) < 1e-12 ? 'i' : NZ(Math.abs(q.im), 7)[tex ? 'tex' : 'text'] + 'i') : par(q); return head ? head + (neg ? ' - ' : ' + ') + qs : (neg ? '-' : '') + qs; };
+            const fixM = t => t.replace(/ - /g, ' − ').replace(/^-z/, '−z');
+            r.main = { label: 'f(z) =', text: `${wrapT(fixM(lin(a, b)))} / ${wrapT(fixM(lin(c, d)))}`, tex: `f(z)=\\dfrac{${lin(a, b, true)}}{${lin(c, d, true)}}` };
+            let kind; if (cabs(csub(b, Cx())) < 1e-12 && cabs(c) < 1e-12 && cabs(csub(a, d)) < 1e-12) kind = 'identity'; else if (Math.abs(tr2.im) < 1e-9 && Math.abs(tr2.re - 4) < 1e-9) kind = 'parabolic (one fixed point; translation-like)'; else if (Math.abs(tr2.im) < 1e-9 && tr2.re >= 0 && tr2.re < 4) kind = 'elliptic (two fixed points; a rotation about them)'; else if (Math.abs(tr2.im) < 1e-9 && tr2.re > 4) kind = 'hyperbolic (two fixed points; pure stretching between them)'; else kind = 'loxodromic (two fixed points; stretching combined with rotation)';
+            r.items.push({ label: 'Type:', text: kind + `;  tr²/det = ${cStr(tr2)}`, tex: '' });
+            let fixed = []; if (cabs(c) < 1e-12) { if (cabs(csub(d, a)) > 1e-12) fixed.push(cdiv(b, csub(d, a))); fixed.push(null); } else { const disc = math.sqrt(math.complex(csub(cmul(csub(d, a), csub(d, a)), cmul(Cx(-4), cmul(c, b))).re, csub(cmul(csub(d, a), csub(d, a)), cmul(Cx(-4), cmul(c, b))).im)); const dd = Cx(disc.re, disc.im), nb = csub(a, d); [cadd(nb, dd), csub(nb, dd)].forEach(num => fixed.push(cdiv(num, cmul(Cx(2), c)))); }
+            if (kind !== 'identity') { const fx = fixed.filter((z, i, arr) => z === null || arr.findIndex(w => w !== null && cabs(csub(w, z)) < 1e-9) === i); r.items.push({ label: 'Fixed points:', text: fx.map(z => z === null ? '∞' : cStr(z)).join(',  '), tex: '' }); }
+            r.items.push({ label: 'Poles / zeros:', text: `f(${c.re === 0 && c.im === 0 ? '∞' : cStr(cdiv(Cx(-d.re, -d.im), c))}) = ∞,  f(${cStr(cdiv(Cx(-b.re, -b.im), a))}) = 0`, tex: '' });
+            const circleImage = (zc, rad, name) => { const pts = [0, 1, 2].map(k => Cx(zc.re + rad * Math.cos(2 * Math.PI * k / 3 + 0.3), zc.im + rad * Math.sin(2 * Math.PI * k / 3 + 0.3))); const im = pts.map(zq => mobApply(M, zq)); if (im.some(w => w === null)) return `${name} → a line`; const [p1, p2, p3] = im; const cross = (p2.re - p1.re) * (p3.im - p1.im) - (p2.im - p1.im) * (p3.re - p1.re); if (Math.abs(cross) < 1e-9 * Math.max(1, cabs(p1) * cabs(p2))) return `${name} → a straight line`; const D = 2 * (p1.re * (p2.im - p3.im) + p2.re * (p3.im - p1.im) + p3.re * (p1.im - p2.im)); const ux = ((p1.re ** 2 + p1.im ** 2) * (p2.im - p3.im) + (p2.re ** 2 + p2.im ** 2) * (p3.im - p1.im) + (p3.re ** 2 + p3.im ** 2) * (p1.im - p2.im)) / D, uy = ((p1.re ** 2 + p1.im ** 2) * (p3.re - p2.re) + (p2.re ** 2 + p2.im ** 2) * (p1.re - p3.re) + (p3.re ** 2 + p3.im ** 2) * (p2.re - p1.re)) / D; return `${name} → the circle with centre ${cStr(Cx(ux, uy))} and radius ${NZ(Math.hypot(p1.re - ux, p1.im - uy), 6).text}`; };
+            r.items.push({ label: 'Images:', text: `${circleImage(Cx(), 1, 'the unit circle')};  ${(() => { const q = [0, 1, 2].map(k => Cx(k - 1, 0)); const im = q.map(zq => mobApply(M, zq)); if (im.some(w => w === null)) return 'the real axis → a line'; const [p1, p2, p3] = im; const cross = (p2.re - p1.re) * (p3.im - p1.im) - (p2.im - p1.im) * (p3.re - p1.re); return Math.abs(cross) < 1e-9 * Math.max(1, cabs(p1) * cabs(p2)) ? 'the real axis → a straight line' : 'the real axis → a circle'; })()}`, tex: '' });
+            r.meta.push(`Verified: all three given points map exactly to their targets (largest gap ${worst.toExponential(1)})` + (zs.every(z => z !== null) && ws.every(w => w !== null) ? `, and the cross-ratio of a fourth, random point is preserved (gap ${worstCR.toExponential(1)}).` : '.'));
+            r.meta.push('Method: send the three points to 0, 1, ∞ with the cross-ratio map, do the same for the targets, and compose one with the inverse of the other.');
+            r.steps.push({ title: 'Three points determine a Möbius map', text: 'f = T_w⁻¹ ∘ T_z, where T sends its three points to 0, 1, ∞. Möbius maps send circles and lines to circles and lines and preserve the cross-ratio.', tex: 'f(z)=\\frac{az+b}{cz+d},\\ ad-bc\\ne 0' });
+            info = ['mobius'];
+        } else {
+            const node = engine.parse(src); const vs = engine.freeVars(node); if (vs.length > 1 || (vs.length === 1 && vs[0] !== 'z')) throw new CalcError('Use the single complex variable z, e.g. (z-1)/(z+1) or z^2 or exp(z).');
+            const code = node.compile(); f = (x, y) => { try { return cOf(code.evaluate({ z: math.complex(x, y) })); } catch (e) { return Cx(NaN, NaN); } };
+            const dN = engine.diff(node, 'z'); const dcode = dN.compile(); const fp = (x, y) => { try { return cOf(dcode.evaluate({ z: math.complex(x, y) })); } catch (e) { return Cx(NaN, NaN); } };
+            r.main = { label: 'w = f(z) =', text: engine.strOf(node), tex: `w=${engine.texOf(node)}` }; r.items.push({ label: "f′(z) =", text: engine.strOf(dN), tex: `f'(z)=${engine.texOf(dN)}` });
+            const rat = I.toRational(node, 'z'); let crit = [], polesL = [];
+            if (rat) { const ratD = I.toRational(dN, 'z'); if (ratD && ratD.n.length > 1) crit = I.polyRoots(I.polyTrim(ratD.n.slice())).map(z => Cx(z.re, z.im)); if (rat.d.length > 1) polesL = I.polyRoots(I.polyTrim(rat.d.slice())).map(z => Cx(z.re, z.im)); }
+            let critTxt; if (rat) critTxt = crit.length ? crit.map(cStr).join(',  ') + '  (angles there are multiplied: the map folds the plane)' : 'nowhere – the map preserves angles at every point where it is defined';
+            else { const G = 40, found = []; const mag = (x, y) => { const w = fp(x, y); return Number.isFinite(w.re) ? cabs(w) : Infinity; }; const hh = 1e-6; for (let i = 0; i <= G; i++) for (let j = 0; j <= G; j++) { let z = Cx(-Rr + 2 * Rr * i / G, -Rr + 2 * Rr * j / G); if (mag(z.re, z.im) > 0.6) continue; for (let it = 0; it < 40; it++) { const g = fp(z.re, z.im), g1 = fp(z.re + hh, z.im), g0 = fp(z.re - hh, z.im); const dd = Cx((g1.re - g0.re) / (2 * hh), (g1.im - g0.im) / (2 * hh)); if (!(cabs(dd) > 1e-12) || !Number.isFinite(g.re)) break; const st = cdiv(g, dd); z = Cx(z.re - st.re, z.im - st.im); if (cabs(st) < 1e-13) break; } const g = fp(z.re, z.im); if (Number.isFinite(g.re) && cabs(g) < 1e-8 && Math.abs(z.re) <= Rr + 1e-9 && Math.abs(z.im) <= Rr + 1e-9 && !found.some(w => cabs(csub(w, z)) < 1e-5)) found.push(Cx(Math.abs(z.re) < 1e-9 ? 0 : z.re, Math.abs(z.im) < 1e-9 ? 0 : z.im)); } crit = found; critTxt = found.length ? found.slice(0, 8).map(cStr).join(',  ') + '  (found numerically in the plotted region; angles there are multiplied)' : 'none found in the plotted region – the map preserves angles wherever it is defined'; }
+            r.items.push({ label: 'Not conformal where f′(z) = 0:', text: critTxt, tex: '' });
+            if (polesL.length) r.items.push({ label: 'Poles of f:', text: polesL.map(cStr).join(',  '), tex: '' });
+            // independent conformality check by finite differences (does not use the derivative formula)
+            let worstAng = 0, worstMod = 0, used = 0; const h = 1e-5; let seed = 12345; const rnd = () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
+            for (let t = 0; t < 400 && used < 40; t++) {
+                const x = (rnd() * 2 - 1) * Rr, y = (rnd() * 2 - 1) * Rr; const d1 = fp(x, y); if (!(cabs(d1) > 1e-2 && cabs(d1) < 1e3)) continue; const fx = f(x + h, y), fxm = f(x - h, y), fy = f(x, y + h), fym = f(x, y - h); if (![fx, fxm, fy, fym].every(w => Number.isFinite(w.re) && Number.isFinite(w.im))) continue;
+                const u = Cx((fx.re - fxm.re) / (2 * h), (fx.im - fxm.im) / (2 * h)), vv = Cx((fy.re - fym.re) / (2 * h), (fy.im - fym.im) / (2 * h)); const ratio = cdiv(vv, u); worstAng = Math.max(worstAng, Math.abs(Math.atan2(ratio.im, ratio.re) - Math.PI / 2)); worstMod = Math.max(worstMod, Math.abs(cabs(u) - cabs(d1)) / cabs(d1)); used++;
+            }
+            if (used < 5) throw new CalcError('The function is not defined (or has f′ = 0) on most of the chosen region. Try a different extent.');
+            if (worstAng > 1e-3 || worstMod > 1e-3) throw new CalcError('The map failed the angle-preservation check, so the derivative may be wrong.');
+            r.meta.push(`Verified: at ${used} random points, finite differences show the images of the horizontal and vertical directions stay perpendicular (largest deviation ${(worstAng * 180 / Math.PI).toExponential(1)}°) and are stretched by |f′(z)| (largest relative gap ${worstMod.toExponential(1)}).`);
+            r.steps.push({ title: 'Why analytic maps are conformal', text: 'Near z₀ the map acts like multiplication by f′(z₀): a rotation by arg f′ and a stretch by |f′|. Every curve through z₀ turns by the same angle, so angles between curves are kept (as long as f′(z₀) ≠ 0).', tex: 'f(z_0+\\delta)\\approx f(z_0)+f\'(z_0)\\,\\delta' });
+        }
+        const clip = Math.max(8, 8 * Rr); const gi = gridImage(f, region, Rr, clip);
+        const names = region === 'polar' ? ['circles |z| = r', 'rays arg z = θ'] : ['vertical lines Re z = c', 'horizontal lines Im z = c'];
+        const traces = [{ x: gi.fam1.x, y: gi.fam1.y, mode: 'lines', type: 'scatter', name: `image of ${names[0]}`, connectgaps: false }, { x: gi.fam2.x, y: gi.fam2.y, mode: 'lines', type: 'scatter', name: `image of ${names[1]}`, connectgaps: false }];
+        const lim = Math.min(clip, Math.max(2, ...traces.flatMap(t => t.x.concat(t.y).filter(v => v !== null && Math.abs(v) < clip).map(Math.abs))) * 1.05);
+        r.items.push({ label: 'Plot:', text: `the image of a ${region === 'polar' ? 'polar' : 'square'} grid over ${region === 'polar' ? `the disc |z| ≤ ${NZ(Rr, 4).text}` : `[−${NZ(Rr, 4).text}, ${NZ(Rr, 4).text}]²`}; the two families still cross at right angles`, tex: '' });
+        r.plot = { generic: { title: 'Image of the grid under w = f(z)', xTitle: 'Re w', yTitle: 'Im w', equal: true, xRange: [-lim, lim], yRange: [-lim, lim], traces } };
+        void info; return I.finalizeText(r);
+    }
+    const prevComplexC = engine.run.complex;
+    register({ complex: (src, opt) => (opt.op === 'map' || opt.op === 'mobius') ? runConformal(src, opt) : prevComplexC(src, opt) });
+
+    // ======================================================================
+    // Numerical methods lab for y' = f(x, y): order of accuracy of Euler, Heun, midpoint, Kutta, RK4, Dormand–Prince and backward Euler
+    // ======================================================================
+    const DP = { c: [0, 1 / 5, 3 / 10, 4 / 5, 8 / 9, 1, 1], a: [[], [1 / 5], [3 / 40, 9 / 40], [44 / 45, -56 / 15, 32 / 9], [19372 / 6561, -25360 / 2187, 64448 / 6561, -212 / 729], [9017 / 3168, -355 / 33, 46732 / 5247, 49 / 176, -5103 / 18656], [35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84]], b: [35 / 384, 0, 500 / 1113, 125 / 192, -2187 / 6784, 11 / 84, 0] };
+    const ODE_METHODS = [
+        { id: 'euler', name: 'Euler', order: 1, step: (f, x, y, h) => y + h * f(x, y) },
+        { id: 'midpoint', name: 'Midpoint', order: 2, step: (f, x, y, h) => y + h * f(x + h / 2, y + h / 2 * f(x, y)) },
+        { id: 'heun', name: 'Heun (improved Euler)', order: 2, step: (f, x, y, h) => { const k1 = f(x, y), k2 = f(x + h, y + h * k1); return y + h / 2 * (k1 + k2); } },
+        { id: 'kutta3', name: 'Kutta (3rd order)', order: 3, step: (f, x, y, h) => { const k1 = f(x, y), k2 = f(x + h / 2, y + h / 2 * k1), k3 = f(x + h, y - h * k1 + 2 * h * k2); return y + h / 6 * (k1 + 4 * k2 + k3); } },
+        { id: 'rk4', name: 'Runge–Kutta 4', order: 4, step: (f, x, y, h) => { const k1 = f(x, y), k2 = f(x + h / 2, y + h / 2 * k1), k3 = f(x + h / 2, y + h / 2 * k2), k4 = f(x + h, y + h * k3); return y + h / 6 * (k1 + 2 * k2 + 2 * k3 + k4); } },
+        { id: 'dp5', name: 'Dormand–Prince (5th order)', order: 5, step: (f, x, y, h) => { const k = []; for (let s = 0; s < 6; s++) { let yy = y; for (let j = 0; j < s; j++) yy += h * DP.a[s][j] * k[j]; k.push(f(x + DP.c[s] * h, yy)); } let ynew = y; for (let j = 0; j < 6; j++) ynew += h * DP.b[j] * k[j]; return ynew; } },
+        { id: 'beuler', name: 'Backward Euler (implicit)', order: 1, step: (f, x, y, h) => { let Y = y + h * f(x, y); const g = Yv => Yv - y - h * f(x + h, Yv); let Y0 = y, g0 = g(Y0), Y1 = Y, g1 = g(Y1); for (let it = 0; it < 60 && Math.abs(g1) > 1e-15 * Math.max(1, Math.abs(Y1)); it++) { const den = g1 - g0; if (!(Math.abs(den) > 1e-300)) break; const Y2 = Y1 - g1 * (Y1 - Y0) / den; Y0 = Y1; g0 = g1; Y1 = Y2; g1 = g(Y1); } return Y1; } }
+    ];
+    function runODELab(src, opt) {
+        const node = engine.parse(src); const vs = engine.freeVars(node); if (vs.some(v => v !== 'x' && v !== 'y')) throw new CalcError('Write y′ = f(x, y) using only x and y, e.g. y - x^2 + 1.');
+        const f0 = engine.compile(node, ['x', 'y']); const ff = (x, y) => { const v = f0(x, y); return typeof v === 'number' ? v : NaN; };
+        const x0 = I.parseLimit(opt.x0 === undefined || opt.x0 === '' ? '0' : opt.x0, 'Start').value, xe = I.parseLimit(opt.xEnd === undefined || opt.xEnd === '' ? '2' : opt.xEnd, 'End').value, y0 = I.parseLimit(opt.y0 === undefined || opt.y0 === '' ? '1' : opt.y0, 'y(x₀)').value;
+        if (![x0, xe, y0].every(Number.isFinite) || !(xe > x0)) throw new CalcError('Give a finite start x₀, a larger end value, and a finite y(x₀).'); if (!Number.isFinite(ff(x0, y0))) throw new CalcError('f(x₀, y₀) is not defined.');
+        const run = (m, N) => { const h = (xe - x0) / N; let y = y0, x = x0; for (let i = 0; i < N; i++) { y = m.step(ff, x, y, h); x = x0 + (i + 1) * h; if (!Number.isFinite(y) || Math.abs(y) > 1e150) return NaN; } return y; };
+        const dp = ODE_METHODS.find(m => m.id === 'dp5'); const ref1 = run(dp, 1024), ref2 = run(dp, 2048); if (!Number.isFinite(ref1) || !Number.isFinite(ref2)) throw new CalcError('The solution blows up or leaves the domain on this interval. Try a shorter interval.');
+        const refGap = Math.abs(ref1 - ref2) / Math.max(1, Math.abs(ref2)); if (refGap > 1e-9) throw new CalcError('Could not compute a trustworthy reference solution (the equation may be too stiff or too wild on this interval).');
+        const ref = ref2 + (ref2 - ref1) / 31;   // Richardson step: fifth-order scheme, error ratio 2⁵
+        const Ns = [4, 8, 16, 32, 64, 128]; const rows = ODE_METHODS.map(m => { const errs = Ns.map(N => { const y = run(m, N); return Number.isFinite(y) ? Math.abs(y - ref) : NaN; }); const orders = []; for (let i = 0; i + 1 < errs.length; i++) orders.push(errs[i] > 1e-13 && errs[i + 1] > 1e-13 && Number.isFinite(errs[i]) && Number.isFinite(errs[i + 1]) ? Math.log2(errs[i] / errs[i + 1]) : NaN); const good = orders.filter(Number.isFinite); const est = good.length ? good[Math.max(0, good.length - 2)] : NaN; return { m, errs, orders, est }; });
+        const r = I.makeResult('ode', 'Numerical methods lab'); r.main = { label: `y(${NZ(xe, 6).text}) ≈`, text: engine.fmt(ref, 12), tex: `y(${NZ(xe, 6).tex})\\approx ${engine.fmt(ref, 12)}` };
+        r.items.push({ label: 'Problem:', text: `y′ = ${engine.strOf(node)},  y(${NZ(x0, 6).text}) = ${NZ(y0, 8).text}  on [${NZ(x0, 6).text}, ${NZ(xe, 6).text}]`, tex: `y'=${engine.texOf(node)},\\ y(${NZ(x0, 6).tex})=${NZ(y0, 8).tex}` });
+        r.items.push({ label: `Step counts N:`, text: Ns.join(', ') + `   (step size h = (end − start)/N)`, tex: '' });
+        let flagged = 0; rows.forEach(({ m, errs, est }) => { const e = errs.map(x => (Number.isFinite(x) ? x.toExponential(1) : 'unstable')).join('  '); const okOrder = Number.isFinite(est) && Math.abs(est - m.order) < 0.45; if (!okOrder && Number.isFinite(est)) flagged++; r.items.push({ label: `${m.name}:`, text: `error at x = ${NZ(xe, 4).text}:  ${e}   →  observed order ≈ ${Number.isFinite(est) ? est.toFixed(2) : '–'}  (theory ${m.order})`, tex: '' }); });
+        const best = rows.filter(x => Number.isFinite(x.errs[x.errs.length - 1])).sort((p, q) => p.errs[p.errs.length - 1] - q.errs[q.errs.length - 1])[0]; if (best) r.items.push({ label: 'Most accurate at the finest step:', text: `${best.m.name} (error ${best.errs[best.errs.length - 1].toExponential(1)} with N = ${Ns[Ns.length - 1]})`, tex: '' });
+        const eul = []; { const N = 5, h = (xe - x0) / N; let x = x0, y = y0; eul.push(`(${NZ(x, 5).text}, ${NZ(y, 6).text})`); for (let i = 0; i < N; i++) { y = ODE_METHODS[0].step(ff, x, y, h); x = x0 + (i + 1) * h; eul.push(`(${NZ(x, 5).text}, ${NZ(y, 6).text})`); } r.items.push({ label: 'Euler by hand, N = 5:', text: eul.join('  '), tex: '' }); }
+        r.meta.push(`Verified: the reference value comes from a fifth-order scheme run with 1024 and 2048 steps (they agree to ${refGap.toExponential(1)}) plus one Richardson step; each method's observed order of accuracy was measured from how the error shrinks when N doubles.`);
+        if (flagged) r.warnings.push(`${flagged} method${flagged > 1 ? 's' : ''} did not show the textbook order. That happens when the solution is not smooth, the steps are too coarse (stiff problems) or the error reaches rounding level.`);
+        r.meta.push('Smaller steps cost more work: an order-p method\'s error falls like h^p, so doubling N divides the error by about 2^p.');
+        r.steps.push({ title: 'Global error and order', text: 'A method has order p if the error at the end of the interval behaves like C·h^p. On a log–log plot the data fall on a line of slope p.', tex: '\\text{error}\\approx C\\,h^{p}' }); r.steps.push({ title: 'Backward Euler', text: 'It is only first order, but implicit steps stay stable on stiff problems where explicit Euler blows up.', tex: 'y_{n+1}=y_n+h\\,f(x_{n+1},y_{n+1})' });
+        r.plot = { generic: { title: 'Error versus step size (log–log)', xTitle: 'log₁₀ h', yTitle: 'log₁₀ error at the end', traces: rows.map(({ m, errs }) => ({ x: Ns.filter((_, i) => Number.isFinite(errs[i]) && errs[i] > 0).map(N => Math.log10((xe - x0) / N)), y: errs.filter(e => Number.isFinite(e) && e > 0).map(Math.log10), mode: 'lines+markers', type: 'scatter', name: `${m.name} (p=${m.order})` })) } };
+        return I.finalizeText(r);
+    }
+    const prevOdeLab = engine.run.ode;
+    register({ ode: (src, opt) => opt.odeType === 'methods' ? runODELab(src, opt) : prevOdeLab(src, opt) });
+
     return engine;
 });

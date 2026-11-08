@@ -1,6 +1,14 @@
 const test = require('node:test'), assert = require('node:assert');
 const NL = require('../js/nlp.js');
 const cases = [
+  ['z transform of 0.5^n', { mode: 'laplace', fn: '0.5^n', opts: { op: 'ztrans' } }],
+  ['inverse z transform of z/(z-0.5)', { mode: 'laplace', fn: 'z/(z-0.5)', opts: { op: 'iztrans' } }],
+  ['solve the difference equation y(n) = 0.9*y(n-1) + x(n) with input step', { mode: 'laplace', opts: { op: 'zdiff', xin: 'step' } }],
+  ['pade [3/2] approximant of tan(x)', { mode: 'series', fn: 'tan(x)', opts: { task: 'pade', pm: '3', pn: '2' } }],
+  ['pade approximant of exp(x)', { mode: 'series', fn: 'exp(x)', opts: { task: 'pade', pm: '2', pn: '2' } }],
+  ['mobius transformation through 0 -> -1, 1 -> 0, inf -> 1', { mode: 'complex', fn: '0 -> -1 ; 1 -> 0 ; inf -> 1', opts: { op: 'mobius' } }],
+  ['conformal map of (z-1)/(z+1)', { mode: 'complex', fn: '(z-1)/(z+1)', opts: { op: 'map' } }],
+  ["compare numerical methods for y' = y - x^2 + 1 with y(0) = 0.5 to 2", { mode: 'ode', fn: 'y-x^2+1', opts: { odeType: 'methods', y0: '0.5', xEnd: '2' } }],
   ['laplace transform of t for 0<t<1 ; 2-t for 1<t<2 ; 0 otherwise', { mode: 'laplace', opts: { op: 'laplace' } }],
   ['fourier transform of 1 for -1<t<1 ; 0 otherwise', { mode: 'laplace', opts: { op: 'fourier' } }],
   ['equilibria of y ; -sin(x)-0.3*y', { mode: 'ode', opts: { odeType: 'equilibria' } }],
