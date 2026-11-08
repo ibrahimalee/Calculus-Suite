@@ -147,6 +147,8 @@
         if (m) return { mode: 'limit', fn: mathify(m[1]), opts: { task: 'epsdelta', point: m[2], eps: m[3] || '0.1', direction: 'both', variable: '' }, say: 'Epsilon–delta' };
         m = s.match(/^(?:run |do )?(?:a )?chi[- ]?(?:square|squared)(?: test)?(?: (?:of|on|for))? ([\d.,;\s]+?)(?: (?:expected|with expected|against) ([\d.,\s]+))?$/);
         if (m) return { mode: 'stats', fn: m[1].trim(), opts: { op: 'chisq', expected: (m[2] || '').trim(), alpha: '0.05' }, say: 'Chi-square test' };
+        m = s.match(/^(?:run |do )?(?:a )?mann[- ]?whitney(?: u)?(?: test)?(?: (?:of|on|for))? ([\d.,;\s-]+)$/);
+        if (m) return { mode: 'stats', fn: m[1].trim(), opts: { op: 'mannwhitney', alpha: '0.05' }, say: 'Mann–Whitney U test' };
         m = s.match(/^(?:run |do )?(?:a )?(?:one[- ]?way )?anova(?: test)?(?: (?:of|on|for))? ([\d.,;\s-]+)$/);
         if (m) return { mode: 'stats', fn: m[1].trim(), opts: { op: 'anova', alpha: '0.05' }, say: 'One-way ANOVA' };
         m = s.match(/^(?:the )?(heat|wave) equation(?: with| for| on)? (?:initial (?:temperature|shape|profile|condition) )?(?:u\(x,? ?0\) ?= ?)?(.+?)(?: (?:until|for|up to|at) t(?:ime)? ?= ?([\d.]+))?$/);

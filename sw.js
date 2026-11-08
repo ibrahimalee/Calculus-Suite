@@ -1,5 +1,5 @@
 /* Offline support: app shell is network-first (always fresh when online), vendor libraries are cache-first. */
-const VERSION = 'cs-v13';
+const VERSION = 'cs-v14';
 const CORE = ['./', 'index.html', 'app.html', 'css/home.css', 'js/home.js', 'css/styles.css', 'js/lib-guard.js', 'js/engine.js', 'js/extras.js', 'js/nlp.js', 'js/practice.js', 'js/i18n.js', 'js/braille.js', 'js/runner.js', 'js/worker.js', 'js/app.js',
     'vendor/math.min.js', 'vendor/algebrite.min.js', 'vendor/plotly.min.js', 'vendor/katex/katex.min.js', 'vendor/katex/katex.min.css',
     'vendor/fonts/fraunces-latin-wght-normal.woff2', 'vendor/fonts/ibm-plex-sans-latin-400-normal.woff2', 'vendor/fonts/ibm-plex-sans-latin-500-normal.woff2', 'vendor/fonts/ibm-plex-sans-latin-600-normal.woff2', 'vendor/fonts/ibm-plex-mono-latin-400-normal.woff2', 'vendor/fonts/ibm-plex-mono-latin-500-normal.woff2', 'icon.svg', 'manifest.webmanifest'];

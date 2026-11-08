@@ -1321,6 +1321,7 @@
 
         const node = engine.parse(src); const v = oneVar(node);
         if (op === 'factor') {
+            { const rt = I.toRational(node, v); if (rt && (rt.n.length > 9 || rt.d.length > 9)) throw new CalcError('Factoring is limited to degree 8 here to keep the page responsive. Try Partial fractions or Roots for higher degrees.'); }
             let fac, exp;
             try { if (typeof Algebrite.clearall === 'function') Algebrite.clearall(); fac = String(Algebrite.run(`factor(${engine.strOf(node)})`)).trim(); exp = String(Algebrite.run(`expand(${engine.strOf(node)})`)).trim(); } catch (e) { throw new CalcError('Could not factor that expression.'); }
             if (!fac || /Stop|rror|nil|\?/.test(fac) || !exp || /Stop|rror|nil|\?/.test(exp)) throw new CalcError('Could not factor that expression.');
@@ -1577,8 +1578,11 @@
             r.items.push({ label: 'Between / within / total SS:', text: `${engine.fmt(ssb, 6)} / ${engine.fmt(ssw, 6)} / ${engine.fmt(sst, 6)}`, tex: '' });
             r.items.push({ label: 'Mean squares:', text: `MSB = ${engine.fmt(msb, 6)},  MSW = ${engine.fmt(msw, 6)}`, tex: '' });
             r.items.push({ label: 'Effect size η² =', text: engine.fmt(ssb / sst, 5), tex: '' });
+            const pairs = []; for (let i = 0; i < k; i++) for (let j = i + 1; j < k; j++) { const dif = means[i] - means[j], se = Math.sqrt(msw * (1 / groups[i].length + 1 / groups[j].length)), tt = dif / se, raw = 2 * (1 - tCdf(Math.abs(tt), d2)); pairs.push({ i, j, dif, tt, raw, adj: Math.min(1, raw * (k * (k - 1) / 2)) }); }
+            if (k === 2 && Math.abs(pairs[0].raw - pv) > 1e-6) throw new CalcError('The pairwise check failed.');
+            if (k > 2) r.items.push({ label: 'Pairwise comparisons (Bonferroni-adjusted):', text: pairs.map(q => `${q.i + 1} vs ${q.j + 1}: difference ${engine.fmt(q.dif, 5)}, adjusted p = ${q.adj < 1e-4 ? q.adj.toExponential(2) : engine.fmt(q.adj, 4)}${q.adj < alpha ? ' *' : ''}`).join(';   '), tex: '' });
             r.meta.push(`Verified: SS between + SS within = SS total (difference ${Math.abs(ssb + ssw - sst).toExponential(1)}); the p-value matches direct numerical integration of the F density`);
-            r.meta.push('Assumes independent samples, roughly normal groups and similar variances. A significant F says some means differ, not which ones.');
+            r.meta.push(k > 2 ? 'Pairwise p-values use the pooled within-group variance and a Bonferroni correction (conservative); * marks pairs significant at α. Assumes independent samples, roughly normal groups and similar variances.' : 'Assumes independent samples, roughly normal groups and similar variances.');
             r.steps.push({ title: 'Split the variation', text: 'Total variation = variation between group means + variation within groups.', tex: '' }); r.steps.push({ title: 'Compare mean squares', text: 'F = (SS between / (k − 1)) ÷ (SS within / (N − k)). Under H₀ it follows an F distribution.', tex: '' });
             r.plot = { generic: { title: 'Groups and their means', xTitle: 'group', yTitle: 'value', traces: groups.map((g, i) => ({ y: g, type: 'box', name: `group ${i + 1}`, boxpoints: 'all', jitter: 0.4 })) } };
             return I.finalizeText(r);
@@ -1613,49 +1617,83 @@
         void tail;
         return I.finalizeText(r);
     }
-    register({ stats: (src, opt) => (opt.op === 'chisq' || opt.op === 'anova') ? runChiAnova(src, opt) : prevStats(src, opt) });
+    function runMannWhitney(src, opt) {
+        const alpha = (() => { const q = +opt.alpha; return q > 0 && q < 1 ? q : 0.05; })();
+        const rows = String(src).split(/[;\n]+/).map(x => x.trim()).filter(Boolean); if (rows.length !== 2) throw new CalcError('Give exactly two samples separated by a semicolon, e.g. 1.2 3.4 2.2 ; 4.5 5.1 3.9.');
+        const A = numList(rows[0], 'Value'), B = numList(rows[1], 'Value'); const n1 = A.length, n2 = B.length, N = n1 + n2; if (n1 < 1 || n2 < 1) throw new CalcError('Each sample needs at least one value.'); if (N > 5000) throw new CalcError('Up to 5,000 values in total.');
+        const all = A.map(v => ({ v, g: 0 })).concat(B.map(v => ({ v, g: 1 }))).sort((a, b) => a.v - b.v); const rank = new Array(N); let ties = 0, tieSum = 0;
+        for (let i = 0; i < N;) { let j = i; while (j + 1 < N && all[j + 1].v === all[i].v) j++; const rk = (i + j) / 2 + 1; for (let q = i; q <= j; q++) rank[q] = rk; const t = j - i + 1; if (t > 1) { ties++; tieSum += t * t * t - t; } i = j + 1; }
+        const R1 = all.reduce((a, o, i) => a + (o.g === 0 ? rank[i] : 0), 0), U1 = R1 - n1 * (n1 + 1) / 2, U2 = n1 * n2 - U1;
+        if (Math.abs(U1 + U2 - n1 * n2) > 1e-9) throw new CalcError('Internal check failed.');
+        const U = Math.min(U1, U2); let p, how;
+        if (!ties && N <= 28) {
+            // exact null distribution of the rank sum: choose n1 of the ranks 1..N
+            const maxS = n1 * (2 * N - n1 + 1) / 2; const dp = Array.from({ length: n1 + 1 }, () => new Float64Array(maxS + 1)); dp[0][0] = 1;
+            for (let r = 1; r <= N; r++) for (let k = Math.min(r, n1); k >= 1; k--) for (let sm = maxS; sm >= r; sm--) dp[k][sm] += dp[k - 1][sm - r];
+            const cnt = dp[n1]; const total = cnt.reduce((a, b) => a + b, 0); let comb = 1; for (let i = 1; i <= n1; i++) comb = comb * (N - n1 + i) / i; if (Math.abs(total - comb) > 1e-6 * comb) throw new CalcError('Internal check failed.');
+            const base = n1 * (n1 + 1) / 2; let lo = 0; for (let sm = 0; sm <= R1; sm++) lo += cnt[sm]; let hi = 0; for (let sm = R1; sm <= maxS; sm++) hi += cnt[sm]; p = Math.min(1, 2 * Math.min(lo, hi) / total); how = `exact (all ${engine.fmt(total, 8)} rank arrangements)`; void base;
+        } else {
+            const mu = n1 * n2 / 2, sg = Math.sqrt(n1 * n2 / 12 * ((N + 1) - tieSum / (N * (N - 1)))); if (!(sg > 0)) throw new CalcError('All values are identical, so the test is undefined.');
+            const z = (Math.abs(U1 - mu) - 0.5) / sg; const Phi = x => 0.5 * (1 + (x >= 0 ? 1 : -1) * gammaP(0.5, x * x / 2)); p = Math.min(1, 2 * (1 - Phi(Math.max(0, z)))); how = `normal approximation with continuity${ties ? ' and tie' : ''} correction`;
+        }
+        const r = I.makeResult('stats', 'Mann–Whitney U test');
+        r.main = { label: 'U test:', text: `U = ${engine.fmt(U, 6)}  (U₁ = ${engine.fmt(U1, 6)}, U₂ = ${engine.fmt(U2, 6)}),  p = ${p < 1e-4 ? p.toExponential(3) : engine.fmt(p, 5)}`, tex: '' };
+        r.items.push({ label: 'Decision:', text: p < alpha ? `Reject H₀ at α = ${alpha}: the two samples differ in location / distribution.` : `Do not reject H₀ at α = ${alpha}: no evidence of a difference.`, tex: '' });
+        r.items.push({ label: 'Probability of superiority:', text: `P(a random value from sample 1 exceeds one from sample 2) ≈ ${engine.fmt((U1 + (ties ? 0 : 0)) / (n1 * n2), 4)}`, tex: '' });
+        r.items.push({ label: 'Rank sums:', text: `R₁ = ${engine.fmt(R1, 6)}, R₂ = ${engine.fmt(N * (N + 1) / 2 - R1, 6)}  (sample sizes ${n1} and ${n2})`, tex: '' });
+        r.items.push({ label: 'p-value method:', text: how, tex: '' });
+        r.meta.push(`Verified: U₁ + U₂ = n₁n₂ and the rank sums add to N(N+1)/2${!ties && N <= 28 ? '; the exact distribution counts every arrangement' : ''}`);
+        r.meta.push('Needs no normality assumption. It tests whether one sample tends to give larger values; it compares medians only if the two distributions have the same shape.');
+        r.steps.push({ title: 'Rank all values together', text: 'Pool both samples, rank from smallest to largest, and give tied values their average rank.', tex: '' }); r.steps.push({ title: 'Sum the ranks', text: 'U₁ = R₁ − n₁(n₁+1)/2. If the samples came from the same distribution, U₁ is near n₁n₂/2.', tex: '' });
+        r.plot = { generic: { title: 'The two samples', xTitle: 'sample', yTitle: 'value', traces: [{ y: A, type: 'box', name: 'sample 1', boxpoints: 'all', jitter: 0.4 }, { y: B, type: 'box', name: 'sample 2', boxpoints: 'all', jitter: 0.4 }] } };
+        return I.finalizeText(r);
+    }
+    register({ stats: (src, opt) => (opt.op === 'chisq' || opt.op === 'anova') ? runChiAnova(src, opt) : opt.op === 'mannwhitney' ? runMannWhitney(src, opt) : prevStats(src, opt) });
 
     // ---- heat and wave equations on [0, L] with fixed ends ----
     function runPDE(src, opt) {
-        const kind = opt.odeType; const node = engine.parse(src); const fv = engine.freeVars(node); if (fv.some(q => q !== 'x')) throw new CalcError('Write the initial profile in terms of x only, e.g. sin(x) or x*(pi-x).');
+        const kind = opt.odeType, neu = opt.pdeBC === 'neumann'; const node = engine.parse(src); const fv = engine.freeVars(node); if (fv.some(q => q !== 'x')) throw new CalcError('Write the initial profile in terms of x only, e.g. sin(x) or x*(pi-x).');
         const L = I.parseLimit(opt.pdeL === undefined || opt.pdeL === '' ? 'pi' : opt.pdeL, 'Length').value, T = I.parseLimit(opt.pdeT === undefined || opt.pdeT === '' ? '1' : opt.pdeT, 'Final time').value, cf = I.parseLimit(opt.pdeK === undefined || opt.pdeK === '' ? '1' : opt.pdeK, kind === 'heat' ? 'Diffusivity' : 'Wave speed').value;
         if (!(L > 0 && L < 1e4) || !(T > 0 && T < 1e5) || !(cf > 0 && cf < 1e4)) throw new CalcError('Length, final time and the coefficient must be positive numbers.');
         const u0 = engine.compile(node, ['x']); const vNode = kind === 'wave' ? engine.parse(opt.pdeV === undefined || String(opt.pdeV).trim() === '' ? '0' : opt.pdeV) : null; if (vNode && engine.freeVars(vNode).some(q => q !== 'x')) throw new CalcError('The initial velocity must depend on x only.'); const v0 = vNode ? engine.compile(vNode, ['x']) : null;
         const sc = Math.max(1e-12, ...Array.from({ length: 2001 }, (_, i) => Math.abs(u0(L * i / 2000)))); if (!Number.isFinite(sc)) throw new CalcError('The initial profile is not defined on the whole interval.');
-        if (Math.abs(u0(0)) > 1e-6 * sc || Math.abs(u0(L)) > 1e-6 * sc) throw new CalcError('Both ends are held at 0, so the initial profile must be 0 at x = 0 and x = L (for example sin(x) on [0, π], or x*(pi−x)).');
+        if (!neu && (Math.abs(u0(0)) > 1e-6 * sc || Math.abs(u0(L)) > 1e-6 * sc)) throw new CalcError('Both ends are held at 0, so the initial profile must be 0 at x = 0 and x = L (for example sin(x) on [0, π], or x*(pi−x)).');
         const Nx = kind === 'heat' ? 120 : 240, dx = L / Nx, xs = Array.from({ length: Nx + 1 }, (_, i) => i * dx);
-        let u = xs.map(x => u0(x)); u[0] = 0; u[Nx] = 0; const frames = [{ t: 0, u: u.slice() }]; const keep = 60; const rec = []; // snapshots for the surface
+        let u = xs.map(x => u0(x)); if (!neu) { u[0] = 0; u[Nx] = 0; } const frames = [{ t: 0, u: u.slice() }]; const keep = 60; const rec = []; // snapshots for the surface
         const snap = (t, uu) => rec.push({ t, u: uu.slice() }); snap(0, u);
         if (kind === 'heat') {
-            const steps = 800, dt = T / steps, r = cf * dt / (2 * dx * dx), n = Nx - 1; const a = new Array(n).fill(-r), b = new Array(n).fill(1 + 2 * r), c = new Array(n).fill(-r);
+            const steps = 800, dt = T / steps, r = cf * dt / (2 * dx * dx), n = neu ? Nx + 1 : Nx - 1, off = neu ? 0 : 1;
+            const a = new Array(n).fill(-r), b = new Array(n).fill(1 + 2 * r), c = new Array(n).fill(-r); if (neu) { c[0] = -2 * r; a[n - 1] = -2 * r; }
             for (let st = 1; st <= steps; st++) {
-                const d = []; for (let i = 1; i < Nx; i++) d.push((1 - 2 * r) * u[i] + r * (u[i - 1] + u[i + 1]));
+                const d = new Array(n); for (let k = 0; k < n; k++) { const i = k + off; const um = i === 0 ? u[1] : u[i - 1], up = i === Nx ? u[Nx - 1] : u[i + 1]; d[k] = (1 - 2 * r) * u[i] + r * (um + up); }
                 const cp = new Array(n), dp = new Array(n); cp[0] = c[0] / b[0]; dp[0] = d[0] / b[0]; for (let i = 1; i < n; i++) { const m = b[i] - a[i] * cp[i - 1]; cp[i] = c[i] / m; dp[i] = (d[i] - a[i] * dp[i - 1]) / m; }
-                const nu = new Array(Nx + 1).fill(0); nu[n] = dp[n - 1]; for (let i = n - 2; i >= 0; i--) nu[i + 1] = dp[i] - cp[i] * nu[i + 2]; u = nu;
+                const sol = new Array(n); sol[n - 1] = dp[n - 1]; for (let i = n - 2; i >= 0; i--) sol[i] = dp[i] - cp[i] * sol[i + 1];
+                const nu = new Array(Nx + 1).fill(0); for (let k = 0; k < n; k++) nu[k + off] = sol[k]; u = nu;
                 if (st % (steps / keep) === 0) snap(st * dt, u);
             }
         } else {
             let dt = 0.5 * dx / cf; const steps = Math.max(2, Math.ceil(T / dt)); if (steps > 40000) throw new CalcError('That would need too many time steps; shorten the time or the length.'); dt = T / steps; const lam2 = (cf * dt / dx) ** 2; if (lam2 > 1) throw new CalcError('Internal stability check failed.');
-            const vel = xs.map(x => (v0 ? v0(x) : 0)); let prev = u.slice(), cur = new Array(Nx + 1).fill(0); for (let i = 1; i < Nx; i++) cur[i] = u[i] + dt * vel[i] + 0.5 * lam2 * (u[i + 1] - 2 * u[i] + u[i - 1]); const every = Math.max(1, Math.floor(steps / keep)); if (every === 1 || steps >= 1) { /* record first */ }
-            for (let st = 2; st <= steps; st++) { const nxt = new Array(Nx + 1).fill(0); for (let i = 1; i < Nx; i++) nxt[i] = 2 * cur[i] - prev[i] + lam2 * (cur[i + 1] - 2 * cur[i] + cur[i - 1]); prev = cur; cur = nxt; if (st % every === 0) snap(st * dt, cur); }
+            const vel = xs.map(x => (v0 ? v0(x) : 0)); let prev = u.slice(), cur = new Array(Nx + 1).fill(0); for (let i = neu ? 0 : 1; i <= (neu ? Nx : Nx - 1); i++) { const um = i === 0 ? u[1] : u[i - 1], up = i === Nx ? u[Nx - 1] : u[i + 1]; cur[i] = u[i] + dt * vel[i] + 0.5 * lam2 * (up - 2 * u[i] + um); } const every = Math.max(1, Math.floor(steps / keep)); if (every === 1 || steps >= 1) { /* record first */ }
+            for (let st = 2; st <= steps; st++) { const nxt = new Array(Nx + 1).fill(0); for (let i = neu ? 0 : 1; i <= (neu ? Nx : Nx - 1); i++) { const um = i === 0 ? cur[1] : cur[i - 1], up = i === Nx ? cur[Nx - 1] : cur[i + 1]; nxt[i] = 2 * cur[i] - prev[i] + lam2 * (up - 2 * cur[i] + um); } prev = cur; cur = nxt; if (st % every === 0) snap(st * dt, cur); }
             u = cur; if (rec[rec.length - 1].t < T - 1e-12) snap(T, u);
         }
         // independent check: Fourier sine series
-        const NM = 80, lam = n => n * Math.PI / L; const coef = fn => Array.from({ length: NM }, (_, i) => { const n = i + 1; return 2 / L * simpson(x => fn(x) * Math.sin(lam(n) * x), 0, L, 4000); });
-        const bn = coef(u0), dn = kind === 'wave' ? coef(v0) : null;
-        const exact = x => { let s = 0; for (let i = 0; i < NM; i++) { const n = i + 1, k = lam(n); s += kind === 'heat' ? bn[i] * Math.exp(-cf * k * k * T) * Math.sin(k * x) : (bn[i] * Math.cos(cf * k * T) + dn[i] / (cf * k) * Math.sin(cf * k * T)) * Math.sin(k * x); } return s; };
+        const NM = 80, lam = n => n * Math.PI / L; const basisF = neu ? Math.cos : Math.sin; const coef = fn => Array.from({ length: NM }, (_, i) => { const n = i + 1; return 2 / L * simpson(x => fn(x) * basisF(lam(n) * x), 0, L, 4000); });
+        const bn = coef(u0), dn = kind === 'wave' ? coef(v0) : null; const a0 = neu ? simpson(u0, 0, L, 4000) / L : 0, d0 = neu && kind === 'wave' ? simpson(v0, 0, L, 4000) / L : 0;
+        const exact = x => { let s = a0 + d0 * T; for (let i = 0; i < NM; i++) { const n = i + 1, k = lam(n); s += (kind === 'heat' ? bn[i] * Math.exp(-cf * k * k * T) : (bn[i] * Math.cos(cf * k * T) + dn[i] / (cf * k) * Math.sin(cf * k * T))) * basisF(k * x); } return s; };
         let diff = 0; xs.forEach((x, i) => { diff = Math.max(diff, Math.abs(exact(x) - u[i])); }); const rel = diff / sc;
         const r = I.makeResult('ode', kind === 'heat' ? 'Heat equation' : 'Wave equation');
         const peak = Math.max(...u.map(Math.abs));
         r.main = { label: kind === 'heat' ? 'uₜ = α·uₓₓ  on [0, L]:' : 'uₜₜ = c²·uₓₓ  on [0, L]:', text: `max |u(x, ${engine.fmt(T, 5)})| = ${engine.fmt(peak, 6)}  (initially ${engine.fmt(sc, 6)})`, tex: '' };
         const lead = bn.map((b, i) => ({ n: i + 1, b })).filter(q => Math.abs(q.b) > 1e-6 * sc).slice(0, 4);
-        r.items.push({ label: 'Setup:', text: `L = ${engine.fmt(L, 6)}, ${kind === 'heat' ? 'α' : 'c'} = ${engine.fmt(cf, 6)}, ends fixed at 0, final time T = ${engine.fmt(T, 6)}`, tex: '' });
-        r.items.push({ label: 'Leading sine modes of u(x, 0):', text: lead.map(q => `b${q.n} = ${engine.fmt(q.b, 5)}`).join(',  ') || 'none', tex: '' });
+        r.items.push({ label: 'Setup:', text: `L = ${engine.fmt(L, 6)}, ${kind === 'heat' ? 'α' : 'c'} = ${engine.fmt(cf, 6)}, ${neu ? 'insulated / free ends (uₓ = 0)' : 'ends fixed at 0'}, final time T = ${engine.fmt(T, 6)}`, tex: '' });
+        if (neu) r.items.push({ label: 'Average level of u(x, 0):', text: engine.fmt(Math.abs(a0) < 1e-10 * sc ? 0 : a0, 6), tex: '' });
+        r.items.push({ label: neu ? 'Leading cosine modes of u(x, 0):' : 'Leading sine modes of u(x, 0):', text: lead.map(q => `b${q.n} = ${engine.fmt(q.b, 5)}`).join(',  ') || 'none', tex: '' });
         r.items.push({ label: kind === 'heat' ? 'Mode decay rates:' : 'Mode frequencies:', text: lead.map(q => kind === 'heat' ? `mode ${q.n}: e^(−${engine.fmt(cf * lam(q.n) ** 2, 5)}·t)` : `mode ${q.n}: ω = ${engine.fmt(cf * lam(q.n), 5)}`).join(',  ') || '–', tex: '' });
-        if (kind === 'heat') r.items.push({ label: 'Heat remaining ∫u dx:', text: `${engine.fmt(u.reduce((a, q) => a + q * dx, 0), 6)} (from ${engine.fmt(xs.map((x, i) => frames[0].u[i]).reduce((a, q) => a + q * dx, 0), 6)})`, tex: '' });
-        if (rel < 0.02) r.meta.push(`Verified: the finite-difference solution matches the exact Fourier sine-series solution at the final time (largest difference ${engine.fmt(diff, 3)}, ${(rel * 100).toFixed(2)}% of the initial maximum)`); else r.warnings.push(`The numerical and series solutions differ by ${(rel * 100).toFixed(1)}% of the initial maximum; the initial data may be too rough for this grid.`);
-        r.meta.push(kind === 'heat' ? `Method: Crank–Nicolson finite differences (${Nx} cells, 800 steps), unconditionally stable and second-order accurate` : `Method: explicit leapfrog finite differences (${Nx} cells, CFL number 0.5)`);
-        r.steps.push({ title: 'Separate variables', text: 'Write u = X(x)·T(t). With fixed ends the spatial modes are sin(nπx/L).', tex: '' });
+        if (kind === 'heat') r.items.push({ label: 'Heat remaining ∫u dx:', text: `${engine.fmt((v => (Math.abs(v) < 1e-9 * sc * L ? 0 : v))(u.reduce((a, q) => a + q * dx, 0)), 6)} (from ${engine.fmt((v => (Math.abs(v) < 1e-9 * sc * L ? 0 : v))(frames[0].u.reduce((a, q) => a + q * dx, 0)), 6)})`, tex: '' });
+        if (rel < 0.02) r.meta.push(`Verified: the finite-difference solution matches the exact Fourier ${neu ? 'cosine' : 'sine'}-series solution at the final time (largest difference ${engine.fmt(diff, 3)}, ${(rel * 100).toFixed(2)}% of the initial maximum)`); else r.warnings.push(`The numerical and series solutions differ by ${(rel * 100).toFixed(1)}% of the initial maximum; the initial data may be too rough for this grid.`);
+        r.meta.push(kind === 'heat' ? `Method: Crank–Nicolson finite differences (${Nx} cells, 800 steps), unconditionally stable and second-order accurate${neu ? '; insulated ends use a mirrored ghost point' : ''}` : `Method: explicit leapfrog finite differences (${Nx} cells, CFL number 0.5)`);
+        r.steps.push({ title: 'Separate variables', text: neu ? 'Write u = X(x)·T(t). With insulated ends (uₓ = 0) the spatial modes are cos(nπx/L), plus a constant mode for the average.' : 'Write u = X(x)·T(t). With fixed ends the spatial modes are sin(nπx/L).', tex: '' });
         r.steps.push({ title: kind === 'heat' ? 'Each mode decays' : 'Each mode oscillates', text: kind === 'heat' ? 'Mode n evolves as e^(−α(nπ/L)²t): high modes die fastest, so the profile smooths out.' : 'Mode n oscillates at frequency c·nπ/L: the shape travels and reflects at the ends instead of dying away.', tex: '' });
         r.steps.push({ title: 'Sum the modes', text: 'The solution is the sum of the modes, with weights from the sine-series coefficients of the initial data.', tex: '' });
         const pick = [0, 0.1, 0.25, 0.5, 1].map(fr => rec.reduce((best, q) => (Math.abs(q.t - fr * T) < Math.abs(best.t - fr * T) ? q : best), rec[0]));

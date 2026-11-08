@@ -1,6 +1,7 @@
 const test = require('node:test'), assert = require('node:assert');
 const NL = require('../js/nlp.js');
 const cases = [
+  ['mann whitney test 1 2 3 4 ; 5 6 7 8', { mode: 'stats', opts: { op: 'mannwhitney' } }],
   ['epsilon delta for x^2 near 2 with epsilon 0.05', { mode: 'limit', opts: { task: 'epsdelta', point: '2', eps: '0.05' } }],
   ['chi square test 18,22,20,40', { mode: 'stats', opts: { op: 'chisq' } }],
   ['anova 5,6,7;8,9,10', { mode: 'stats', opts: { op: 'anova' } }],

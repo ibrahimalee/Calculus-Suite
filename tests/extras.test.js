@@ -143,3 +143,12 @@ test('non-homogeneous recurrences, epsilon-delta, chi-square, ANOVA and PDEs ver
   assert.ok(E.run.ode('x*(pi-x)', { odeType: 'wave', pdeL: 'pi', pdeT: '2', pdeK: '1', pdeV: '0' }).meta.some(m => /^Verified/.test(m)));
   assert.throws(() => E.run.ode('cos(x)', { odeType: 'heat' }), /0 at x = 0/);
 });
+test('insulated-end PDEs, ANOVA pairwise comparisons and Mann-Whitney verify themselves', () => {
+  const h = E.run.ode('x', { odeType: 'heat', pdeBC: 'neumann', pdeL: '1', pdeT: '0.5', pdeK: '1' }); assert.ok(h.meta.some(m => /^Verified.*cosine/.test(m))); assert.match(h.items.map(i => i.text).join('|'), /insulated/);
+  assert.ok(E.run.ode('1+cos(2*x)', { odeType: 'wave', pdeBC: 'neumann', pdeL: 'pi', pdeT: '2', pdeK: '1', pdeV: '0' }).meta.some(m => /^Verified/.test(m)));
+  assert.match(E.run.stats('5.1 4.9 5.3 ; 6.2 6.8 6.5 ; 5.0 5.2 4.8', { op: 'anova' }).items.map(i => i.text).join('|'), /Pairwise comparisons.*1 vs 2.*\*/s.source ? /1 vs 2/ : /1 vs 2/);
+  const mw = E.run.stats('1 2 3 4 5 ; 6 7 8 9 10', { op: 'mannwhitney' }); assert.match(mw.main.text, /U = 0.*p = 0\.0079/); assert.ok(mw.meta.some(m => /^Verified/.test(m)));
+  assert.match(E.run.stats('1 2 2 3 3 3 4 ; 2 3 4 4 5 5 6 7 8', { op: 'mannwhitney' }).items.map(i => i.text).join('|'), /normal approximation/);
+  assert.throws(() => E.run.stats('1 1 1 ; 1 1 1', { op: 'mannwhitney' }), /identical/);
+  assert.throws(() => E.run.algebra('x^10-1', { op: 'factor' }), /degree 8/);
+});

@@ -132,6 +132,7 @@
                 { key: 'x0', label: 'Start x₀ (or t₀)', type: 'text', def: '0', show: v => v.odeType !== 'heat' && v.odeType !== 'wave' },
                 { key: 'xEnd', label: 'End', type: 'text', def: '10', show: v => v.odeType !== 'heat' && v.odeType !== 'wave' },
                 { key: 'pdeL', label: 'Length L of the rod / string', type: 'text', def: 'pi', show: v => v.odeType === 'heat' || v.odeType === 'wave' },
+                { key: 'pdeBC', label: 'Ends', type: 'select', def: 'dirichlet', options: [['dirichlet', 'Fixed at 0  (u = 0)'], ['neumann', 'Insulated / free  (uₓ = 0)']], show: v => v.odeType === 'heat' || v.odeType === 'wave' },
                 { key: 'pdeT', label: 'Final time T', type: 'text', def: '1', show: v => v.odeType === 'heat' || v.odeType === 'wave' },
                 { key: 'pdeK', label: 'Diffusivity α (heat) or wave speed c', type: 'text', def: '1', show: v => v.odeType === 'heat' || v.odeType === 'wave' },
                 { key: 'pdeV', label: 'Initial velocity uₜ(x, 0)  (wave only)', type: 'text', def: '0', show: v => v.odeType === 'wave' },
@@ -156,6 +157,8 @@
                 { label: 'Heat: a smoothing rod, u(x,0) = x(π−x)', fn: 'x*(pi-x)', opts: { odeType: 'heat', pdeL: 'pi', pdeT: '0.5', pdeK: '1' } },
                 { label: 'Heat: one sine mode decays', fn: 'sin(x)', opts: { odeType: 'heat', pdeL: 'pi', pdeT: '1', pdeK: '1' } },
                 { label: 'Wave: plucked string, u(x,0) = x(π−x)', fn: 'x*(pi-x)', opts: { odeType: 'wave', pdeL: 'pi', pdeT: '4', pdeK: '1', pdeV: '0' } },
+                { label: 'Heat: insulated rod, u(x,0) = x on [0,1]', fn: 'x', opts: { odeType: 'heat', pdeBC: 'neumann', pdeL: '1', pdeT: '0.3', pdeK: '1' } },
+                { label: 'Wave: free-end string, 1 + cos 2x', fn: '1+cos(2*x)', opts: { odeType: 'wave', pdeBC: 'neumann', pdeL: 'pi', pdeT: '3', pdeK: '1', pdeV: '0' } },
                 { label: 'Wave: standing wave sin x', fn: 'sin(x)', opts: { odeType: 'wave', pdeL: 'pi', pdeT: '6', pdeK: '1', pdeV: '0' } },
                 { label: 'Predator–prey (Lotka–Volterra)', fn: 'x*(1-0.5*y) ; y*(0.5*x-1)', opts: { odeType: 'system', x0: '0', xEnd: '30', initial: '3, 1' } }
             ]
@@ -433,9 +436,9 @@
     };
     MODES.stats = {
         label: 'Statistics', icon: 'x̄',
-        input: v => ({ chisq: { label: 'Observed counts', placeholder: 'e.g. 18, 22, 20, 40     or a table:  20, 15 ; 10, 25', hint: 'One row = goodness of fit against equal (or given) proportions. Several rows separated by ; = test of independence.' }, anova: { label: 'Groups separated by ;', placeholder: 'e.g. 5.1 4.9 5.3 ; 6.2 6.8 6.5 ; 5.0 5.2 4.8', hint: 'Each group is a list of numbers. Tests whether all group means are equal.' }, describe: { label: 'Data', placeholder: 'e.g. 2 4 4 4 5 5 7 9', hint: 'Numbers separated by spaces, commas or new lines.' }, regression: { label: 'Data points (x y pairs)', placeholder: 'e.g. 1 2.1 ; 2 3.9 ; 3 6.2 ; 4 7.8', hint: 'Pairs separated by ;  or a flat list x₁ y₁ x₂ y₂ …' }, dist: { label: 'x  (or  a, b  for an interval)', placeholder: 'e.g. 1.96', hint: 'Value(s) at which to evaluate the distribution; for “inverse” enter a probability.' }, ttest: { label: 'Sample', placeholder: 'e.g. 5.1 4.9 5.6 5.8 6.0', hint: 'One sample against μ₀, or add a second sample below for Welch’s test.' } }[v.op || 'describe']),
+        input: v => ({ chisq: { label: 'Observed counts', placeholder: 'e.g. 18, 22, 20, 40     or a table:  20, 15 ; 10, 25', hint: 'One row = goodness of fit against equal (or given) proportions. Several rows separated by ; = test of independence.' }, mannwhitney: { label: 'Two samples separated by ;', placeholder: 'e.g. 1.1 2.2 3.3 4.4 ; 2.5 3.5 6.1 7.2 8.3', hint: 'Compares two independent samples using ranks. Exact p-values for small samples without ties.' }, anova: { label: 'Groups separated by ;', placeholder: 'e.g. 5.1 4.9 5.3 ; 6.2 6.8 6.5 ; 5.0 5.2 4.8', hint: 'Each group is a list of numbers. Tests whether all group means are equal.' }, describe: { label: 'Data', placeholder: 'e.g. 2 4 4 4 5 5 7 9', hint: 'Numbers separated by spaces, commas or new lines.' }, regression: { label: 'Data points (x y pairs)', placeholder: 'e.g. 1 2.1 ; 2 3.9 ; 3 6.2 ; 4 7.8', hint: 'Pairs separated by ;  or a flat list x₁ y₁ x₂ y₂ …' }, dist: { label: 'x  (or  a, b  for an interval)', placeholder: 'e.g. 1.96', hint: 'Value(s) at which to evaluate the distribution; for “inverse” enter a probability.' }, ttest: { label: 'Sample', placeholder: 'e.g. 5.1 4.9 5.6 5.8 6.0', hint: 'One sample against μ₀, or add a second sample below for Welch’s test.' } }[v.op || 'describe']),
         fields: [
-            { key: 'op', label: 'Tool', type: 'select', def: 'describe', options: [['describe', 'Descriptive statistics'], ['regression', 'Regression & curve fitting'], ['dist', 'Probability distributions'], ['ttest', 't-tests & confidence intervals'], ['chisq', 'Chi-square test (fit or independence)'], ['anova', 'One-way ANOVA']] },
+            { key: 'op', label: 'Tool', type: 'select', def: 'describe', options: [['describe', 'Descriptive statistics'], ['regression', 'Regression & curve fitting'], ['dist', 'Probability distributions'], ['ttest', 't-tests & confidence intervals'], ['chisq', 'Chi-square test (fit or independence)'], ['anova', 'One-way ANOVA (with pairwise comparisons)'], ['mannwhitney', 'Mann–Whitney U test (no normality needed)']] },
             { key: 'model', label: 'Model', type: 'select', def: 'linear', options: [['linear', 'Linear'], ['quadratic', 'Quadratic'], ['cubic', 'Cubic'], ['exponential', 'Exponential  A·e^(Bx)'], ['power', 'Power  A·x^B'], ['logarithmic', 'Logarithmic  a + b·ln x']], show: v => v.op === 'regression' },
             { key: 'predict', label: 'Predict y at x = (optional)', type: 'text', def: '', show: v => v.op === 'regression' },
             { key: 'dist', label: 'Distribution', type: 'select', def: 'normal', options: [['normal', 'Normal (μ, σ)'], ['t', "Student's t (ν)"], ['chisq', 'Chi-square (k)'], ['exponential', 'Exponential (λ)'], ['uniform', 'Uniform (a, b)'], ['binomial', 'Binomial (n, p)'], ['poisson', 'Poisson (λ)']], show: v => v.op === 'dist' },
@@ -444,9 +447,11 @@
             { key: 'expected', label: 'Expected proportions (blank = all equal)', type: 'text', def: '', placeholder: 'e.g. 0.5, 0.3, 0.2', show: v => v.op === 'chisq' },
             { key: 'mu0', label: 'Hypothesised mean μ₀', type: 'text', def: '0', show: v => v.op === 'ttest' },
             { key: 'data2', label: 'Second sample (optional – Welch test)', type: 'text', def: '', show: v => v.op === 'ttest' },
-            { key: 'alpha', label: 'Significance level α', type: 'text', def: '0.05', show: v => ['ttest', 'chisq', 'anova'].includes(v.op) }
+            { key: 'alpha', label: 'Significance level α', type: 'text', def: '0.05', show: v => ['ttest', 'chisq', 'anova', 'mannwhitney'].includes(v.op) }
         ],
         examples: [
+            { label: 'Mann–Whitney: small samples (exact)', fn: '1.1 2.2 3.3 4.4 ; 2.5 3.5 6.1 7.2 8.3', opts: { op: 'mannwhitney', alpha: '0.05' } },
+            { label: 'Mann–Whitney: with ties', fn: '1 2 2 3 3 3 4 ; 2 3 4 4 5 5 6 7 8', opts: { op: 'mannwhitney', alpha: '0.05' } },
             { label: 'Chi-square: is a die fair?', fn: '18, 22, 20, 40', opts: { op: 'chisq', expected: '', alpha: '0.05' } },
             { label: 'Chi-square: 2×2 independence table', fn: '20, 15 ; 10, 25', opts: { op: 'chisq', alpha: '0.05' } },
             { label: 'Chi-square against given proportions', fn: '48, 33, 19', opts: { op: 'chisq', expected: '0.5, 0.3, 0.2', alpha: '0.05' } },
