@@ -2623,7 +2623,7 @@
             r.meta.push(`Verified: at ${used} random points, finite differences show the images of the horizontal and vertical directions stay perpendicular (largest deviation ${(worstAng * 180 / Math.PI).toExponential(1)}°) and are stretched by |f′(z)| (largest relative gap ${worstMod.toExponential(1)}).`);
             r.steps.push({ title: 'Why analytic maps are conformal', text: 'Near z₀ the map acts like multiplication by f′(z₀): a rotation by arg f′ and a stretch by |f′|. Every curve through z₀ turns by the same angle, so angles between curves are kept (as long as f′(z₀) ≠ 0).', tex: 'f(z_0+\\delta)\\approx f(z_0)+f\'(z_0)\\,\\delta' });
         }
-        const clip = Math.max(8, 8 * Rr); const gi = gridImage(f, region, Rr, clip);
+        let clip = Math.max(8, 8 * Rr); let gi = gridImage(f, region, Rr, clip); { const m1 = Math.max(0, ...gi.fam1.x.map((v, i) => (v !== null && gi.fam1.y[i] !== null ? Math.hypot(v, gi.fam1.y[i]) : 0))); const tight = Math.max(4, 3 * m1); if (m1 > 0 && tight < clip * 0.8) { clip = tight; gi = gridImage(f, region, Rr, clip); } }
         const names = region === 'polar' ? ['circles |z| = r', 'rays arg z = θ'] : ['vertical lines Re z = c', 'horizontal lines Im z = c'];
         const traces = [{ x: gi.fam1.x, y: gi.fam1.y, mode: 'lines', type: 'scatter', name: `image of ${names[0]}`, connectgaps: false }, { x: gi.fam2.x, y: gi.fam2.y, mode: 'lines', type: 'scatter', name: `image of ${names[1]}`, connectgaps: false }];
         const lim = Math.min(clip, Math.max(2, ...traces.flatMap(t => t.x.concat(t.y).filter(v => v !== null && Math.abs(v) < clip).map(Math.abs))) * 1.05);
@@ -2667,7 +2667,7 @@
         if (flagged) r.warnings.push(`${flagged} method${flagged > 1 ? 's' : ''} did not show the textbook order. That happens when the solution is not smooth, the steps are too coarse (stiff problems) or the error reaches rounding level.`);
         r.meta.push('Smaller steps cost more work: an order-p method\'s error falls like h^p, so doubling N divides the error by about 2^p.');
         r.steps.push({ title: 'Global error and order', text: 'A method has order p if the error at the end of the interval behaves like C·h^p. On a log–log plot the data fall on a line of slope p.', tex: '\\text{error}\\approx C\\,h^{p}' }); r.steps.push({ title: 'Backward Euler', text: 'It is only first order, but implicit steps stay stable on stiff problems where explicit Euler blows up.', tex: 'y_{n+1}=y_n+h\\,f(x_{n+1},y_{n+1})' });
-        r.plot = { generic: { title: 'Error versus step size (log–log)', xTitle: 'log₁₀ h', yTitle: 'log₁₀ error at the end', traces: rows.map(({ m, errs }) => ({ x: Ns.filter((_, i) => Number.isFinite(errs[i]) && errs[i] > 0).map(N => Math.log10((xe - x0) / N)), y: errs.filter(e => Number.isFinite(e) && e > 0).map(Math.log10), mode: 'lines+markers', type: 'scatter', name: `${m.name} (p=${m.order})` })) } };
+        r.plot = { generic: { title: 'Error versus step size (log–log)', xTitle: 'log₁₀ h', yTitle: 'log₁₀ error at the end', traces: rows.map(({ m, errs }) => ({ x: Ns.filter((_, i) => Number.isFinite(errs[i]) && errs[i] > 0).map(N => Math.log10((xe - x0) / N)), y: errs.filter(e => Number.isFinite(e) && e > 0).map(Math.log10), mode: 'lines+markers', type: 'scatter', name: `${m.name} (p=${m.order})`, line: { dash: m.id === 'beuler' ? 'dash' : 'solid' } })) } };
         return I.finalizeText(r);
     }
     const prevOdeLab = engine.run.ode;

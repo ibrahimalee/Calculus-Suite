@@ -246,7 +246,7 @@
             const g = P.generate(topic, level, (seed >>> 0) + i * 7919 + 1); let type = 'number', key = g.answerText, extra = {};
             if (g.input === 'expression') { if (/^Prime factorisation/i.test(g.text)) type = 'factors'; else { type = 'expr'; if (/\+\s*C\s*$/i.test(key)) extra.plusC = true; } }
             else if (g.input === 'list') type = 'list'; else if (g.input === 'matrix') type = 'matrix';
-            key = String(key).replace(/\s*\*\s*/g, '*').replace(/\s+\^\s+/g, '^').trim(); if (g.topic === 'stats' && /standard deviation/.test(g.text)) extra.tol = 0.0051;
+            key = String(key).replace(/\s*\*\s*/g, '*').replace(/\s+\^\s+/g, '^').trim(); if ((g.topic === 'stats' && /standard deviation/.test(g.text)) || (g.topic === 'geometry' && g.level >= 2)) extra.tol = 0.0051;
             if (type === 'matrix') key = String(key).replace(/\s+/g, ' ');
             out.push(Object.assign({ type, prompt: g.text, key, points: 1, hint: '', placeholder: g.placeholder || '' }, extra));
         }

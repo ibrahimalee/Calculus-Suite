@@ -183,3 +183,8 @@ test('property: for 300 different student names, the answers derived from that s
   }
   assert.ok(differ > 150, 'neighbouring students should usually get different numbers (' + differ + ')');
 });
+
+test('practice topics for counting and geometry become worksheet questions; rounded geometry answers are accepted', () => {
+  for (const topic of ['counting', 'geometry']) for (let level = 1; level <= 3; level++) { const qs = C.fromPractice(P, topic, level, 6, 11); assert.strictEqual(qs.length, 6); const w = C.normalise({ questions: qs }); w.questions.forEach(q => assert.ok(C.check(q, q.key).ok, `${topic}/${level}: ${q.prompt}`)); }
+  const geo = C.normalise({ questions: C.fromPractice(P, 'geometry', 2, 5, 3) }).questions; geo.forEach(q => { const rounded = (Math.round(parseFloat(q.key) * 100) / 100).toFixed(2); assert.ok(C.check(q, rounded).ok, `rounded ${rounded} vs ${q.key}`); assert.ok(!C.check(q, String(parseFloat(q.key) + 0.5)).ok); });
+});

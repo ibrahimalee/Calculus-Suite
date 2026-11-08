@@ -131,3 +131,8 @@ details#analysis > summary { cursor: pointer; font: 500 12px var(--mono); letter
   .print-pts { font-size: 9.5pt; color: #444; } .print-space { height: 70pt; border-bottom: 1px solid #bbb; } .print-choices { display: grid; gap: 3pt; margin-left: 4pt; }
   .print-key { padding-left: 22pt; } .print-key li { margin: 0 0 4pt; }
 }
+
+/* long option text must never widen a phone screen */
+.page select, .page .in, .page textarea { max-width: 100%; }
+.row > .field { min-width: 0; max-width: 100%; }
+.row > .field select { width: 100%; text-overflow: ellipsis; }

@@ -734,8 +734,8 @@
 
     const MODE_GROUPS = [
         ['Core calculus', ['derivative', 'integral', 'limit', 'series', 'analysis']],
-        ['Explore & visualise', ['graph', 'riemann', 'applications', 'root', 'fourier']],
-        ['Algebra & sums', ['calc', 'solve', 'algebra', 'sums', 'number', 'units', 'stats', 'geometry', 'discrete']],
+        ['Explore & visualise', ['graph', 'riemann', 'applications', 'root', 'fourier', 'geometry']],
+        ['Algebra & sums', ['calc', 'solve', 'algebra', 'sums', 'number', 'units', 'stats', 'discrete']],
         ['Advanced', ['ode', 'multivariable', 'vector', 'matrix', 'laplace', 'complex', 'numerical']]
     ];
     const MODE_ORDER = MODE_GROUPS.flatMap(g => g[1]);
@@ -1156,7 +1156,7 @@
     // ------------------------------------------------------------------
     // Result rendering
     // ------------------------------------------------------------------
-    const KIND_ICON = { derivative: '∂', integral: '∫', definite: '∫', series: 'Σ', limit: 'lim', analysis: 'f', ode: 'y′', multivariable: '∇', vector: '∇', graph: '∿', riemann: 'Δx', applications: 'V', root: 'x*', fourier: '∼', matrix: '[ ]', calc: '=', solve: 'x=', sum: 'Σk', laplace: 'ℒ', stats: 'x̄', number: '#', units: '⇄', complex: 'ℂ' };
+    const KIND_ICON = { derivative: '∂', integral: '∫', definite: '∫', series: 'Σ', limit: 'lim', analysis: 'f', ode: 'y′', multivariable: '∇', vector: '∇', graph: '∿', riemann: 'Δx', applications: 'V', root: 'x*', fourier: '∼', matrix: '[ ]', calc: '=', solve: 'x=', sum: 'Σk', laplace: 'ℒ', stats: 'x̄', number: '#', units: '⇄', complex: 'ℂ', algebra: 'p(x)', numerical: '≈', geometry: '△', discrete: '∧' };
 
     /** Metadata lines that are not already shown as trust badges. */
     function metaRest(r) { return r.meta.filter(m => !/^Method: /.test(m) && !/^Verified|cross-?checked|verified against/i.test(m)); }
@@ -1628,7 +1628,7 @@
     function checkBox(r) {
         const lines = (r.meta || []).filter(m => /^Verified|^Method:|cross-?checked|agree|independent/i.test(m));
         if (!lines.length) return '';
-        const explain = { derivative: 'The derivative is compared with a numerical derivative (central differences) at several sample points.', integral: 'An antiderivative is differentiated and compared with the integrand; definite integrals are also evaluated by numerical quadrature.', definite: 'The exact value is compared with an independent numerical integration.', limit: 'The limit is approached from both sides numerically and compared with the closed form.', laplace: 'The transform is checked by numerically integrating f(t)·e^(−st) at a test value of s.', matrix: 'The decomposition is multiplied back together and compared with the original matrix.', stats: 'Probabilities use exact special functions rather than tables or simulation.', number: 'Factorisations are multiplied back; congruences are substituted back.' }[r.kind] || 'The engine compares its answer with an independent calculation, shown below. Results that cannot be checked independently are labelled numerical.';
+        const explain = { derivative: 'The derivative is compared with a numerical derivative (central differences) at several sample points.', integral: 'An antiderivative is differentiated and compared with the integrand; definite integrals are also evaluated by numerical quadrature.', definite: 'The exact value is compared with an independent numerical integration.', limit: 'The limit is approached from both sides numerically and compared with the closed form.', laplace: 'The transform is checked by numerically integrating f(t)·e^(−st) at a test value of s.', matrix: 'The decomposition is multiplied back together and compared with the original matrix.', stats: 'Probabilities use exact special functions rather than tables or simulation.', number: 'Factorisations are multiplied back; congruences are substituted back; Diophantine, Pell and RSA results are substituted into their equations, and counts are cross-checked by a second formula.', numerical: 'Interpolants are checked at their nodes and against a second algorithm, splines against their own smoothness conditions, and quadrature and differences against an independent reference value.', geometry: 'Triangles are checked against the laws of sines and cosines and Heron’s formula; conics by generating points from the canonical form and substituting them into your equation.', discrete: 'Minimised Boolean forms are evaluated on every input row; Dijkstra is checked against Bellman–Ford and Kruskal against Prim.', algebra: 'Partial fractions and divisions are recombined and compared; recurrences are checked against their first terms; linear programs against vertex enumeration.', complex: 'Residues are computed two ways; conformal maps are checked by finite differences that angles are preserved; Möbius maps by exact point images and the cross-ratio.', ode: 'Solutions are substituted back, PDEs are compared with exact series, and numerical methods against a high-order reference.' }[r.kind] || 'The engine compares its answer with an independent calculation, shown below. Results that cannot be checked independently are labelled numerical.';
         return `<details class="check-box"><summary>${icon('shield', 14)}How was this checked?</summary><div class="check-body"><p>${esc(explain)}</p><ul>${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul><p class="check-note">Checks catch most mistakes but are not formal proofs – for anything important, confirm with a second source.</p></div></details>`;
     }
 
