@@ -560,6 +560,9 @@
         ]
     };
 
+    // Mode names arrive from links, history and imported files: make lookups of inherited names (constructor, __proto__, toString) impossible.
+    Object.setPrototypeOf(MODES, null);
+
     const MODE_GROUPS = [
         ['Core calculus', ['derivative', 'integral', 'limit', 'series', 'analysis']],
         ['Explore & visualise', ['graph', 'riemann', 'applications', 'root', 'fourier']],
@@ -852,6 +855,8 @@
         const src = $('functionInput').value;
         const preview = $('preview');
         state.liveSpec = null;
+        const LIMIT = state.mode === 'stats' ? 200000 : 5000;
+        if (src.length > LIMIT) { preview.className = 'preview-box error'; preview.innerHTML = `<strong>⚠</strong> That input is too long (${src.length.toLocaleString()} characters; the limit for this tool is ${LIMIT.toLocaleString()}).`; return false; }
         if (!src.trim()) {
             preview.className = 'preview-box';
             preview.textContent = 'Enter a function to begin…';
@@ -1660,15 +1665,17 @@
         $('projImport').addEventListener('click', () => $('projFile').click());
         $('projFile').addEventListener('change', e => {
             const file = e.target.files && e.target.files[0]; if (!file) return;
+            if (file.size > 4e6) { toast('That file is too large to be a backup', 'err'); e.target.value = ''; return; }
             const fr = new FileReader();
             fr.onload = () => {
                 try {
                     const d = JSON.parse(String(fr.result));
                     if (!d || d.app !== 'calculus-suite' || !Array.isArray(d.notebooks)) throw new Error('bad');
                     let added = 0;
-                    d.notebooks.forEach(p => {
+                    d.notebooks.slice(0, 50).forEach(p => {
                         if (!p || typeof p.name !== 'string' || !Array.isArray(p.items)) return;
-                        const items = p.items.filter(i => i && i.s && MODES[i.s.m] && typeof i.s.f === 'string').map(i => ({ id: uid(), s: { m: i.s.m, f: i.s.f, o: i.s.o && typeof i.s.o === 'object' ? i.s.o : {} }, title: String(i.title || ''), text: String(i.text || ''), tex: String(i.tex || ''), pinned: !!i.pinned, note: String(i.note || '').slice(0, 300), ts: +i.ts || Date.now() }));
+                        const cleanOpts = o => { const out = {}; if (o && typeof o === 'object') Object.keys(o).slice(0, 40).forEach(k => { if (typeof o[k] === 'string') out[k.slice(0, 40)] = o[k].slice(0, 400); }); return out; };
+                        const items = p.items.slice(0, 500).filter(i => i && i.s && MODES[i.s.m] && typeof i.s.f === 'string').map(i => ({ id: uid(), s: { m: i.s.m, f: i.s.f.slice(0, 5000), o: cleanOpts(i.s.o) }, title: String(i.title || '').slice(0, 200), text: String(i.text || '').slice(0, 2000), tex: String(i.tex || '').slice(0, 4000), pinned: !!i.pinned, note: String(i.note || '').slice(0, 300), ts: +i.ts || Date.now() }));
                         nb.list.push({ id: uid(), name: p.name.slice(0, 40) + ' (imported)', items }); added += items.length;
                     });
                     nbSave(); renderNotebook(); toast(`Imported ${added} result(s)`, 'ok');

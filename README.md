@@ -82,7 +82,7 @@ Open `teacher.html`. Build a worksheet (write questions, or generate practice pr
 
 ## Run
 
-Open `index.html` (or `npm run serve` and visit http://localhost:8080). All libraries are vendored in `vendor/` (math.js, Algebrite, Plotly, KaTeX); a CDN fallback is used only if a local file is missing. Deploys as-is to GitHub Pages.
+Open `index.html` for the home page or `app.html` for the calculator (or `npm run serve` and visit http://localhost:8080). All libraries are vendored in `vendor/` (math.js, Algebrite, Plotly, KaTeX); there is deliberately no CDN fallback. Deploys as-is to any static host; on Vercel the headers in `vercel.json` (including a strict Content-Security-Policy) apply automatically.
 
 ## Deploy to Vercel
 

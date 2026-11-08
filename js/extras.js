@@ -1882,7 +1882,6 @@
         if (det < 0) return { kind: 'saddle', stab: 'unstable', hyper: true, cat: 'saddle', tr, det, disc };
         if (Math.abs(tr) <= eps && disc < 0) return { kind: 'centre of the linearisation', stab: 'linearisation inconclusive (the true system may spiral in or out)', hyper: false, cat: 'inc', tr, det, disc };
         if (Math.abs(disc) <= eps) { const star = Math.abs(b) < 1e-12 && Math.abs(c) < 1e-12 && Math.abs(a - d) < 1e-12; return { kind: (tr < 0 ? 'stable ' : 'unstable ') + (star ? 'star node' : '(degenerate) node'), stab: tr < 0 ? 'asymptotically stable' : 'unstable', hyper: true, cat: tr < 0 ? 'stable' : 'unstable', tr, det, disc }; }
-        if (false) return { kind: tr < 0 ? 'stable (degenerate) node' : 'unstable (degenerate) node', stab: tr < 0 ? 'asymptotically stable' : 'unstable', hyper: true, cat: tr < 0 ? 'stable' : 'unstable', tr, det, disc };
         if (disc > 0) return { kind: tr < 0 ? 'stable node' : 'unstable node', stab: tr < 0 ? 'asymptotically stable' : 'unstable', hyper: true, cat: tr < 0 ? 'stable' : 'unstable', tr, det, disc };
         return { kind: tr < 0 ? 'stable spiral' : 'unstable spiral', stab: tr < 0 ? 'asymptotically stable' : 'unstable', hyper: true, cat: tr < 0 ? 'stable' : 'unstable', tr, det, disc };
     }

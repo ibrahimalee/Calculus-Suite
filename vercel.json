@@ -28,10 +28,60 @@
         {
           "key": "Permissions-Policy",
           "value": "camera=(), microphone=(), geolocation=(), payment=()"
-        },
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "frame-ancestors *"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-VBSIhyR2Nh7aCSjarXeV29rDNPQjFV9QknYj3+lnnZ4=' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *"
+        }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-VBSIhyR2Nh7aCSjarXeV29rDNPQjFV9QknYj3+lnnZ4=' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *"
+        }
+      ]
+    },
+    {
+      "source": "/app.html",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-VBSIhyR2Nh7aCSjarXeV29rDNPQjFV9QknYj3+lnnZ4=' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *"
+        }
+      ]
+    },
+    {
+      "source": "/CalculusSuite.html",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-VBSIhyR2Nh7aCSjarXeV29rDNPQjFV9QknYj3+lnnZ4=' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *"
+        }
+      ]
+    },
+    {
+      "source": "/teacher.html",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-VBSIhyR2Nh7aCSjarXeV29rDNPQjFV9QknYj3+lnnZ4=' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+        }
+      ]
+    },
+    {
+      "source": "/worksheet.html",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-VBSIhyR2Nh7aCSjarXeV29rDNPQjFV9QknYj3+lnnZ4=' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
         }
       ]
     },

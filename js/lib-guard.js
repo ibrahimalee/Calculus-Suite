@@ -2,18 +2,18 @@
  * Library loader.
  *
  * Every dependency ships in /vendor so the app works offline and from file://.
- * If a local file is missing (e.g. only the HTML was copied) we fall back to a
- * CDN. Scripts are loaded in order, then js/engine.js, js/runner.js and
+ * There is deliberately no CDN fallback: unpinned third-party scripts are a supply-chain risk,
+ * and the Content-Security-Policy would block them. Scripts are loaded in order, then js/engine.js, js/runner.js and
  * js/app.js start the application.
  */
 (function () {
     'use strict';
 
     const LIBS = [
-        { name: 'math.js', global: 'math', urls: ['vendor/math.min.js', 'https://cdn.jsdelivr.net/npm/mathjs@11.11.0/lib/browser/math.js'] },
-        { name: 'Algebrite', global: 'Algebrite', urls: ['vendor/algebrite.min.js', 'https://cdn.jsdelivr.net/npm/algebrite@1.4.0/dist/algebrite.bundle-for-browser.js'] },
-        { name: 'Plotly', global: 'Plotly', urls: ['vendor/plotly.min.js', 'https://cdn.jsdelivr.net/npm/plotly.js-dist-min@4.2.0/plotly.min.js'] },
-        { name: 'KaTeX', global: 'katex', optional: true, urls: ['vendor/katex/katex.min.js', 'https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/katex.min.js'] }
+        { name: 'math.js', global: 'math', urls: ['vendor/math.min.js'] },
+        { name: 'Algebrite', global: 'Algebrite', urls: ['vendor/algebrite.min.js'] },
+        { name: 'Plotly', global: 'Plotly', urls: ['vendor/plotly.min.js'] },
+        { name: 'KaTeX', global: 'katex', optional: true, urls: ['vendor/katex/katex.min.js'] }
     ];
     const APP_SCRIPTS = ['js/engine.js', 'js/extras.js', 'js/nlp.js', 'js/practice.js', 'js/i18n.js', 'js/braille.js', 'js/runner.js', 'js/app.js'];
 
