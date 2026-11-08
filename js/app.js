@@ -454,10 +454,12 @@
     };
     MODES.vector = {
         label: 'Vector calculus', icon: '∮',
-        input: v => ({ jacobian: { label: 'F = (F₁ ; F₂ ; …)', placeholder: 'e.g. x^2*y ; sin(x)+z', hint: 'Components separated by ;  The Jacobian holds every partial derivative ∂Fᵢ/∂xⱼ.' }, line: { label: 'Scalar field f(x, y, z)', placeholder: 'e.g. x^2 + y^2', hint: 'Integrates f along the path with ds = |r′(t)| dt.' }, work: { label: 'Vector field F = (P ; Q ; R)', placeholder: 'e.g. -y ; x', hint: 'Work / circulation ∫ F·dr along the path r(t).' }, triple: { label: 'f(x, y, z)', placeholder: 'e.g. x*y*z', hint: 'Iterated triple integral: z is innermost, then y, then x.' }, green: { label: 'F = (P ; Q)', placeholder: 'e.g. -y ; x', hint: "Compares ∮ P dx + Q dy with ∬ (Qₓ − Pᵧ) dA over the region between two curves y = g₁(x) and y = g₂(x)." }, divergence: { label: 'F = (P ; Q ; R)', placeholder: 'e.g. x ; y ; z', hint: 'Compares ∭ div F dV with the outward flux through the six faces of a box.' }, surface: { label: 'Scalar field f(x, y, z)', placeholder: 'e.g. 1  (area)   or   z^2', hint: 'Integrates f over the parametrised surface r(u, v). Use f = 1 for surface area.' }, flux: { label: 'F = (P ; Q ; R)', placeholder: 'e.g. x ; y ; z', hint: 'Flux through r(u, v) with normal rᵤ × rᵥ.' } }[v.op || 'jacobian']),
+        input: v => ({ potential: { label: 'Field F = (P ; Q ; R)', placeholder: 'e.g. 2*x*y ; x^2 + 3*y^2', hint: 'Tests whether F is conservative (cross-partials agree) and, if so, finds a potential f with ∇f = F. Optionally evaluates ∫F·dr between two points as f(B) − f(A).' }, jacobian: { label: 'F = (F₁ ; F₂ ; …)', placeholder: 'e.g. x^2*y ; sin(x)+z', hint: 'Components separated by ;  The Jacobian holds every partial derivative ∂Fᵢ/∂xⱼ.' }, line: { label: 'Scalar field f(x, y, z)', placeholder: 'e.g. x^2 + y^2', hint: 'Integrates f along the path with ds = |r′(t)| dt.' }, work: { label: 'Vector field F = (P ; Q ; R)', placeholder: 'e.g. -y ; x', hint: 'Work / circulation ∫ F·dr along the path r(t).' }, triple: { label: 'f(x, y, z)', placeholder: 'e.g. x*y*z', hint: 'Iterated triple integral: z is innermost, then y, then x.' }, green: { label: 'F = (P ; Q)', placeholder: 'e.g. -y ; x', hint: "Compares ∮ P dx + Q dy with ∬ (Qₓ − Pᵧ) dA over the region between two curves y = g₁(x) and y = g₂(x)." }, divergence: { label: 'F = (P ; Q ; R)', placeholder: 'e.g. x ; y ; z', hint: 'Compares ∭ div F dV with the outward flux through the six faces of a box.' }, surface: { label: 'Scalar field f(x, y, z)', placeholder: 'e.g. 1  (area)   or   z^2', hint: 'Integrates f over the parametrised surface r(u, v). Use f = 1 for surface area.' }, flux: { label: 'F = (P ; Q ; R)', placeholder: 'e.g. x ; y ; z', hint: 'Flux through r(u, v) with normal rᵤ × rᵥ.' } }[v.op || 'jacobian']),
         fields: [
-            { key: 'op', label: 'Operation', type: 'select', def: 'jacobian', options: [['jacobian', 'Jacobian matrix & determinant'], ['line', 'Line integral of a scalar field ∫ f ds'], ['work', 'Work / circulation ∫ F·dr'], ['triple', 'Triple integral ∭ f dV'], ['green', "Green's theorem (both sides)"], ['divergence', 'Divergence theorem on a box (both sides)'], ['surface', 'Surface integral ∬ f dS'], ['flux', 'Flux ∬ F·n dS through r(u, v)']] },
+            { key: 'op', label: 'Operation', type: 'select', def: 'jacobian', options: [['jacobian', 'Jacobian matrix & determinant'], ['line', 'Line integral of a scalar field ∫ f ds'], ['work', 'Work / circulation ∫ F·dr'], ['triple', 'Triple integral ∭ f dV'], ['green', "Green's theorem (both sides)"], ['potential', 'Conservative field: potential function'], ['divergence', 'Divergence theorem on a box (both sides)'], ['surface', 'Surface integral ∬ f dS'], ['flux', 'Flux ∬ F·n dS through r(u, v)']] },
             { key: 'vars', label: 'Variables (comma-separated, blank = auto)', type: 'text', def: '', placeholder: 'x, y, z', show: v => v.op === 'jacobian' || v.op === 'triple' },
+            { key: 'pa', label: 'Start point A (optional)', type: 'text', def: '', placeholder: 'e.g. 0, 0', show: v => v.op === 'potential' },
+            { key: 'pb', label: 'End point B (optional)', type: 'text', def: '', placeholder: 'e.g. 1, 2', show: v => v.op === 'potential' },
             { key: 'point', label: 'Evaluate at point (optional)', type: 'text', def: '', placeholder: 'e.g. 1, 2', show: v => v.op === 'jacobian' },
             { key: 'px', label: 'x(t) =', type: 'text', def: 'cos(t)', show: v => v.op === 'line' || v.op === 'work' },
             { key: 'py', label: 'y(t) =', type: 'text', def: 'sin(t)', show: v => v.op === 'line' || v.op === 'work' },
@@ -471,6 +473,10 @@
             { key: 'ua', label: 'u from', type: 'text', def: '0', show: v => v.op === 'surface' || v.op === 'flux' }, { key: 'ub', label: 'u to', type: 'text', def: 'pi', show: v => v.op === 'surface' || v.op === 'flux' }, { key: 'va', label: 'v from', type: 'text', def: '0', show: v => v.op === 'surface' || v.op === 'flux' }, { key: 'vb', label: 'v to', type: 'text', def: '2*pi', show: v => v.op === 'surface' || v.op === 'flux' }
         ],
         examples: [
+            { label: 'Potential: F = (2xy, x² + 3y²), work from (0,0) to (1,2)', fn: '2*x*y ; x^2 + 3*y^2', opts: { op: 'potential', pa: '0, 0', pb: '1, 2' } },
+            { label: 'Potential in 3D: F = (yz, xz, xy)', fn: 'y*z ; x*z ; x*y', opts: { op: 'potential', pa: '0, 0, 0', pb: '1, 2, 3' } },
+            { label: 'Potential with trig terms', fn: 'y*cos(x*y) + 2*x ; x*cos(x*y) + 3*y^2', opts: { op: 'potential', pa: '', pb: '' } },
+            { label: 'Not conservative: F = (y, −x)', fn: 'y ; -x', opts: { op: 'potential', pa: '', pb: '' } },
             { label: 'Jacobian of polar → Cartesian', fn: 'r*cos(t) ; r*sin(t)', opts: { op: 'jacobian', vars: 'r, t', point: '' } },
             { label: 'Jacobian of a 3-D map at a point', fn: 'x^2*y ; sin(x)+z ; x*y*z', opts: { op: 'jacobian', vars: '', point: '1, 2, 3' } },
             { label: '∮ (x²+y²) ds around the unit circle', fn: 'x^2+y^2', opts: { op: 'line', px: 'cos(t)', py: 'sin(t)', pz: '', ta: '0', tb: '2*pi' } },
@@ -535,11 +541,11 @@
             { label: 'Welch two-sample test', fn: '5.1 4.9 5.6 5.8 6.0', opts: { op: 'ttest', mu0: '0', data2: '4.1 4.4 3.9 4.8 4.5', alpha: '0.05' } }
         ]
     };
-    const NUM_HELP = { factor: ['Integer n', '360', 'Prime factorisation, divisors, φ(n) and σ(n).'], isprime: ['Integer n', '1000000007', 'Deterministic Miller–Rabin.'], gcd: ['Integers (comma-separated)', '48, 18', 'Two or more numbers; two numbers also give the Bézout identity.'], lcm: ['Integers (comma-separated)', '12, 18, 30', 'Least common multiple.'], modinv: ['a, m', '3, 11', 'Inverse of a modulo m.'], powmod: ['a, e, m', '2, 100, 13', 'a^e mod m by square-and-multiply.'], totient: ['Integer n', '360', 'Euler’s totient φ(n).'], ncr: ['n, k', '10, 3', 'Number of combinations C(n, k).'], npr: ['n, k', '10, 3', 'Number of permutations P(n, k).'], fib: ['Index n', '100', 'The n-th Fibonacci number (exact).'], primes: ['Limit n', '100', 'All primes up to n (sieve of Eratosthenes).'], base: ['n, base', '255, 2', 'Convert n to another base (2–36).'], crt: ['Congruences  a mod m ; …', '2 mod 3 ; 3 mod 5 ; 2 mod 7', 'Chinese remainder theorem.'] };
+    const NUM_HELP = { factor: ['Integer n', '360', 'Prime factorisation, divisors, φ(n) and σ(n).'], isprime: ['Integer n', '1000000007', 'Deterministic Miller–Rabin.'], gcd: ['Integers (comma-separated)', '48, 18', 'Two or more numbers; two numbers also give the Bézout identity.'], lcm: ['Integers (comma-separated)', '12, 18, 30', 'Least common multiple.'], modinv: ['a, m', '3, 11', 'Inverse of a modulo m.'], powmod: ['a, e, m', '2, 100, 13', 'a^e mod m by square-and-multiply.'], totient: ['Integer n', '360', 'Euler’s totient φ(n).'], ncr: ['n, k', '10, 3', 'Number of combinations C(n, k).'], npr: ['n, k', '10, 3', 'Number of permutations P(n, k).'], fib: ['Index n', '100', 'The n-th Fibonacci number (exact).'], primes: ['Limit n', '100', 'All primes up to n (sieve of Eratosthenes).'], base: ['n, base', '255, 2', 'Convert n to another base (2–36).'], crt: ['Congruences  a mod m ; …', '2 mod 3 ; 3 mod 5 ; 2 mod 7', 'Chinese remainder theorem.'], dioph: ['a, b, c  (for ax + by = c)', '12, 18, 60', 'All integer solutions of a linear Diophantine equation, with the positive ones counted.'], cfrac: ['Fraction, decimal, sqrt(n), pi, e', '415/93', 'Continued fraction and convergents; √n is periodic.'], pell: ['D', '61', "The smallest solution of Pell's equation x² − Dy² = 1, found from the continued fraction of √D."], primroot: ['n', '23', 'Primitive roots modulo n, with the order checked directly.'], legendre: ['a, n  (n odd)', '5, 11', 'Legendre and Jacobi symbols by quadratic reciprocity, checked with Euler’s criterion.'], partitions: ['n', '100', 'p(n), partitions into distinct and odd parts, listed for small n.'], stirling: ['n, k', '6, 3', 'Stirling numbers of both kinds and the Bell number.'], combi: ['n', '10', 'Catalan numbers, derangements, central binomials, factorials and Pascal’s triangle.'], rsa: ['p, q, [e,] message', '61, 53, 17, 65', 'A classroom RSA demo: keys, encryption and decryption with tiny primes.'] };
     MODES.number = {
         label: 'Number theory', icon: '#',
         input: v => { const a = NUM_HELP[v.op || 'factor']; return { label: a[0], placeholder: 'e.g. ' + a[1], hint: a[2] }; },
-        fields: [{ key: 'op', label: 'Operation', type: 'select', def: 'factor', options: [['factor', 'Prime factorisation'], ['isprime', 'Primality test'], ['gcd', 'GCD (+ Bézout)'], ['lcm', 'LCM'], ['modinv', 'Modular inverse'], ['powmod', 'Modular exponentiation'], ['totient', "Euler's totient φ(n)"], ['ncr', 'Combinations C(n, k)'], ['npr', 'Permutations P(n, k)'], ['fib', 'Fibonacci number'], ['primes', 'Primes up to n'], ['base', 'Base conversion'], ['crt', 'Chinese remainder theorem']] }],
+        fields: [{ key: 'op', label: 'Operation', type: 'select', def: 'factor', options: [['factor', 'Prime factorisation'], ['isprime', 'Primality test'], ['gcd', 'GCD (+ Bézout)'], ['lcm', 'LCM'], ['modinv', 'Modular inverse'], ['powmod', 'Modular exponentiation'], ['totient', "Euler's totient φ(n)"], ['ncr', 'Combinations C(n, k)'], ['npr', 'Permutations P(n, k)'], ['fib', 'Fibonacci number'], ['primes', 'Primes up to n'], ['base', 'Base conversion'], ['crt', 'Chinese remainder theorem'], ['dioph', 'Linear Diophantine equation ax + by = c'], ['cfrac', 'Continued fractions'], ['pell', "Pell's equation"], ['primroot', 'Primitive roots'], ['legendre', 'Legendre / Jacobi symbol'], ['partitions', 'Integer partitions'], ['stirling', 'Stirling and Bell numbers'], ['combi', 'Catalan numbers, derangements'], ['rsa', 'RSA demo']] }],
         examples: [
             { label: 'Factorise 360', fn: '360', opts: { op: 'factor' } },
             { label: 'Factorise 600851475143', fn: '600851475143', opts: { op: 'factor' } },
@@ -549,7 +555,22 @@
             { label: '2¹⁰⁰ mod 13', fn: '2, 100, 13', opts: { op: 'powmod' } },
             { label: 'C(52, 5) poker hands', fn: '52, 5', opts: { op: 'ncr' } },
             { label: 'Fibonacci F(200)', fn: '200', opts: { op: 'fib' } },
-            { label: 'Chinese remainder theorem', fn: '2 mod 3 ; 3 mod 5 ; 2 mod 7', opts: { op: 'crt' } }
+            { label: 'Chinese remainder theorem', fn: '2 mod 3 ; 3 mod 5 ; 2 mod 7', opts: { op: 'crt' } },
+            { label: 'Diophantine: 12x + 18y = 60', fn: '12, 18, 60', opts: { op: 'dioph' } },
+            { label: 'Diophantine: no solution 6x + 9y = 8', fn: '6, 9, 8', opts: { op: 'dioph' } },
+            { label: 'Continued fraction of 415/93', fn: '415/93', opts: { op: 'cfrac' } },
+            { label: 'Continued fraction of √23 (periodic)', fn: 'sqrt(23)', opts: { op: 'cfrac' } },
+            { label: 'Continued fraction of π', fn: 'pi', opts: { op: 'cfrac' } },
+            { label: "Pell's equation x² − 61y² = 1", fn: '61', opts: { op: 'pell' } },
+            { label: 'Primitive root modulo 23', fn: '23', opts: { op: 'primroot' } },
+            { label: 'Primitive root modulo 10⁹+7', fn: '1000000007', opts: { op: 'primroot' } },
+            { label: 'Legendre symbol (5 / 11)', fn: '5, 11', opts: { op: 'legendre' } },
+            { label: 'Jacobi symbol (5 / 21)', fn: '5, 21', opts: { op: 'legendre' } },
+            { label: 'Partitions of 10', fn: '10', opts: { op: 'partitions' } },
+            { label: 'Partitions of 200', fn: '200', opts: { op: 'partitions' } },
+            { label: 'Stirling numbers S(10, 4)', fn: '10, 4', opts: { op: 'stirling' } },
+            { label: 'Catalan C(10) and derangements', fn: '10', opts: { op: 'combi' } },
+            { label: 'RSA with p = 61, q = 53', fn: '61, 53, 17, 65', opts: { op: 'rsa' } }
         ]
     };
     MODES.units = {
@@ -668,10 +689,53 @@
         ]
     };
 
+    MODES.geometry = {
+        label: 'Geometry', icon: '△',
+        input: v => ({ triangle: { label: 'Known values', placeholder: 'e.g. a = 7, b = 5, C = 60', hint: 'Give three values with at least one side: sides a, b, c and angles A, B, C (A is opposite a). Handles SSS, SAS, ASA, AAS and the ambiguous SSA case (0, 1 or 2 triangles).' }, conic: { label: 'Equation in x and y', placeholder: 'e.g. 9x^2 + 4y^2 - 18x + 16y - 11 = 0', hint: 'Any second-degree equation, including rotated ones with an xy term: classifies it and finds centre, axes, foci, vertices, asymptotes or directrix.' }, circle3: { label: 'Three points', placeholder: 'e.g. (0,0), (4,0), (0,3)', hint: 'The circle through three points, with its equation.' }, polygon: { label: 'Vertices in order', placeholder: 'e.g. (0,0), (4,0), (4,3), (0,3)', hint: 'Area (shoelace formula), perimeter, centroid, and whether the polygon is convex.' } }[v.op || 'triangle']),
+        fields: [
+            { key: 'op', label: 'Tool', type: 'select', def: 'triangle', options: [['triangle', 'Triangle solver (laws of sines and cosines)'], ['conic', 'Conic section: classify, centre, foci'], ['circle3', 'Circle through three points'], ['polygon', 'Polygon: area, perimeter, centroid']] },
+            { key: 'unit', label: 'Angles in', type: 'select', def: 'deg', options: [['deg', 'Degrees'], ['rad', 'Radians']], show: v => v.op === 'triangle' }
+        ],
+        examples: [
+            { label: 'Triangle: 3-4-5 (SSS)', fn: 'a = 3, b = 4, c = 5', opts: { op: 'triangle', unit: 'deg' } },
+            { label: 'Triangle: two sides and the angle between (SAS)', fn: 'a = 7, b = 5, C = 60', opts: { op: 'triangle', unit: 'deg' } },
+            { label: 'Triangle: two angles and a side (AAS)', fn: 'A = 40, B = 60, c = 10', opts: { op: 'triangle', unit: 'deg' } },
+            { label: 'Triangle: the ambiguous case, two solutions', fn: 'a = 8, b = 10, A = 30', opts: { op: 'triangle', unit: 'deg' } },
+            { label: 'Triangle: the ambiguous case, no solution', fn: 'a = 3, b = 10, A = 30', opts: { op: 'triangle', unit: 'deg' } },
+            { label: 'Conic: ellipse 9x² + 4y² − 18x + 16y − 11 = 0', fn: '9x^2 + 4y^2 - 18x + 16y - 11 = 0', opts: { op: 'conic' } },
+            { label: 'Conic: hyperbola x² − y² = 1', fn: 'x^2 - y^2 = 1', opts: { op: 'conic' } },
+            { label: 'Conic: rotated hyperbola x² + 4xy + y² = 1', fn: 'x^2 + 4*x*y + y^2 = 1', opts: { op: 'conic' } },
+            { label: 'Conic: parabola y = x² − 4x + 7', fn: 'y = x^2 - 4x + 7', opts: { op: 'conic' } },
+            { label: 'Conic: rotated parabola', fn: 'x^2 + 2*x*y + y^2 + x - y = 0', opts: { op: 'conic' } },
+            { label: 'Circle through (0,0), (4,0), (0,3)', fn: '(0,0), (4,0), (0,3)', opts: { op: 'circle3' } },
+            { label: 'Polygon: a concave pentagon', fn: '(0,0), (4,0), (2,1), (4,4), (0,4)', opts: { op: 'polygon' } }
+        ]
+    };
+    MODES.discrete = {
+        label: 'Discrete maths', icon: '∧',
+        input: v => ({ truth: { label: 'Boolean expression', placeholder: 'e.g. (A and B) or (not A and C)', hint: 'Use and / or / not / xor / -> / <-> (or & | ! ^). Gives the truth table, minterms, canonical forms and the minimal sum of products (Quine–McCluskey). Up to 6 variables.' }, graph: { label: 'Edges  (u-v:weight, …)', placeholder: 'e.g. A-B:4, A-C:2, B-C:1, B-D:5', hint: 'Undirected edges A-B:4 or directed edges A->B:4, separated by commas. Gives shortest paths (Dijkstra), a minimum spanning tree, components, Euler trails and bipartiteness.' } }[v.op || 'truth']),
+        fields: [
+            { key: 'op', label: 'Tool', type: 'select', def: 'truth', options: [['truth', 'Boolean algebra: truth table and minimisation'], ['graph', 'Graph: shortest paths, spanning tree, structure']] },
+            { key: 'gsrc', label: 'Start vertex  (blank = first)', type: 'text', def: '', placeholder: 'A', show: v => v.op === 'graph' },
+            { key: 'gdst', label: 'Destination  (optional)', type: 'text', def: '', placeholder: 'E', show: v => v.op === 'graph' }
+        ],
+        examples: [
+            { label: 'Minimise (A ∧ B) ∨ (¬A ∧ C)', fn: '(A and B) or (not A and C)', opts: { op: 'truth' } },
+            { label: 'Implication A → B', fn: 'A -> B', opts: { op: 'truth' } },
+            { label: 'Hypothetical syllogism is a tautology', fn: '(P -> Q) and (Q -> R) -> (P -> R)', opts: { op: 'truth' } },
+            { label: 'Parity: A xor B xor C', fn: 'A xor B xor C', opts: { op: 'truth' } },
+            { label: 'Minimise a four-variable function', fn: '(A xor B) or (C and D)', opts: { op: 'truth' } },
+            { label: 'Graph: shortest path A to E', fn: 'A-B:4, A-C:2, B-C:1, B-D:5, C-D:8, D-E:3', opts: { op: 'graph', gsrc: 'A', gdst: 'E' } },
+            { label: 'Directed graph from A', fn: 'A->B:3, B->C:1, A->C:5, C->D:2', opts: { op: 'graph', gsrc: 'A', gdst: '' } },
+            { label: 'Triangle graph: Euler circuit, odd cycle', fn: 'A-B, B-C, C-A', opts: { op: 'graph', gsrc: 'A', gdst: '' } },
+            { label: 'Two components', fn: 'A-B:1, C-D:2', opts: { op: 'graph', gsrc: 'A', gdst: '' } }
+        ]
+    };
+
     const MODE_GROUPS = [
         ['Core calculus', ['derivative', 'integral', 'limit', 'series', 'analysis']],
         ['Explore & visualise', ['graph', 'riemann', 'applications', 'root', 'fourier']],
-        ['Algebra & sums', ['calc', 'solve', 'algebra', 'sums', 'number', 'units', 'stats']],
+        ['Algebra & sums', ['calc', 'solve', 'algebra', 'sums', 'number', 'units', 'stats', 'geometry', 'discrete']],
         ['Advanced', ['ode', 'multivariable', 'vector', 'matrix', 'laplace', 'complex', 'numerical']]
     ];
     const MODE_ORDER = MODE_GROUPS.flatMap(g => g[1]);
@@ -679,7 +743,7 @@
         derivative: 'Rules, steps, tangent', integral: 'Symbolic, definite, improper', limit: 'Two-sided & at ∞', series: 'Taylor / Maclaurin', analysis: 'Roots, extrema, asymptotes',
         graph: 'Sliders & intersections', riemann: 'Left, mid, trap, Simpson', applications: 'Area, volume, arc length', root: 'Newton, bisection, secant', fourier: 'Coefficients & Gibbs',
         calc: 'Variables, exact, ans', solve: 'Equations & inequalities', sums: 'Convergence tests', ode: 'Closed form + RK45', multivariable: '∇, Hessian, ∬, curl', matrix: 'det, inverse, eigen, SVD, LU, QR',
-        laplace: 'Laplace, inverse, Fourier', vector: 'Jacobian, ∮, work, ∭', stats: 'Describe, fit, distributions', number: 'Factor, gcd, mod, CRT', units: 'Convert anything', complex: 'Domain colouring, roots', numerical: 'Splines, quadrature, errors'
+        laplace: 'Laplace, inverse, Fourier', vector: 'Jacobian, ∮, work, ∭', stats: 'Describe, fit, distributions', number: 'Factor, gcd, mod, CRT', units: 'Convert anything', complex: 'Domain colouring, roots', numerical: 'Splines, quadrature, errors', geometry: 'Triangles, conics, circles', discrete: 'Logic, graphs'
     };
 
     const TEMPLATES = [
@@ -983,7 +1047,7 @@
                 preview.innerHTML = `<span class="preview-tex plain">${esc(lines[0] || '')}</span><span class="preview-meta">${lines.length} line${lines.length === 1 ? '' : 's'}</span>`;
                 return true;
             }
-            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur', 'gf', 'lp'].includes(currentValues().op)) || (state.mode === 'applications' && currentValues().op === 'curvature' && src.includes(';')) || (state.mode === 'ode' && ['linear2', 'equilibria'].includes(currentValues().odeType)) || (state.mode === 'laplace' && ['ztrans', 'iztrans', 'zdiff'].includes(currentValues().op)) || (state.mode === 'complex' && currentValues().op === 'mobius') || (state.mode === 'numerical' && ['lagrange', 'spline'].includes(currentValues().op || 'lagrange')) || (state.mode === 'laplace' && (/\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src) || /(^|[\s;)])(for|if|when|otherwise)(\s|$|(?=[-+(\d]))/i.test(src)))) {
+            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur', 'gf', 'lp'].includes(currentValues().op)) || (state.mode === 'applications' && currentValues().op === 'curvature' && src.includes(';')) || (state.mode === 'ode' && ['linear2', 'equilibria'].includes(currentValues().odeType)) || (state.mode === 'laplace' && ['ztrans', 'iztrans', 'zdiff'].includes(currentValues().op)) || (state.mode === 'complex' && currentValues().op === 'mobius') || (state.mode === 'numerical' && ['lagrange', 'spline'].includes(currentValues().op || 'lagrange')) || state.mode === 'geometry' || state.mode === 'discrete' || (state.mode === 'laplace' && (/\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src) || /(^|[\s;)])(for|if|when|otherwise)(\s|$|(?=[-+(\d]))/i.test(src)))) {
                 preview.className = 'preview-box valid';
                 const n = src.split(/[\n;]+/).filter(x => x.trim()).length;
                 preview.innerHTML = `<span class="preview-tex plain">${esc(src.length > 160 ? src.slice(0, 160) + '…' : src)}</span><span class="preview-meta">${state.mode === 'stats' ? (src.split(/[\s,;]+/).filter(Boolean).length + ' values') : state.mode === 'vector' ? (n + ' component' + (n === 1 ? '' : 's')) : 'ready'}</span>`;

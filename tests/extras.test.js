@@ -318,3 +318,56 @@ test('numerical differentiation: exact reference, best step sizes, second deriva
   const s2 = NM('exp(x)', { op: 'diff', dat: '0.5', dord: '2' }); assert.match(s2.main.text, /^1\.6487212707/); assert.equal(r.plot.generic.traces.length, 5);
   assert.throws(() => NM('log(x)', { op: 'diff', dat: '-1' }), /not defined/); assert.throws(() => NM('x+y', { op: 'diff' }), /only the variable x/);
 });
+
+// ---------- batch C: more number theory, geometry, discrete maths, conservative fields ----------
+const NT = (src, op) => E.run.number(src, { op });
+test('number theory extras: Diophantine, continued fractions, Pell, primitive roots, symbols', () => {
+  assert.match(NT('12, 18, 60', 'dioph').main.text, /^x = -10 \+ 3·t,\s+y = 10 − 2·t/); assert.match(NT('6, 9, 8', 'dioph').main.text, /no integer solutions/); assert.match(txt(NT('3, 5, 100', 'dioph')), /Solutions in positive integers: 6 \(the smallest is \(5, 17\)\)/);
+  assert.equal(NT('415/93', 'cfrac').main.text, '[4; 2, 6, 7]'); assert.equal(NT('sqrt(23)', 'cfrac').main.text, '[4; 1, 3, 1, 8 repeating]'); assert.match(NT('pi', 'cfrac').main.text, /^\[3; 7, 15, 1, 292/); assert.throws(() => NT('hello', 'cfrac'), /Enter a fraction/);
+  assert.match(NT('61', 'pell').main.text, /x = 1766319049, y = 226153980/); assert.match(NT('13', 'pell').main.text, /x = 649, y = 180/); assert.throws(() => NT('49', 'pell'), /perfect square/);
+  assert.equal(NT('23', 'primroot').main.text, '5'); assert.equal(NT('1000000007', 'primroot').main.text, '5'); assert.match(NT('15', 'primroot').main.text, /no primitive roots/); assert.match(txt(NT('23', 'primroot')), /φ\(φ\(n\)\)\:? 10/);
+  assert.equal(NT('5, 11', 'legendre').main.text, '1'); assert.equal(NT('1001, 9907', 'legendre').main.text, '-1'); assert.equal(NT('5, 21', 'legendre').main.text, '1'); assert.throws(() => NT('3, 8', 'legendre'), /odd/);
+  assert.match(txt(NT('5, 11', 'legendre')), /A square root: 4/);
+});
+test('counting: partitions, Stirling numbers, Catalan, derangements, RSA', () => {
+  assert.equal(NT('10', 'partitions').main.text, 'p(10) = 42'.replace('p(10) = ', '')); assert.equal(NT('100', 'partitions').main.text, '190569292'); assert.match(txt(NT('10', 'partitions')), /Euler: always equal/);
+  assert.match(NT('10, 4', 'stirling').main.text, /^34105/); assert.match(txt(NT('10, 4', 'stirling')), /Bell number B\(10\) = 115975/);
+  assert.match(NT('10', 'combi').main.text, /C\(10\) = 16796,\s+!10 = 1334961/); assert.match(NT('0', 'combi').main.text, /C\(0\) = 1/);
+  const rsa = NT('61, 53, 17, 65', 'rsa'); assert.equal(rsa.main.text, '65^17 mod 3233 = 2790'); assert.match(txt(rsa), /Private exponent d: 2753/); assert.ok(rsa.warnings.length > 0); assert.throws(() => NT('4, 5, 17, 65', 'rsa'), /both be prime/);
+});
+const GM = (src, opt) => E.run.geometry(src, opt);
+test('triangle solver: all cases, the ambiguous SSA case and impossible input', () => {
+  assert.match(GM('a = 3, b = 4, c = 5', { op: 'triangle' }).main.text, /C = 90°/); assert.match(GM('a = 7, b = 5, C = 60', { op: 'triangle' }).main.text, /c = 6\.244998/);
+  assert.match(GM('A = 40, B = 60, c = 10', { op: 'triangle' }).main.text, /C = 80°/);
+  const amb = GM('a = 8, b = 10, A = 30', { op: 'triangle' }); assert.match(amb.main.label, /2 triangles/); assert.ok(amb.meta.some(m => /Ambiguous case/.test(m))); assert.equal(amb.plot.generic.traces.length, 2);
+  assert.match(GM('a = 3, b = 10, A = 30', { op: 'triangle' }).main.label, /No triangle/); assert.match(GM('a = 5, b = 3, A = 40', { op: 'triangle' }).main.label, /Solution/);
+  assert.throws(() => GM('a = 1, b = 2, c = 5', { op: 'triangle' }), /cannot form/); assert.throws(() => GM('A = 100, B = 90, c = 3', { op: 'triangle' }), /no room/); assert.throws(() => GM('A = 30, B = 60, C = 90', { op: 'triangle' }), /at least one side/); assert.throws(() => GM('a = 3', { op: 'triangle' }), /three known/);
+  assert.match(GM('a = 1, b = 1, c = 1', { op: 'triangle' }).items.map(i => i.text).join('|'), /equilateral/);
+});
+test('conics: classification, centre, foci and the focus-property check', () => {
+  const el = GM('9x^2 + 4y^2 - 18x + 16y - 11 = 0', { op: 'conic' }); assert.match(el.main.text, /centre \(1, -2\), semi-axes 3 and 2/); assert.match(txt(el), /Foci: \(1, 0\.2360679\d*\), \(1, -4\.2360679\d*\)/); assert.ok(el.meta.some(m => /distances to the two foci add to 2a/.test(m)));
+  assert.match(GM('x^2 - y^2 = 1', { op: 'conic' }).main.text, /^centre \(0, 0\), a = 1, b = 1/); assert.match(txt(GM('x^2 + 4*x*y + y^2 = 1', { op: 'conic' })), /Eccentricity: 2/);
+  assert.match(GM('y = x^2 - 4x + 7', { op: 'conic' }).main.text, /vertex \(2, 3\), focus \(2, 3\.25\)/); assert.match(GM('x^2 + y^2 - 6x + 4y - 12 = 0', { op: 'conic' }).main.text, /centre \(3, -2\), radius 5/);
+  assert.match(GM('x^2 - y^2 = 0', { op: 'conic' }).main.text, /two intersecting lines/); assert.match(GM('x^2 + y^2 = -1', { op: 'conic' }).main.text, /no real points/); assert.throws(() => GM('x^3 + y = 1', { op: 'conic' }), /not a conic/); assert.throws(() => GM('x + y = 1', { op: 'conic' }), /line, not a conic/);
+  assert.match(txt(GM('x^2 + 2*x*y + y^2 + x - y = 0', { op: 'conic' })), /Directrix/);
+});
+test('circle through three points and polygons', () => {
+  assert.match(GM('(0,0), (4,0), (0,3)', { op: 'circle3' }).main.text, /centre \(2, 3\/2\), radius 5\/2/); assert.throws(() => GM('(0,0), (1,1), (2,2)', { op: 'circle3' }), /one line/);
+  const pg = GM('(0,0), (4,0), (4,3), (0,3)', { op: 'polygon' }); assert.equal(pg.main.text, '12'); assert.match(txt(pg), /convex/); assert.match(txt(GM('(0,0), (4,0), (2,1), (4,4), (0,4)', { op: 'polygon' })), /concave/); assert.match(txt(GM('(0,0), (5,0), (1,3), (4,3)', { op: 'polygon' })), /self-intersecting/); assert.throws(() => GM('(0,0), (4,4), (4,0), (0,4)', { op: 'polygon' }), /no area/); assert.throws(() => GM('(0,0), (1,1)', { op: 'polygon' }), /at least three/);
+});
+const DS = (src, opt) => E.run.discrete(src, opt);
+test('Boolean algebra: truth tables, classification and Quine–McCluskey minimisation', () => {
+  assert.equal(DS('(A and B) or (not A and C)', { op: 'truth' }).main.text, '(¬A ∧ C) ∨ (A ∧ B)'); assert.equal(DS('A -> B', { op: 'truth' }).main.text, '¬A ∨ B'); assert.match(DS('A or not A', { op: 'truth' }).main.text, /tautology/); assert.match(DS('A and not A', { op: 'truth' }).main.text, /contradiction/);
+  assert.match(DS('(P -> Q) and (Q -> R) -> (P -> R)', { op: 'truth' }).main.text, /tautology/); assert.equal(DS('A&B | A&!B | !A&B', { op: 'truth' }).main.text, 'B ∨ A'); assert.equal(DS('(A xor B) or (C and D)', { op: 'truth' }).main.text, '(C ∧ D) ∨ (¬A ∧ B) ∨ (A ∧ ¬B)');
+  assert.match(txt(DS('A and B', { op: 'truth' })), /Minterms Σm: 3/); assert.throws(() => DS('A and (B or', { op: 'truth' }), /ends too soon/); assert.throws(() => DS('a b', { op: 'truth' }), /Join terms/); assert.throws(() => DS('A and B $', { op: 'truth' }), /Unexpected character/); assert.throws(() => DS('a and b and c and d and e and f and g', { op: 'truth' }), /6 variables/);
+});
+test('graphs: Dijkstra cross-checked with Bellman–Ford, spanning tree, Euler trails, bipartiteness', () => {
+  const g = DS('A-B:4, A-C:2, B-C:1, B-D:5, C-D:8, D-E:3', { op: 'graph', gsrc: 'A', gdst: 'E' }); assert.match(g.main.text, /A → C → B → D → E {2}\(length 11\)/); assert.match(txt(g), /total weight 11/); assert.ok(g.meta.some(m => /Bellman–Ford/.test(m) && /Kruskal/.test(m)));
+  assert.match(txt(DS('A-B, B-C, C-A', { op: 'graph' })), /Euler circuit exists/); assert.match(txt(DS('A-B, B-C, C-A', { op: 'graph' })), /Bipartite: no/); assert.match(txt(DS('A-B:1, C-D:2', { op: 'graph', gsrc: 'A' })), /Components: \{A, B\}\s+\{C, D\}/); assert.match(txt(DS('A->B:3, B->C:1, A->C:5', { op: 'graph', gsrc: 'A' })), /C: 4/);
+  assert.throws(() => DS('A-B:-1', { op: 'graph' }), /Negative/); assert.throws(() => DS('A-B, B->C', { op: 'graph' }), /either all directed/); assert.throws(() => DS('A-B:4', { op: 'graph', gsrc: 'Z' }), /not a vertex/); assert.throws(() => DS('hello', { op: 'graph' }), /Could not read the edge/);
+});
+test('conservative fields: potential function, non-conservative detection and path independence', () => {
+  const V = (s, o) => E.run.vector(s, Object.assign({ op: 'potential' }, o)); const r = V('2*x*y ; x^2 + 3*y^2', { pa: '0,0', pb: '1,2' }); assert.match(r.main.text, /x \^ 2 \* y \+ y \^ 3 \+ C/); assert.match(txt(r), /= 10/); assert.ok(r.meta.some(m => /numerical line integral/.test(m)));
+  assert.match(V('y*z ; x*z ; x*y', {}).main.text, /^[xyz] \* [xyz] \* [xyz] \+ C$/); assert.match(V('y ; -x', {}).main.label, /not conservative/); assert.match(V('x^2*y ; x^3', {}).main.label, /not conservative/); assert.match(V('y*cos(x*y) + 2*x ; x*cos(x*y) + 3*y^2', {}).main.text, /sin\(x \* y\)/);
+  assert.throws(() => V('x ; y ; z ; w', {}), /two or three/); assert.throws(() => V('x ; t', {}), /variables must be/); assert.throws(() => V('2*x*y ; x^2', { pa: '0' }), /both end points/);
+});

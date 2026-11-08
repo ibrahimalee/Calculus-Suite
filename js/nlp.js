@@ -69,6 +69,27 @@
         }
 
         // ---- ODEs ----------------------------------------------------------
+        {
+            let q;
+            const splitTop = str => { const out = []; let d = 0, cur = ''; for (const ch of str) { if (ch === '(') d++; if (ch === ')') d--; if (ch === ',' && d === 0) { out.push(cur); cur = ''; } else cur += ch; } out.push(cur); return out.map(x => x.trim()).filter(Boolean); };
+            if ((q = s.match(/^(?:solve )?(?:the )?triangle (?:with |given |where )?(.+=.+)$/))) return { mode: 'geometry', fn: q[1].replace(/\s+and\s+/g, ', ').replace(/°|degrees/g, '').trim(), opts: { op: 'triangle', unit: 'deg' }, say: 'Triangle solver' };
+            if ((q = s.match(/^(?:classify |identify |analy[sz]e )?(?:the )?(?:conic section|conic|ellipse|hyperbola|parabola)(?: given by| with equation| for| of)? (.+=.+)$/))) return { mode: 'geometry', fn: q[1].trim(), opts: { op: 'conic' }, say: 'Conic section' };
+            if ((q = s.match(/^(?:the )?circle (?:through|passing through) (.+\d.*)$/))) return { mode: 'geometry', fn: q[1].trim(), opts: { op: 'circle3' }, say: 'Circle through three points' };
+            if ((q = s.match(/^(?:the )?(?:area|perimeter|centroid) of (?:the )?polygon (?:with vertices )?(.+\d.*)$/))) return { mode: 'geometry', fn: q[1].trim(), opts: { op: 'polygon' }, say: 'Polygon' };
+            if ((q = s.match(/^(?:the )?(?:truth table|boolean (?:expression|simplification|algebra)|simplify (?:the )?boolean (?:expression )?|minimi[sz]e (?:the )?(?:boolean )?(?:expression |function )?)(?: of| for)? ?(.+)$/)) && /[a-z]/.test(q[1])) return { mode: 'discrete', fn: q[1].trim(), opts: { op: 'truth' }, say: 'Boolean algebra' };
+            if ((q = s.match(/^shortest path (?:from )?([a-z0-9_]+) to ([a-z0-9_]+) (?:in|on|for|through) (?:the )?(?:graph )?(.+)$/i))) return { mode: 'discrete', fn: q[3].trim(), opts: { op: 'graph', gsrc: q[1].toUpperCase(), gdst: q[2].toUpperCase() }, say: 'Shortest path' };
+            if ((q = s.match(/^(?:the )?(?:minimum spanning tree|mst|graph)(?: of| for| with edges)? (?:the )?(?:graph )?([a-z0-9_]+\s*-+>?\s*[a-z0-9_].+)$/i))) return { mode: 'discrete', fn: q[1].trim(), opts: { op: 'graph', gsrc: '', gdst: '' }, say: 'Graph' };
+            if ((q = s.match(/^(?:solve )?(?:the )?(?:linear )?diophantine equation (-?\d*)\s*x\s*([+-]\s*\d*)\s*y\s*=\s*(-?\d+)$/))) { const co = t => { const u = t.replace(/\s+/g, ''); return u === '' || u === '+' ? '1' : u === '-' ? '-1' : u.replace(/^\+/, ''); }; return { mode: 'number', fn: `${co(q[1])}, ${co(q[2])}, ${q[3]}`, opts: { op: 'dioph' }, say: 'Diophantine equation' }; }
+            if ((q = s.match(/^(?:the )?continued fraction (?:expansion )?(?:of )?(.+)$/))) return { mode: 'number', fn: q[1].replace(/√\s*/, 'sqrt').replace(/sqrt\s*(\d+)$/, 'sqrt($1)').replace(/\s+/g, ''), opts: { op: 'cfrac' }, say: 'Continued fraction' };
+            if ((q = s.match(/^(?:solve )?(?:the )?pell(?:'s)? equation (?:with |for )?(?:d ?= ?|x\^?2 ?- ?)?(\d+)(?:y\^?2 ?= ?1)?$/))) return { mode: 'number', fn: q[1], opts: { op: 'pell' }, say: "Pell's equation" };
+            if ((q = s.match(/^(?:the )?(?:smallest )?primitive roots? (?:of|modulo|mod) (\d+)$/))) return { mode: 'number', fn: q[1], opts: { op: 'primroot' }, say: 'Primitive roots' };
+            if ((q = s.match(/^(?:the )?(?:legendre|jacobi) symbol \(?\s*(-?\d+)\s*[\/,]\s*(\d+)\s*\)?$/))) return { mode: 'number', fn: `${q[1]}, ${q[2]}`, opts: { op: 'legendre' }, say: 'Legendre symbol' };
+            if ((q = s.match(/^(?:the )?(?:number of )?(?:integer )?partitions of (\d+)$/))) return { mode: 'number', fn: q[1], opts: { op: 'partitions' }, say: 'Integer partitions' };
+            if ((q = s.match(/^(?:the )?stirling (?:number|numbers)(?: of the second kind)? (?:s\()?(\d+)[ ,]+(\d+)\)?$/))) return { mode: 'number', fn: `${q[1]}, ${q[2]}`, opts: { op: 'stirling' }, say: 'Stirling numbers' };
+            if ((q = s.match(/^(?:the )?(?:catalan number|derangements?)(?: of| for| number)? ?(\d+)$/))) return { mode: 'number', fn: q[1], opts: { op: 'combi' }, say: 'Catalan numbers and derangements' };
+            if ((q = s.match(/^rsa (?:with )?p ?= ?(\d+),? q ?= ?(\d+),?(?: e ?= ?(\d+),?)? (?:message|m) ?= ?(\d+)$/))) return { mode: 'number', fn: [q[1], q[2], q[3], q[4]].filter(Boolean).join(', '), opts: { op: 'rsa' }, say: 'RSA demo' };
+            if ((q = s.match(/^(?:find )?(?:the )?potential (?:function )?(?:of|for) (?:the )?(?:vector )?(?:field )?(?:f ?= ?)?\(?(.+?)\)?$/)) && /,|;/.test(q[1])) return { mode: 'vector', fn: splitTop(q[1].replace(/;/g, ',')).map(mathify).join(' ; '), opts: { op: 'potential', pa: '', pb: '' }, say: 'Potential function' };
+        }
         const ndM = s.match(/^(?:numerical|finite[- ]difference) (?:derivative|differentiation)(?: of)? (.+?) at (?:x ?= ?)?(-?[\d.]+|pi[^ ]*)$/);
         if (ndM) return { mode: 'numerical', fn: mathify(ndM[1]), opts: { op: 'diff', dat: ndM[2], dord: '1' }, say: 'Numerical differentiation' };
         const cmpM = s.match(/^compare (?:the )?(?:numerical |ode )?(?:methods|solvers)(?: for| on| of)? (?:y'? ?= ?|dy\/dx ?= ?)(.+?)(?: with y\(0\) ?= ?(-?[\d.]+))?(?: (?:from 0 )?(?:to|until|on \[0,) ?([\d.]+)\]?)?$/);

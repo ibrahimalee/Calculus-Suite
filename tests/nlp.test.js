@@ -1,6 +1,18 @@
 const test = require('node:test'), assert = require('node:assert');
 const NL = require('../js/nlp.js');
 const cases = [
+  ['solve the triangle a = 7, b = 5, C = 60', { mode: 'geometry', opts: { op: 'triangle' } }],
+  ['classify the conic 9x^2 + 4y^2 - 18x + 16y - 11 = 0', { mode: 'geometry', opts: { op: 'conic' } }],
+  ['circle through (0,0), (4,0), (0,3)', { mode: 'geometry', opts: { op: 'circle3' } }],
+  ['truth table of (A and B) or not C', { mode: 'discrete', opts: { op: 'truth' } }],
+  ['shortest path from A to E in A-B:4, A-C:2, B-C:1, B-D:5, D-E:3', { mode: 'discrete', opts: { op: 'graph', gsrc: 'A', gdst: 'E' } }],
+  ['solve the diophantine equation 12x + 18y = 60', { mode: 'number', fn: '12, 18, 60', opts: { op: 'dioph' } }],
+  ['continued fraction of 415/93', { mode: 'number', fn: '415/93', opts: { op: 'cfrac' } }],
+  ['pell equation with d = 61', { mode: 'number', fn: '61', opts: { op: 'pell' } }],
+  ['primitive root of 23', { mode: 'number', fn: '23', opts: { op: 'primroot' } }],
+  ['legendre symbol (5/11)', { mode: 'number', fn: '5, 11', opts: { op: 'legendre' } }],
+  ['number of partitions of 100', { mode: 'number', fn: '100', opts: { op: 'partitions' } }],
+  ['potential function of F = (2xy, x^2 + 3y^2)', { mode: 'vector', opts: { op: 'potential' } }],
   ['natural cubic spline through (0,0), (1,2), (2,1), (3,3)', { mode: 'numerical', opts: { op: 'spline', bc: 'natural' } }],
   ['interpolating polynomial through (0,1), (1,3), (2,2)', { mode: 'numerical', fn: '(0,1), (1,3), (2,2)', opts: { op: 'lagrange' } }],
   ['runge phenomenon for 1/(1+25x^2) degree 14', { mode: 'numerical', opts: { op: 'chebyshev', n: '14' } }],

@@ -27,6 +27,8 @@
         ['sums', 'Σk', 'Sums & series', 'Closed forms, telescoping, and convergence tests'],
         ['laplace', 'ℒ', 'Transforms', 'Laplace, Fourier and Z-transforms, difference equations'],
         ['numerical', '≈', 'Numerical methods', 'Interpolation, splines, quadrature, finite differences'],
+        ['geometry', '△', 'Geometry', 'Triangle solver, conic sections, circles, polygons'],
+        ['discrete', '∧', 'Discrete maths', 'Truth tables, Boolean minimisation, graph algorithms'],
         ['vector', '∮', 'Vector calculus', 'Div, curl, line, surface and flux integrals'],
         ['stats', 'x̄', 'Statistics', 'Summaries, regression and distributions'],
         ['number', '#', 'Number theory', 'Factoring, gcd, modular arithmetic, primes'],
