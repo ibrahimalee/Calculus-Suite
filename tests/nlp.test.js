@@ -1,6 +1,8 @@
 const test = require('node:test'), assert = require('node:assert');
 const NL = require('../js/nlp.js');
 const cases = [
+  ['laplace transform of t for 0<t<1 ; 2-t for 1<t<2 ; 0 otherwise', { mode: 'laplace', opts: { op: 'laplace' } }],
+  ['fourier transform of 1 for -1<t<1 ; 0 otherwise', { mode: 'laplace', opts: { op: 'fourier' } }],
   ['equilibria of y ; -sin(x)-0.3*y', { mode: 'ode', opts: { odeType: 'equilibria' } }],
   ['kruskal wallis 1 2 3 ; 4 5 6 ; 7 8 9', { mode: 'stats', opts: { op: 'kruskal' } }],
   ['phase portrait of 1 2 ; 3 4', { mode: 'ode', opts: { odeType: 'linear2' } }],

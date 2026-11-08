@@ -27,7 +27,7 @@
     // ---------- builder ----------
     const TYPE_HELP = { number: 'A number. Fractions and things like sqrt(2)/2 are fine.', expr: 'A formula in x. Any equivalent form is accepted.', choice: '', text: 'Separate accepted alternatives with |', list: 'Numbers separated by commas; order does not matter.', matrix: 'Rows separated by ;  e.g. 1 0 ; 0 2', factors: 'Like 2^3*3*5. Students must use primes.' };
     function renderBuilder() {
-        $('wsTitle').value = cur.title; $('wsInstr').value = cur.instructions; $('wsEmail').value = cur.email || ''; $('wsCalc').checked = !!cur.calculator; $('wsSelf').checked = !!cur.selfCheck;
+        $('wsTitle').value = cur.title; $('wsInstr').value = cur.instructions; $('wsEmail').value = cur.email || ''; $('wsCalc').checked = !!cur.calculator; $('wsSelf').checked = !!cur.selfCheck; $('wsTime').value = cur.timeLimit || 0; $('wsLock').checked = cur.timeLock !== false; $('wsLock').disabled = !(cur.timeLimit > 0);
         const list = $('qList'); list.textContent = ''; $('qCount').textContent = `(${cur.questions.length} of ${C.LIMITS.questions})`;
         cur.questions.forEach((q, i) => list.appendChild(qCard(q, i)));
     }
@@ -65,6 +65,7 @@
     }
     $('wsTitle').addEventListener('input', e => { cur.title = e.target.value; later(); }); $('wsInstr').addEventListener('input', e => { cur.instructions = e.target.value; later(); });
     $('wsEmail').addEventListener('input', e => { cur.email = e.target.value; later(); }); $('wsCalc').addEventListener('change', e => { cur.calculator = e.target.checked; later(); }); $('wsSelf').addEventListener('change', e => { cur.selfCheck = e.target.checked; later(); });
+    $('wsTime').addEventListener('input', e => { cur.timeLimit = Math.max(0, Math.min(600, Math.round(+e.target.value || 0))); $('wsLock').disabled = !(cur.timeLimit > 0); later(); }); $('wsLock').addEventListener('change', e => { cur.timeLock = e.target.checked; later(); });
     $('addQ').addEventListener('click', () => { if (cur.questions.length >= C.LIMITS.questions) { $('linkErr').textContent = `At most ${C.LIMITS.questions} questions per worksheet.`; return; } cur.questions.push({ type: 'number', prompt: '', key: '', points: 1, hint: '' }); persist(); renderBuilder(); const t = $('qList').querySelectorAll('textarea'); if (t.length) t[t.length - 1].focus(); });
     $('genTopic').appendChild(document.createDocumentFragment()); P.TOPICS.forEach(t => $('genTopic').appendChild(h('option', { value: t[0], text: t[1] })));
     $('genBtn').addEventListener('click', () => {
@@ -79,11 +80,30 @@
     $('wsPick').addEventListener('change', e => use(e.target.value));
     $('expBtn').addEventListener('click', () => { const blob = new Blob([JSON.stringify({ calculusSuiteWorksheet: 1, worksheet: cur }, null, 1)], { type: 'application/json' }); const a = h('a', { href: URL.createObjectURL(blob), download: (cur.title || 'worksheet').replace(/[^A-Za-z0-9]+/g, '_').slice(0, 40) + '.worksheet.json' }); document.body.appendChild(a); a.click(); a.remove(); });
     $('impFile').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; if (f.size > 2e6) { $('linkErr').textContent = 'That file is too large to be a worksheet.'; return; } try { const o = JSON.parse(await f.text()); const w = o && o.calculusSuiteWorksheet === 1 ? o.worksheet : null; if (!w) throw new Error('This is not a worksheet file from Calculus Suite Pro.'); const clean = C.normalise(w); const ex = sheets.findIndex(s => s.id === clean.id); if (ex >= 0) clean.id = C.uid(); cur = clean; sheets.push(cur); persist(); renderBuilder(); $('linkErr').textContent = ''; } catch (err) { $('linkErr').textContent = 'Import failed: ' + err.message; } });
+    // ---------- QR code for the student link ----------
+    let qrMatrix = null;
+    function makeQR(text) {
+        if (typeof window.qrcode !== 'function') throw new Error('The QR library did not load.');
+        const qr = window.qrcode(0, 'L'); qr.addData(text, 'Byte'); qr.make(); const n = qr.getModuleCount(); const m = []; for (let r = 0; r < n; r++) { const row = []; for (let c = 0; c < n; c++) row.push(qr.isDark(r, c)); m.push(row); } return m;
+    }
+    function drawQR(text) {
+        const box = $('qrBox'), note = $('qrNote'); note.textContent = ''; qrMatrix = null; box.hidden = true;
+        try { qrMatrix = makeQR(text); } catch (e) { const msg = String((e && e.message) || e); note.textContent = /overflow|length/i.test(msg) ? 'This link is too long for a QR code (the limit is about 2,900 characters). Use fewer or shorter questions, or share the link by chat or email.' : 'Could not make a QR code: ' + msg; return; }
+        const n = qrMatrix.length, q = 4, svg = $('qrSvg'); svg.textContent = ''; svg.setAttribute('viewBox', `0 0 ${n + 2 * q} ${n + 2 * q}`);
+        const NS = 'http://www.w3.org/2000/svg'; const bg = document.createElementNS(NS, 'rect'); bg.setAttribute('width', n + 2 * q); bg.setAttribute('height', n + 2 * q); bg.setAttribute('fill', '#fff'); svg.appendChild(bg);
+        let d = ''; qrMatrix.forEach((row, r) => { let c = 0; while (c < n) { if (!row[c]) { c++; continue; } let e = c; while (e < n && row[e]) e++; d += `M${c + q} ${r + q}h${e - c}v1h${c - e}z`; c = e; } });
+        const path = document.createElementNS(NS, 'path'); path.setAttribute('d', d); path.setAttribute('fill', '#000'); svg.appendChild(path); box.hidden = false;
+    }
+    $('qrPng').addEventListener('click', () => {
+        if (!qrMatrix) return; const n = qrMatrix.length, q = 4, px = 10, size = (n + 2 * q) * px, cv = document.createElement('canvas'); cv.width = cv.height = size; const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, size, size); g.fillStyle = '#000'; qrMatrix.forEach((row, r) => row.forEach((v, c) => { if (v) g.fillRect((c + q) * px, (r + q) * px, px, px); }));
+        cv.toBlob(b => { const a = h('a', { href: URL.createObjectURL(b), download: ((cur && cur.title) || 'worksheet').replace(/[^A-Za-z0-9]+/g, '_').slice(0, 40) + '-qr.png' }); document.body.appendChild(a); a.click(); a.remove(); }, 'image/png');
+    });
+    $('qrPrint').addEventListener('click', () => { const frame = document.querySelector('.qr-frame'); const wrap = document.createElement('div'); wrap.className = 'qr-print-root'; wrap.style.cssText = 'display:none;text-align:center;padding:40px'; const t = document.createElement('h1'); t.textContent = (cur && cur.title) || 'Worksheet'; const copy = frame.cloneNode(true); copy.style.cssText = 'display:inline-block;border:0'; copy.querySelector('svg').style.cssText = 'width:420px;height:420px'; const p2 = document.createElement('p'); p2.textContent = 'Scan to open the worksheet'; wrap.append(t, copy, p2); document.querySelector('main').appendChild(wrap); document.body.classList.add('print-qr'); const done = () => { document.body.classList.remove('print-qr'); wrap.remove(); window.removeEventListener('afterprint', done); }; window.addEventListener('afterprint', done); window.print(); });
     $('linkBtn').addEventListener('click', async () => {
         const err = $('linkErr'); err.textContent = '';
         try {
             const clean = C.normalise(cur); cur.id = clean.id; persist(); const code = await C.encodeStudent(clean); const url = new URL('worksheet.html', location.href); url.hash = 'w=' + code; const s = url.href;
-            $('linkOut').value = s; $('linkBox').hidden = false; $('openLink').href = s;
+            $('linkOut').value = s; $('linkBox').hidden = false; $('openLink').href = s; drawQR(s);
             $('linkNote').textContent = s.length > 6000 ? `This link is ${s.length.toLocaleString()} characters. Some chat apps cut very long links; consider fewer questions or send it by email.` : `${s.length.toLocaleString()} characters.${clean.selfCheck ? ' Practice mode: the answers are inside this link.' : ' The answer key is not in the link.'}`;
         } catch (e) { err.textContent = e.message; $('linkBox').hidden = true; }
     });
@@ -109,14 +129,14 @@
         stat(String(res.count), 'students'); if (res.count) { stat(Math.round(res.mean * 100) + '%', 'class average'); stat(Math.round(res.median * 100) + '%', 'median'); }
         if (!res.count) { $('tblWrap').hidden = true; $('skipNote').textContent = 'No submissions yet. Paste the codes your students sent.'; return; }
         $('tblWrap').hidden = false;
-        const head = h('tr', null, h('th', { text: 'Student', scope: 'col' }), ws.questions.map((q, i) => h('th', { scope: 'col', title: q.prompt.slice(0, 120), text: `Q${i + 1}` })), h('th', { text: 'Score', scope: 'col' }), h('th', { text: '%', scope: 'col' }));
+        const head = h('tr', null, h('th', { text: 'Student', scope: 'col' }), ws.questions.map((q, i) => h('th', { scope: 'col', title: q.prompt.slice(0, 120), text: `Q${i + 1}` })), h('th', { text: 'Score', scope: 'col' }), h('th', { text: '%', scope: 'col' }), ws.timeLimit > 0 ? h('th', { text: 'Time', scope: 'col' }) : null);
         tbl.appendChild(h('thead', null, head)); const tb = h('tbody'); const details = new Map();
         res.rows.forEach((r, ri) => {
             const tr = h('tr', null, h('td', { text: r.name }));
-            r.per.forEach((p, qi) => tr.appendChild(h('td', null, h('button', { class: 'cellbtn ' + (p.ok ? 'ok' : 'no'), type: 'button', 'aria-label': `${r.name}, question ${qi + 1}: ${p.ok ? 'correct' : 'incorrect'}. Show answer`, 'aria-expanded': 'false', text: p.ok ? '✓' : '✗', onclick: ev => { const id = ri; let d = details.get(id); if (d) { d.remove(); details.delete(id); ev.currentTarget.setAttribute('aria-expanded', 'false'); return; } d = h('tr', null, h('td', { class: 'detail', colspan: ws.questions.length + 3 }, h('dl', null, r.per.flatMap((pp, k) => [h('dt', { text: `Q${k + 1} ${pp.ok ? '✓' : '✗'}` }), h('dd', { text: (ws.questions[k].type === 'choice' ? (pp.answer === '' ? '(blank)' : (ws.questions[k].options[+pp.answer] || pp.answer)) : (pp.answer || '(blank)')) + (pp.note && pp.note !== 'blank' ? `   (${pp.note})` : '') })])))); tr.after(d); details.set(id, d); ev.currentTarget.setAttribute('aria-expanded', 'true'); } }))));
-            tr.appendChild(h('td', { text: `${r.score} / ${r.max}` })); tr.appendChild(h('td', { text: (r.max ? Math.round(100 * r.score / r.max) : 0) + '%' })); tb.appendChild(tr);
+            r.per.forEach((p, qi) => tr.appendChild(h('td', null, h('button', { class: 'cellbtn ' + (p.ok ? 'ok' : 'no'), type: 'button', 'aria-label': `${r.name}, question ${qi + 1}: ${p.ok ? 'correct' : 'incorrect'}. Show answer`, 'aria-expanded': 'false', text: p.ok ? '✓' : '✗', onclick: ev => { const id = ri; let d = details.get(id); if (d) { d.remove(); details.delete(id); ev.currentTarget.setAttribute('aria-expanded', 'false'); return; } d = h('tr', null, h('td', { class: 'detail', colspan: ws.questions.length + 3 + (ws.timeLimit > 0 ? 1 : 0) }, h('dl', null, r.per.flatMap((pp, k) => [h('dt', { text: `Q${k + 1} ${pp.ok ? '✓' : '✗'}` }), h('dd', { text: (ws.questions[k].type === 'choice' ? (pp.answer === '' ? '(blank)' : (ws.questions[k].options[+pp.answer] || pp.answer)) : (pp.answer || '(blank)')) + (pp.note && pp.note !== 'blank' ? `   (${pp.note})` : '') })])))); tr.after(d); details.set(id, d); ev.currentTarget.setAttribute('aria-expanded', 'true'); } }))));
+            tr.appendChild(h('td', { text: `${r.score} / ${r.max}` })); tr.appendChild(h('td', { text: (r.max ? Math.round(100 * r.score / r.max) : 0) + '%' })); if (ws.timeLimit > 0) tr.appendChild(h('td', { text: (r.used === null || r.used === undefined ? '–' : `${Math.floor(r.used / 60)}:${String(Math.round(r.used % 60)).padStart(2, '0')}`) + (r.over ? ' · ran out' : '') })); tb.appendChild(tr);
         });
-        const sum = h('tr', { class: 'sum' }, h('td', { text: '% correct' }), res.perQuestion.map(v => h('td', { text: Math.round(v * 100) + '%' })), h('td', { colspan: 2, text: '' })); tb.appendChild(sum); tbl.appendChild(tb);
+        const sum = h('tr', { class: 'sum' }, h('td', { text: '% correct' }), res.perQuestion.map(v => h('td', { text: Math.round(v * 100) + '%' })), h('td', { colspan: ws.timeLimit > 0 ? 3 : 2, text: '' })); tb.appendChild(sum); tbl.appendChild(tb);
         if (res.skipped.length) $('skipNote').textContent = `Not counted: ${res.skipped.map(x => `${x.name} (${x.why})`).join('; ')}.`;
     }
     function addText(text) {

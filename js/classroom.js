@@ -33,7 +33,7 @@
     function normalise(ws) {
         if (!ws || typeof ws !== 'object') throw new Error('Not a worksheet.');
         const qs = Array.isArray(ws.questions) ? ws.questions : []; if (!qs.length) throw new Error('Add at least one question.'); if (qs.length > LIMITS.questions) throw new Error(`At most ${LIMITS.questions} questions.`);
-        const out = { id: /^[A-Za-z0-9_-]{4,16}$/.test(ws.id || '') ? ws.id : uid(), title: clip(ws.title, LIMITS.title).trim() || 'Worksheet', instructions: clip(ws.instructions, LIMITS.instr), email: clip(ws.email, 120).trim(), calculator: !!ws.calculator, selfCheck: !!ws.selfCheck, created: ws.created || Date.now(), questions: [] };
+        const out = { id: /^[A-Za-z0-9_-]{4,16}$/.test(ws.id || '') ? ws.id : uid(), title: clip(ws.title, LIMITS.title).trim() || 'Worksheet', instructions: clip(ws.instructions, LIMITS.instr), email: clip(ws.email, 120).trim(), calculator: !!ws.calculator, selfCheck: !!ws.selfCheck, timeLimit: Math.max(0, Math.min(600, Math.round(+ws.timeLimit || 0))), timeLock: ws.timeLock === undefined ? true : !!ws.timeLock, created: ws.created || Date.now(), questions: [] };
         qs.forEach((q, i) => {
             const type = TYPES.includes(q.type) ? q.type : 'number'; const prompt = clip(q.prompt, LIMITS.prompt).trim(); if (!prompt) throw new Error(`Question ${i + 1} has no text.`);
             const c = { type, prompt, points: Math.max(1, Math.min(100, Math.round(+q.points || 1))), hint: clip(q.hint, 400), key: clip(q.key, LIMITS.key).trim() };
@@ -51,12 +51,12 @@
     }
     /** What a student receives. The key is left out unless the worksheet is in self-check mode. */
     async function encodeStudent(ws) {
-        const o = { v: 1, id: ws.id, t: ws.title, i: ws.instructions, e: ws.email, a: ws.calculator ? 1 : 0, s: ws.selfCheck ? 1 : 0, q: ws.questions.map(q => { const r = { y: q.type, p: q.prompt, n: q.points }; if (q.hint) r.h = q.hint; if (q.placeholder) r.ph = q.placeholder; if (q.options) r.o = q.options; if (ws.selfCheck) { r.k = q.key; if (q.tol) r.tl = q.tol; if (q.plusC) r.pc = 1; } return r; }) };
+        const o = { v: 1, id: ws.id, t: ws.title, i: ws.instructions, e: ws.email, a: ws.calculator ? 1 : 0, s: ws.selfCheck ? 1 : 0, tl: ws.timeLimit || 0, lk: ws.timeLock === false ? 0 : 1, q: ws.questions.map(q => { const r = { y: q.type, p: q.prompt, n: q.points }; if (q.hint) r.h = q.hint; if (q.placeholder) r.ph = q.placeholder; if (q.options) r.o = q.options; if (ws.selfCheck) { r.k = q.key; if (q.tol) r.tl = q.tol; if (q.plusC) r.pc = 1; } return r; }) };
         return pack(o);
     }
     async function decodeStudent(str) {
         const o = await unpack(str); if (!o || o.v !== 1 || !Array.isArray(o.q)) throw new Error('This link is not a worksheet.'); if (o.q.length > LIMITS.questions) throw new Error('Too many questions.');
-        return { id: clip(o.id, 16), title: clip(o.t, LIMITS.title) || 'Worksheet', instructions: clip(o.i, LIMITS.instr), email: /^[^\s@<>"]+@[^\s@<>"]+$/.test(o.e || '') ? clip(o.e, 120) : '', calculator: !!o.a, selfCheck: !!o.s, questions: o.q.map(r => { const type = TYPES.includes(r.y) ? r.y : 'text'; const q = { type, prompt: clip(r.p, LIMITS.prompt), points: Math.max(1, Math.min(100, Math.round(+r.n || 1))), hint: clip(r.h, 400), placeholder: clip(r.ph, 60) }; if (Array.isArray(r.o)) q.options = r.o.slice(0, 8).map(x => clip(x, LIMITS.option)); if (o.s) { q.key = clip(r.k, LIMITS.key); if (r.tl > 0) q.tol = +r.tl; q.plusC = !!r.pc; } return q; }) };
+        return { id: clip(o.id, 16), title: clip(o.t, LIMITS.title) || 'Worksheet', instructions: clip(o.i, LIMITS.instr), email: /^[^\s@<>"]+@[^\s@<>"]+$/.test(o.e || '') ? clip(o.e, 120) : '', calculator: !!o.a, selfCheck: !!o.s, timeLimit: Math.max(0, Math.min(600, Math.round(+o.tl || 0))), timeLock: o.lk !== 0, questions: o.q.map(r => { const type = TYPES.includes(r.y) ? r.y : 'text'; const q = { type, prompt: clip(r.p, LIMITS.prompt), points: Math.max(1, Math.min(100, Math.round(+r.n || 1))), hint: clip(r.h, 400), placeholder: clip(r.ph, 60) }; if (Array.isArray(r.o)) q.options = r.o.slice(0, 8).map(x => clip(x, LIMITS.option)); if (o.s) { q.key = clip(r.k, LIMITS.key); if (r.tl > 0) q.tol = +r.tl; q.plusC = !!r.pc; } return q; }) };
     }
 
     // ---------- safe expression handling (answers are untrusted text) ----------
@@ -116,9 +116,9 @@
     }
 
     // ---------- submissions ----------
-    function makeSubmission(ws, name, answers) {
+    function makeSubmission(ws, name, answers, meta) {
         const nm = clip(name, LIMITS.name).trim(); if (!nm) throw new Error('Enter your name first.');
-        const body = { w: ws.id, n: nm, t: Date.now(), a: ws.questions.map((_, i) => clip(answers[i], LIMITS.answer)) };
+        const body = { w: ws.id, n: nm, t: Date.now(), a: ws.questions.map((_, i) => clip(answers[i], LIMITS.answer)) }; if (meta && Number.isFinite(meta.used)) { body.d = Math.max(0, Math.min(86400, Math.round(meta.used))); if (meta.over) body.o = 1; }
         const payload = b64u(utf8(JSON.stringify(body)));
         return `CSW1.${payload}.${fnv(payload + '|' + ws.id)}`;
     }
@@ -127,7 +127,7 @@
         let body; try { body = JSON.parse(unutf8(unb64u(m[1]))); } catch (e) { return { ok: false, error: 'The code is damaged (part of it may be missing).' }; }
         if (!body || typeof body.w !== 'string' || !Array.isArray(body.a)) return { ok: false, error: 'The code is damaged.' };
         if (fnv(m[1] + '|' + body.w) !== m[2]) return { ok: false, error: 'The code has a typo or is incomplete (checksum mismatch).' };
-        return { ok: true, sub: { w: clip(body.w, 16), n: clip(body.n, LIMITS.name), t: +body.t || 0, a: body.a.slice(0, LIMITS.questions).map(x => clip(x, LIMITS.answer)) } };
+        return { ok: true, sub: { w: clip(body.w, 16), n: clip(body.n, LIMITS.name), t: +body.t || 0, d: Number.isFinite(+body.d) && body.d !== undefined ? Math.max(0, Math.min(86400, Math.round(+body.d))) : null, o: body.o === 1, a: body.a.slice(0, LIMITS.questions).map(x => clip(x, LIMITS.answer)) } };
     }
     /** Split pasted text into codes (one per line, or run together) and parse each. */
     function parseMany(text) {
@@ -137,7 +137,7 @@
     }
     function grade(ws, sub) {
         const per = ws.questions.map((q, i) => { const r = check(q, sub.a[i]); return { ok: r.ok, note: r.note, pts: r.ok ? q.points : 0, answer: sub.a[i] || '' }; });
-        return { name: sub.n, time: sub.t, per, score: per.reduce((a, p) => a + p.pts, 0), max: ws.questions.reduce((a, q) => a + q.points, 0) };
+        return { name: sub.n, time: sub.t, used: sub.d === undefined ? null : sub.d, over: !!sub.o, per, score: per.reduce((a, p) => a + p.pts, 0), max: ws.questions.reduce((a, q) => a + q.points, 0) };
     }
     /** Grade many submissions: the latest submission per student name wins; wrong-worksheet codes are reported. */
     function gradeAll(ws, subs) {
@@ -149,8 +149,8 @@
     }
     const csvCell = v => { let s = String(v === undefined || v === null ? '' : v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     function toCSV(ws, res) {
-        const head = ['Name'].concat(ws.questions.map((_, i) => `Q${i + 1} (${ws.questions[i].points})`), ['Score', 'Out of', 'Percent']);
-        const rows = res.rows.map(r => [r.name].concat(r.per.map(p => p.pts), [r.score, r.max, r.max ? Math.round(1000 * r.score / r.max) / 10 : 0]));
+        const timed = ws.timeLimit > 0; const head = ['Name'].concat(ws.questions.map((_, i) => `Q${i + 1} (${ws.questions[i].points})`), ['Score', 'Out of', 'Percent'], timed ? ['Minutes used', 'Ran out of time'] : []);
+        const rows = res.rows.map(r => [r.name].concat(r.per.map(p => p.pts), [r.score, r.max, r.max ? Math.round(1000 * r.score / r.max) / 10 : 0], timed ? [r.used === null ? '' : Math.round(r.used / 6) / 10, r.over ? 'yes' : 'no'] : []));
         return [head].concat(rows).map(r => r.map(csvCell).join(',')).join('\r\n');
     }
     /** Turn the practice generator's problems into worksheet questions. */

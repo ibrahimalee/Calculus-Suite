@@ -36,6 +36,14 @@
             <p class="notice" id="selfNote" hidden>This is a practice worksheet: it checks your answers on this page as soon as you press <b>Check my answers</b>.</p>
             <p id="calcRow" hidden><a class="btn btn-line btn-sm" href="app.html" target="_blank" rel="noopener">Open the calculator in a new tab <span aria-hidden="true">↗</span></a></p>
             <label class="field who"><span>Your name</span><input class="in" id="stuName" autocomplete="name" maxlength="80" placeholder="First and last name"></label>
+            <section id="gate" class="notice" hidden aria-labelledby="gateH">
+                <h2 id="gateH" style="font-size:1.4rem;margin:0 0 8px">This worksheet is timed</h2>
+                <p style="margin:0 0 12px">You have <b id="gateMin"></b> minutes. The timer starts when you press the button and keeps running if you reload the page. <span id="gateLock">When time is up your answers are locked and your code is made for you.</span> Type your name above first.</p>
+                <button class="btn btn-solid" id="startBtn" type="button">Start the timer <span aria-hidden="true">→</span></button>
+                <p class="err" id="gateErr" role="alert"></p>
+            </section>
+            <div id="timerBar" class="timer-bar" hidden><span class="lab" style="margin:0">Time left</span><span id="timerText" class="timer-text" role="timer" aria-live="off">--:--</span></div>
+            <p class="sr-only" id="timerLive" role="status" aria-live="polite"></p>
             <ol class="qs" id="qs"></ol>
             <div class="finish">
                 <button class="btn btn-solid btn-lg" id="finishBtn" type="button">Finish and get my code <span aria-hidden="true">→</span></button>

@@ -173,3 +173,16 @@ test('nonlinear equilibria are found, classified by the Jacobian and cross-check
   assert.throws(() => eq('x^2+1 ; y', '2'), /No equilibria/); assert.throws(() => eq('x ; t', '2'), /autonomous/); assert.throws(() => eq('x ; y ; x', '2'), /two right-hand sides/);
   const circ = eq('x^2+y^2-1 ; x-y', '3'); assert.match(circ.main.label, /^2 equilibria/);
 });
+test('piecewise Laplace and Fourier transforms verify themselves', () => {
+  const L = (s, op) => E.run.laplace(s, { op: op || 'laplace' });
+  const tri = L('t for 0 <= t < 1 ; 2 - t for 1 <= t < 2 ; 0 otherwise'); assert.ok(tri.meta.some(m => /^Verified/.test(m))); assert.match(tri.main.text, /exp\(-1\*s\)\*\(-2\) \/ \(s\^2\)/);
+  assert.ok(L('sin(t) for 0 <= t < pi ; 0 otherwise').meta.some(m => /^Verified/.test(m)));
+  assert.ok(L('t for 0 <= t < 2 ; 2 for t >= 2').meta.some(m => /^Verified/.test(m)));
+  const rect = L('1 for -1 < t < 1 ; 0 otherwise', 'fourier'); assert.ok(rect.meta.some(m => /^Verified.*numerical integration/.test(m)));
+  assert.ok(L('1 + t for -1 <= t < 0 ; 1 - t for 0 <= t < 1 ; 0 otherwise', 'fourier').meta.some(m => /^Verified/.test(m)));
+  assert.ok(L('e^(-2t) for t > 0', 'fourier').meta.some(m => /^Verified/.test(m)));
+  assert.throws(() => L('1 for t > 0', 'fourier'), /absolutely integrable|does not decay/);
+  assert.throws(() => L('t for 0 < t < 2 ; 1 for 1 < t < 3'), /overlap/); assert.throws(() => L('t for banana'), /condition/); assert.throws(() => L('t for 0 < t < x'), /number/);
+  assert.throws(() => L('1 - abs(t) for -1 < t < 1 ; 0 otherwise', 'fourier'), /polynomials, exponentials/);
+  assert.throws(() => L('5 for -3 < t < -1', 'laplace'), /t < 0/);
+});

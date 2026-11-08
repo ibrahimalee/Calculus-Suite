@@ -51,7 +51,7 @@
             const v = document.createElement('div'); v.id = `v${i}`; body.appendChild(v);
             ol.appendChild(li);
         });
-        countDone(); show('sheet');
+        countDone(); show('sheet'); setupTimer();
     }
 
     function selfCheck() {
@@ -61,10 +61,14 @@
         return { got, max };
     }
     let lastCode = '';
-    function finish() {
+    function finish(opts) {
+        const auto = !!(opts && opts.auto);
         const err = $('finishErr'); err.textContent = '';
-        const name = $('stuName').value.trim(); if (!name) { err.textContent = 'Type your name at the top first.'; $('stuName').focus(); return; }
-        let code; try { code = C.makeSubmission(ws, name, answers); } catch (e) { err.textContent = e.message; return; }
+        const name = ($('stuName').value.trim()) || (tstate && tstate.name) || ''; if (!name) { err.textContent = 'Type your name at the top first.'; $('stuName').focus(); return; }
+        if (ws.timeLimit && tstate && !auto && !tstate.done && !confirm('Finish now? This ends your attempt and you will not be able to change your answers.')) return;
+        let meta = null; if (ws.timeLimit && tstate) { const used = Math.min(elapsed(), ws.timeLimit * 60 + (ws.timeLock ? 0 : 86400)); const limit = ws.timeLimit * 60; meta = { used: ws.timeLock ? Math.min(used, limit) : used, over: auto || used >= limit - 0.5 }; if (!ws.timeLock) meta.over = used > limit; }
+        let code; try { code = C.makeSubmission(ws, name, answers, meta); } catch (e) { err.textContent = e.message; return; }
+        if (ws.timeLimit && tstate && !tstate.done) { tstate.done = true; tstate.code = code; tstate.used = meta && meta.used; tstate.over = meta && meta.over; store.set(tkey(), tstate); clearInterval(tick); lockAll(); renderDoneTimer(); }
         lastCode = code; $('codeBox').value = code; $('done').hidden = false;
         $('dlBtn').href = URL.createObjectURL(new Blob([code + '\n'], { type: 'text/plain' })); $('dlBtn').download = `${name.replace(/[^A-Za-z0-9]+/g, '_').slice(0, 40) || 'answers'}-${ws.id}.txt`;
         const mail = $('mailBtn'); if (ws.email) { mail.href = `mailto:${ws.email}?subject=${encodeURIComponent(`${ws.title} – ${name}`)}&body=${encodeURIComponent(`My answers for "${ws.title}":\n\n${code}\n`)}`; mail.hidden = false; } else mail.hidden = true;
@@ -78,6 +82,38 @@
     $('copyBtn').addEventListener('click', async () => { try { await navigator.clipboard.writeText(lastCode); $('copyNote').textContent = 'Copied. Paste it into a message to your teacher.'; } catch (e) { $('codeBox').select(); $('copyNote').textContent = 'Press Ctrl+C (or Cmd+C) to copy the selected code.'; } });
     $('printBtn').addEventListener('click', () => window.print());
 
+
+    // ---------- optional time limit ----------
+    const tkey = () => 'cs_wst_' + ws.id; let tstate = null, tick = 0; const announced = {};
+    const fmtT = sec => { sec = Math.max(0, Math.ceil(sec)); const hh = Math.floor(sec / 3600), mm = Math.floor(sec % 3600 / 60), ss = sec % 60; return (hh ? hh + ':' + String(mm).padStart(2, '0') : String(mm)) + ':' + String(ss).padStart(2, '0'); };
+    const elapsed = () => (tstate ? Math.max(0, (Date.now() - tstate.start) / 1000) : 0);
+    function lockAll() { document.querySelectorAll('#qs input, #qs textarea').forEach(e => { e.disabled = true; }); $('stuName').disabled = true; $('finishBtn').disabled = true; }
+    function renderDoneTimer() { const bar = $('timerBar'); bar.hidden = false; bar.className = 'timer-bar'; $('timerText').textContent = tstate.over ? 'Time ran out' : `Finished in ${fmtT(tstate.used || 0)}`; }
+    function setupTimer() {
+        if (!ws.timeLimit) return;
+        tstate = store.get(tkey()); $('gateMin').textContent = String(ws.timeLimit); $('gateLock').hidden = !ws.timeLock;
+        if (!tstate || !tstate.start) { $('gate').hidden = false; $('qs').hidden = true; document.querySelector('.finish').hidden = true; return; }
+        if (tstate.done) { lockAll(); renderDoneTimer(); if (tstate.code) { lastCode = tstate.code; $('codeBox').value = tstate.code; $('done').hidden = false; $('dlBtn').href = URL.createObjectURL(new Blob([tstate.code + '\n'], { type: 'text/plain' })); } return; }
+        runTimer();
+    }
+    function startTimer() {
+        const name = $('stuName').value.trim(); if (!name) { $('gateErr').textContent = 'Type your name first.'; $('stuName').focus(); return; }
+        tstate = { start: Date.now(), name }; store.set(tkey(), tstate); $('gate').hidden = true; $('qs').hidden = false; document.querySelector('.finish').hidden = false; runTimer(); const first = document.querySelector('#qs input, #qs textarea'); if (first) first.focus();
+    }
+    function runTimer() {
+        const bar = $('timerBar'); bar.hidden = false; const limit = ws.timeLimit * 60;
+        const say = msg => { $('timerLive').textContent = msg; };
+        const step = () => {
+            const left = limit - elapsed(); const txt = $('timerText');
+            if (left > 0) txt.textContent = fmtT(left); else txt.textContent = ws.timeLock ? '0:00' : `+${fmtT(-left)} over`;
+            bar.className = 'timer-bar' + (left < 60 ? ' danger' : left < 300 ? ' warn' : '');
+            [[300, '5 minutes left'], [60, '1 minute left'], [10, '10 seconds left']].forEach(([t, m]) => { if (left <= t && left > 0 && !announced[t] && limit > t) { announced[t] = 1; say(m); } });
+            if (left <= 0 && !announced[0]) { announced[0] = 1; say(ws.timeLock ? 'Time is up. Your answers are locked.' : 'Time is up. You may still finish, but your teacher will see you went over.'); }
+            if (left <= 0 && ws.timeLock && tstate && !tstate.done) { clearInterval(tick); lockAll(); finish({ auto: true }); const n = document.createElement('p'); n.className = 'notice locked-note'; n.textContent = 'Time ran out, so your answers were locked and your code was made for you. Send it to your teacher as usual.'; $('done').insertBefore(n, $('done').children[1]); }
+        };
+        step(); clearInterval(tick); tick = setInterval(step, 500);
+    }
+    $('startBtn').addEventListener('click', startTimer);
     (async function init() {
         const m = /^#w=(.+)$/.exec(location.hash); if (!m) { fail('This page needs a worksheet link from your teacher. Ask them to send the link again.'); return; }
         try { ws = await C.decodeStudent(m[1]); key = 'cs_ws_' + ws.id; build(); } catch (e) { fail(e.message || 'The link looks incomplete. If it was long, it may have been cut off when it was sent; ask for it again.'); }

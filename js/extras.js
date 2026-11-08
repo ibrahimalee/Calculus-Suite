@@ -586,6 +586,82 @@
         return I.finalizeText(r);
     }
 
+    // ---- piecewise functions: Laplace and Fourier transforms ---------------------------------------------
+    const PW_RE = /(^|[\s;)])(for|if|when|otherwise|else)(\s|$|(?=[-+(\d]))/i;
+    function parsePiecewise(src) {
+        const chunks = String(src).split(/[;\n]+/).map(x => x.trim()).filter(Boolean); if (chunks.length < 1 || chunks.length > 12) throw new CalcError('Give between 1 and 12 pieces separated by ;');
+        const pieces = []; let fallback = null;
+        chunks.forEach(ch => {
+            let m = /^(.*?)\s+(?:for|if|when|on)(?:\s+|(?=[-+(\d]))(.+)$/i.exec(ch); if (!m) { const o = /^(.*?)\s+(?:otherwise|else)$/i.exec(ch); if (o) { fallback = o[1]; return; } throw new CalcError(`Write each piece as  expression for condition,  e.g.  t for 0 < t < 1.  Could not read “${ch.slice(0, 40)}”.`); }
+            const exprTxt = m[1].trim(), cond = m[2].trim(); let lo = -Infinity, hi = Infinity, loTxt = '-inf', hiTxt = 'inf';
+            cond.split(/\s+and\s+|&&|,/i).forEach(part => {
+                const toks = part.replace(/≤/g, '<=').replace(/≥/g, '>=').split(/(<=|>=|<|>)/).map(x => x.trim()); if (toks.length < 3 || toks.length % 2 === 0) throw new CalcError(`Could not read the condition “${part.trim()}”. Use forms like 0 < t < 1, t >= 2 or t < 3.`);
+                const isT = x => /^t$/i.test(x); const ops = [];
+                for (let i = 1; i < toks.length; i += 2) ops.push([toks[i - 1], toks[i], toks[i + 1]]);
+                ops.forEach(([a, op, b]) => {
+                    let bound, side;
+                    if (isT(a) && !isT(b)) { bound = b; side = op.startsWith('<') ? 'hi' : 'lo'; } else if (isT(b) && !isT(a)) { bound = a; side = op.startsWith('<') ? 'lo' : 'hi'; } else throw new CalcError(`The condition “${part.trim()}” must compare t with a number.`);
+                    const val = I.parseLimit(bound, 'Bound').value; if (Number.isNaN(val)) throw new CalcError(`“${bound}” is not a number.`);
+                    if (side === 'hi') { if (val < hi) { hi = val; hiTxt = bound; } } else if (val > lo) { lo = val; loTxt = bound; }
+                });
+            });
+            if (!(lo < hi)) throw new CalcError(`The condition “${cond}” describes an empty interval.`);
+            const node = engine.parse(exprTxt); const fv = engine.freeVars(node); if (fv.some(q => q !== 't')) throw new CalcError(`Each piece may only use the variable t (found ${fv.find(q => q !== 't')}).`);
+            pieces.push({ lo, hi, loTxt, hiTxt, exprTxt, node });
+        });
+        pieces.sort((a, b) => a.lo - b.lo);
+        for (let i = 1; i < pieces.length; i++) if (pieces[i].lo < pieces[i - 1].hi - 1e-12) throw new CalcError('Two pieces overlap. Each value of t may belong to only one piece.');
+        if (fallback !== null) { // “otherwise”: fill the gaps (and the unbounded ends) with that expression
+            const node = engine.parse(fallback); const fv = engine.freeVars(node); if (fv.some(q => q !== 't')) throw new CalcError('The “otherwise” piece may only use t.'); const isZero = Math.abs(engine.compile(node, ['t'])(0.37)) < 1e-14 && Math.abs(engine.compile(node, ['t'])(2.9)) < 1e-14;
+            if (!isZero) throw new CalcError('Use “0 otherwise”: transforms need the function to vanish outside the listed pieces.');
+        }
+        if (!pieces.length) throw new CalcError('Add at least one piece with a condition.');
+        return pieces;
+    }
+    const subT = (node, rep) => node.transform(n => (n.type === 'SymbolNode' && n.name === 't' ? new math.ParenthesisNode(rep) : n));
+    function runPiecewise(src, opt) {
+        const fourier = (opt.op || 'laplace') === 'fourier'; const pcs = parsePiecewise(src);
+        const f = t => { for (const p of pcs) if (t >= p.lo && t < p.hi) { const v = engine.compile(p.node, ['t'])(t); return Number.isFinite(v) ? v : NaN; } return 0; };
+        const codes = pcs.map(p => engine.compile(p.node, ['t']));
+        const value = t => { for (let i = 0; i < pcs.length; i++) if (t >= pcs[i].lo && t < pcs[i].hi) return codes[i](t); return 0; };
+        void f;
+        let T = 0, Ttxt = '0'; if (fourier) { const first = pcs[0]; if (first.lo === -Infinity) throw new CalcError('The function must be zero for t below some finite start (use a piece such as “t < -1” only with the value 0, or start at a number).'); if (first.lo < 0) { T = -first.lo; Ttxt = first.loTxt.replace(/^-\s*/, ''); if (first.loTxt.trim()[0] !== '-') Ttxt = `-(${first.loTxt})`; else Ttxt = first.loTxt.trim().slice(1); } }
+        // Laplace is one-sided: ignore t < 0
+        const used = pcs.filter(p => p.hi > (fourier ? -Infinity : 0)).map(p => ({ ...p })); if (!used.length) throw new CalcError('Every piece lies at t < 0, where the one-sided Laplace transform sees nothing.');
+        const noteClip = !fourier && pcs.some(p => p.lo < 0);
+        const stepOf = (txt, num) => (fourier ? `(${txt})+(${Ttxt})` : txt);
+        const terms = []; used.forEach(p => { const expr = fourier && T ? subT(p.node, math.parse(`(t-(${Ttxt}))`)).toString() : p.node.toString(); const lowOn = fourier ? true : p.lo > 0; const lowTxt = lowOn ? stepOf(p.loTxt, p.lo) : null; const upTxt = p.hi < Infinity ? stepOf(p.hiTxt, p.hi) : null; terms.push({ sign: 1, txt: lowTxt ? `(${expr})*u(t-(${lowTxt}))` : `(${expr})` }); if (upTxt) terms.push({ sign: -1, txt: `(${expr})*u(t-(${upTxt}))` }); });
+        const stepForm = terms.map((q, i) => (i === 0 ? (q.sign < 0 ? '-' : '') : (q.sign < 0 ? ' - ' : ' + ')) + q.txt).join('');
+        let base; try { base = laplaceDistribution(stepForm); } catch (e) { if (e instanceof CalcError && /Laplace table/.test(e.message)) throw new CalcError('Each piece must be built from polynomials, exponentials, sin, cos, sinh and cosh of linear arguments in t. For |t| write separate pieces, e.g.  1 + t for -1 < t < 0 ;  1 - t for 0 <= t < 1.'); throw e; }
+        const r = I.makeResult('laplace', fourier ? 'Fourier transform of a piecewise function' : 'Laplace transform of a piecewise function');
+        r.items.push({ label: 'f(t) =', text: pcs.map(p => `${p.exprTxt} for ${p.loTxt === '-inf' ? '' : p.loTxt + ' ≤ '}t${p.hiTxt === 'inf' ? '' : ' < ' + p.hiTxt}`).join(';  ') + ';  0 elsewhere', tex: '' });
+        if (!fourier) { r.main = base.main; r.items.push({ label: 'As step functions:', text: stepForm, tex: '' }); base.meta.filter(m => /^Verified/.test(m)).forEach(m => r.meta.push(m)); base.warnings.forEach(w => r.warnings.push(w)); }
+        else {
+            const sText = base.main.text; const body = sText.replace(/\bs\b/g, '(i*w)'); const full = T ? `exp(i*w*(${Ttxt}))*(${body})` : body;
+            let node; try { node = math.parse(full); } catch (e) { throw new CalcError('Could not form the Fourier transform from the Laplace result.'); }
+            const ce = node.compile(); const ev = w => { try { const v = ce.evaluate({ w }); return typeof v === 'number' ? { re: v, im: 0 } : { re: v.re, im: v.im }; } catch (e) { return { re: NaN, im: NaN }; } };
+            // decay requirement for an unbounded last piece
+            const last = pcs[pcs.length - 1]; if (last.hi === Infinity) { for (const tt of [40, 80, 160]) { const a = Math.abs(value(tt)); if (!(a < (tt >= 160 ? 1e-9 : 1e-4))) throw new CalcError('The last piece does not decay to 0, so the Fourier transform does not exist (the function must be absolutely integrable).'); } }
+            let worst = 0, cnt = 0; const sup = pcs.map(p => [Math.max(p.lo, -1e3), Math.min(p.hi, last.hi === Infinity ? 60 : p.hi)]);
+            for (const w of [0.7, 1.9, 3.3]) { let re = 0, im = 0; pcs.forEach((p, i) => { const [a, b] = [Math.max(p.lo, -400), Math.min(p.hi, 400)]; if (!(b > a)) return; re += engine.integrateRobust(t => codes[i](t) * Math.cos(w * t), a, b).value; im -= engine.integrateRobust(t => codes[i](t) * Math.sin(w * t), a, b).value; }); const c = ev(w); if (![re, im, c.re, c.im].every(Number.isFinite)) continue; worst = Math.max(worst, Math.hypot(re - c.re, im - c.im) / Math.max(1, Math.hypot(re, im))); cnt++; }
+            void sup; if (cnt < 2 || worst > 1e-5) throw new CalcError('The closed form did not match numerical integration, so it was discarded.');
+            r.main = { label: 'F(ω) =', text: full, tex: `F(\\omega)=${engine.texOf(node).replace(/\bw\b/g, '\\omega')}` };
+            r.items.push({ label: 'Convention:', text: 'F(ω) = ∫ f(t) e^(−iωt) dt', tex: '' }); if (T) r.items.push({ label: 'Shift used:', text: `f starts at t = −${nice(T, 8, 1e-9).text}; the transform of the shifted copy is multiplied by e^(iω·${nice(T, 8, 1e-9).text})`, tex: '' });
+            r.meta.push(`Verified: F(ω) agrees with direct numerical integration of f(t)e^(−iωt) at ω = 0.7, 1.9 and 3.3 (largest relative difference ${worst.toExponential(1)})`);
+            const ws = [], mag = [], re = [], im = []; for (let k = 0; k <= 400; k++) { const w = 0.01 + 0.06 * k; const c = ev(w); ws.push(w); mag.push(Math.hypot(c.re, c.im)); re.push(c.re); im.push(c.im); }
+            r.plot = { generic: { title: 'Fourier transform of the piecewise function', xTitle: 'ω', yTitle: 'F(ω)', traces: [{ x: ws, y: mag, mode: 'lines', type: 'scatter', name: '|F(ω)|' }, { x: ws, y: re, mode: 'lines', type: 'scatter', name: 'Re F', line: { dash: 'dash' } }, { x: ws, y: im, mode: 'lines', type: 'scatter', name: 'Im F', line: { dash: 'dot' } }] } };
+        }
+        if (!fourier) { const a = Math.max(0, pcs[0].lo), b = pcs[pcs.length - 1].hi; const hi = b === Infinity ? Math.max(a + 6, ...pcs.map(p => (Number.isFinite(p.lo) ? p.lo : 0)).map(x => x + 6)) : b; const lo0 = Math.min(0, a); const xs = [], ys = []; for (let k = 0; k <= 600; k++) { const t = lo0 - (hi - lo0) * 0.05 + (hi - lo0) * 1.1 * k / 600; xs.push(t); ys.push(t < 0 ? 0 : (() => { const y = value(t); return Number.isFinite(y) ? y : null; })()); } r.plot = { generic: { title: 'The piecewise function f(t)', xTitle: 't', yTitle: 'f(t)', traces: [{ x: xs, y: ys, mode: 'lines', type: 'scatter', name: 'f(t)', line: { shape: 'linear' } }] } }; }
+        if (noteClip) r.items.push({ label: 'Note:', text: 'Parts of the function at t < 0 are ignored: the Laplace transform is one-sided.', tex: '' });
+        r.items.push({ label: 'Support:', text: `${pcs.map(p => `[${p.loTxt === '-inf' ? '−∞' : p.loTxt}, ${p.hiTxt === 'inf' ? '∞' : p.hiTxt})`).join(' ∪ ')}`, tex: '' });
+        r.meta.push(fourier ? 'Method: each piece becomes f(t)·[u(t − a) − u(t − b)]; the Laplace transform of that sum is evaluated at s = iω (after shifting so the support starts at t = 0)' : 'Method: each piece becomes f(t)·[u(t − a) − u(t − b)] and the second shifting theorem ℒ{u(t − a)g(t − a)} = e^(−as)G(s) is applied term by term');
+        r.steps.push({ title: 'Write f with unit steps', text: `f(t) = ${stepForm}`, tex: '' });
+        r.steps.push({ title: 'Shift each piece', text: 'A piece switched on at t = a is rewritten in τ = t − a, transformed, then multiplied by e^(−as).', tex: '' });
+        if (fourier) r.steps.push({ title: 'Evaluate on the imaginary axis', text: 'The Fourier transform is the Laplace transform at s = iω, which exists because the function is absolutely integrable.', tex: '' });
+        base.steps.forEach(st => r.steps.push(st));
+        return I.finalizeText(r);
+    }
+
     // ---- ODEs by Laplace transform: y'' + a y' + b y = f(t) with initial values ------------------------
     function runLaplaceODE(src, opt) {
         const order = String(opt.order || '2') === '1' ? 1 : 2;
@@ -620,6 +696,7 @@
         return I.finalizeText(r);
     }
     register({ laplace: runLaplace });
+    register({ laplace: (src, opt) => ((opt.op === undefined || opt.op === 'laplace' || opt.op === 'fourier') && PW_RE.test(String(src))) ? runPiecewise(src, opt) : runLaplace(src, opt) });
     Object.assign(engine.extras, { toExpPoly, laplaceOfTerms });
 
     // ======================================================================

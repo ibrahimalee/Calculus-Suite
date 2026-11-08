@@ -28,6 +28,7 @@ A calculus workstation that runs entirely in the browser – no backend, no buil
 | **Epsilon–delta** (in Limits) | For a chosen ε, the largest δ that works, with the ε-band and δ-window drawn and 20,000 points checked |
 | **Chi-square and ANOVA** (in Statistics) | Goodness of fit, independence tables, one-way ANOVA with Bonferroni pairwise comparisons; p-values cross-checked by numerical integration |
 | **Heat and wave equations** (in ODEs) | Fixed or insulated ends; finite-difference solutions with a surface plot, checked against the exact Fourier sine or cosine series |
+| **Piecewise transforms** (in Transforms) | Laplace and Fourier transforms of piecewise functions written as `expression for condition ; …`, with exact closed forms and a numerical-integration check |
 | **Phase portraits** (in ODEs) | For x′ = Ax: node / saddle / spiral / centre classification, eigenvalues and eigenvectors, direction field with trajectories and eigenlines, checked against e^(At) |
 | **Equilibria and stability** (in ODEs) | Finds the equilibria of a nonlinear 2-D system, classifies each from the Jacobian (saddle, node, spiral, star), draws nullclines, direction field and trajectories; flags centres as inconclusive |
 | **Wilcoxon and Kruskal–Wallis** (in Statistics) | Rank-based paired and multi-group tests with exact p-values for small samples and numerical cross-checks |
@@ -70,6 +71,7 @@ Open `teacher.html`. Build a worksheet (write questions, or generate practice pr
 - Nothing is uploaded. The answer key lives in your browser (and in files you export), not in the student link.
 - **Practice mode** puts the key in the link so students get instant ✓/✗; a curious student could read it, so use it for practice only.
 - This is for homework, practice and low-stakes quizzes. It cannot stop a student using another tool, and a code cannot prove who wrote it.
+- **QR code** for the student link (put it on a slide or print it); **time limits** with a start gate, a countdown that survives reloads, automatic lock and code at zero, and time used shown in the gradebook and CSV. The timer runs in the student's browser, so it is a guide, not a proctor.
 - Answers typed by students are never executed: they are parsed by a whitelist of maths functions only.
 
 ## Design & trust

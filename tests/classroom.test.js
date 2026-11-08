@@ -77,3 +77,14 @@ test('generated practice problems become checkable questions whose own answer is
     w.questions.forEach((q, i) => assert.ok(C.check(q, q.key).ok, `${topic} L${lv} #${i}: ${q.prompt} -> ${q.key}`));
   }
 });
+test('time limits travel in the link; time used and "ran out" travel in the code and reach the CSV', async () => {
+  const w = C.normalise(Object.assign({}, ws(), { timeLimit: 20, timeLock: false }));
+  assert.equal(w.timeLimit, 20); assert.equal(w.timeLock, false); assert.equal(C.normalise(Object.assign({}, ws(), { timeLimit: 99999 })).timeLimit, 600); assert.equal(C.normalise(Object.assign({}, ws(), { timeLimit: -5 })).timeLimit, 0); assert.equal(C.normalise(ws()).timeLock, true);
+  const back = await C.decodeStudent(await C.encodeStudent(w)); assert.equal(back.timeLimit, 20); assert.equal(back.timeLock, false); assert.equal((await C.decodeStudent(await C.encodeStudent(C.normalise(ws())))).timeLimit, 0);
+  const ok = C.parseSubmission(C.makeSubmission(w, 'Ada', ['9'], { used: 754.4, over: false })), late = C.parseSubmission(C.makeSubmission(w, 'Bo', ['9'], { used: 1200, over: true })), plain = C.parseSubmission(C.makeSubmission(w, 'Cy', ['9']));
+  assert.equal(ok.sub.d, 754); assert.equal(ok.sub.o, false); assert.equal(late.sub.o, true); assert.equal(plain.sub.d, null);
+  const res = C.gradeAll(w, [ok.sub, late.sub, plain.sub]); const csv = C.toCSV(w, res).split('\r\n'); assert.match(csv[0], /Minutes used,Ran out of time$/); assert.match(csv[1], /12\.6,no$/); assert.match(csv[2], /20,yes$/); assert.match(csv[3], /,,no$/);
+  assert.ok(!/Minutes used/.test(C.toCSV(C.normalise(ws()), C.gradeAll(C.normalise(ws()), [])).split('\r\n')[0]));
+  // hostile numbers are clamped, not trusted
+  const forged = C.parseSubmission(C.makeSubmission(w, 'Eve', ['1'], { used: 1e12, over: false })); assert.equal(forged.sub.d, 86400);
+});

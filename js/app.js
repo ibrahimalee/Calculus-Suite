@@ -386,7 +386,7 @@
 
     MODES.laplace = {
         label: 'Transforms', icon: 'ℒ',
-        input: v => ({ laplace: { label: 'f(t)', placeholder: 'e.g. t^2*exp(-3t)*cos(2t)', hint: 'Laplace transform of sums and products of polynomials, exponentials, sin, cos, sinh and cosh.' }, inverse: { label: 'F(s)', placeholder: 'e.g. (s+3)/(s^2+2s+5)', hint: 'A proper rational function of s: partial fractions with complex and repeated poles.' }, fourier: { label: 'f(t)', placeholder: 'e.g. exp(-abs(t))', hint: 'Fourier transform F(ω) = ∫ f(t)e^(−iωt) dt of an absolutely integrable function.' }, ode: { label: 'Forcing function f(t)', placeholder: 'e.g. exp(-t)   (0 for a homogeneous equation)', hint: 'Solves y″ + a·y′ + b·y = f(t) (or y′ + a·y = f(t)) with initial values, using the Laplace transform.' } }[v.op || 'laplace']),
+        input: v => ({ laplace: { label: 'f(t)', placeholder: 'e.g. t^2*exp(-3t)*cos(2t)', hint: 'Laplace transform of sums and products of polynomials, exponentials, sin, cos, sinh and cosh. Piecewise functions work too: write each piece as  expression for condition,  separated by ;' }, inverse: { label: 'F(s)', placeholder: 'e.g. (s+3)/(s^2+2s+5)', hint: 'A proper rational function of s: partial fractions with complex and repeated poles.' }, fourier: { label: 'f(t)', placeholder: 'e.g. exp(-abs(t))', hint: 'Fourier transform F(ω) = ∫ f(t)e^(−iωt) dt of an absolutely integrable function.' }, ode: { label: 'Forcing function f(t)', placeholder: 'e.g. exp(-t)   (0 for a homogeneous equation)', hint: 'Solves y″ + a·y′ + b·y = f(t) (or y′ + a·y = f(t)) with initial values, using the Laplace transform.' } }[v.op || 'laplace']),
         fields: [
             { key: 'op', label: 'Transform', type: 'select', def: 'laplace', options: [['laplace', 'Laplace  ℒ{f(t)}  (u(t−a) and dirac(t−a) allowed)'], ['inverse', 'Inverse Laplace  ℒ⁻¹{F(s)}'], ['fourier', 'Fourier transform'], ['ode', 'Solve an ODE with Laplace']] },
             { key: 'order', label: 'Order of the ODE', type: 'select', def: '2', options: [['2', 'Second order  y″ + a y′ + b y = f'], ['1', 'First order  y′ + a y = f']], show: v => v.op === 'ode' },
@@ -407,6 +407,12 @@
             { label: 'ℒ{(t−2)·u(t−2)} (delayed ramp)', fn: 'u(t-2)*(t-2)', opts: { op: 'laplace' } },
             { label: 'ℒ{1 − u(t−3)} (a pulse)', fn: '1 - u(t-3)', opts: { op: 'laplace' } },
             { label: 'ℒ{t·u(t−1) + 2δ(t−2)}', fn: 't*u(t-1) + 2*dirac(t-2)', opts: { op: 'laplace' } },
+            { label: 'Piecewise Laplace: triangle pulse', fn: 't for 0 <= t < 1 ; 2 - t for 1 <= t < 2 ; 0 otherwise', opts: { op: 'laplace' } },
+            { label: 'Piecewise Laplace: half sine wave', fn: 'sin(t) for 0 <= t < pi ; 0 otherwise', opts: { op: 'laplace' } },
+            { label: 'Piecewise Laplace: ramp then constant', fn: 't for 0 <= t < 2 ; 2 for t >= 2', opts: { op: 'laplace' } },
+            { label: 'Piecewise Fourier: rectangular pulse', fn: '1 for -1 < t < 1 ; 0 otherwise', opts: { op: 'fourier' } },
+            { label: 'Piecewise Fourier: triangle (|t| split in two)', fn: '1 + t for -1 <= t < 0 ; 1 - t for 0 <= t < 1 ; 0 otherwise', opts: { op: 'fourier' } },
+            { label: 'Piecewise Fourier: one-sided decay', fn: 'e^(-2t) for t > 0', opts: { op: 'fourier' } },
             { label: 'ODE: y″ + 3y′ + 2y = 0, y(0)=1', fn: '0', opts: { op: 'ode', order: '2', a: '3', b: '2', y0: '1', v0: '0' } },
             { label: 'ODE: resonance y″ + 4y = cos 2t', fn: 'cos(2t)', opts: { op: 'ode', order: '2', a: '0', b: '4', y0: '0', v0: '0' } },
             { label: 'ODE: y′ + 2y = 1, y(0)=3', fn: '1', opts: { op: 'ode', order: '1', a: '2', b: '0', y0: '3', v0: '0' } }
@@ -867,7 +873,7 @@
                 preview.innerHTML = `<span class="preview-tex plain">${esc(lines[0] || '')}</span><span class="preview-meta">${lines.length} line${lines.length === 1 ? '' : 's'}</span>`;
                 return true;
             }
-            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur', 'gf'].includes(currentValues().op)) || (state.mode === 'applications' && currentValues().op === 'curvature' && src.includes(';')) || (state.mode === 'ode' && ['linear2', 'equilibria'].includes(currentValues().odeType)) || (state.mode === 'laplace' && /\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src))) {
+            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur', 'gf'].includes(currentValues().op)) || (state.mode === 'applications' && currentValues().op === 'curvature' && src.includes(';')) || (state.mode === 'ode' && ['linear2', 'equilibria'].includes(currentValues().odeType)) || (state.mode === 'laplace' && (/\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src) || /(^|[\s;)])(for|if|when|otherwise)(\s|$|(?=[-+(\d]))/i.test(src)))) {
                 preview.className = 'preview-box valid';
                 const n = src.split(/[\n;]+/).filter(x => x.trim()).length;
                 preview.innerHTML = `<span class="preview-tex plain">${esc(src.length > 160 ? src.slice(0, 160) + '…' : src)}</span><span class="preview-meta">${state.mode === 'stats' ? (src.split(/[\s,;]+/).filter(Boolean).length + ' values') : state.mode === 'vector' ? (n + ' component' + (n === 1 ? '' : 's')) : 'ready'}</span>`;

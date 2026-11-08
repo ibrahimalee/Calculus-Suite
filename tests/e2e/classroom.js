@@ -40,6 +40,24 @@ const BASE = process.env.BASE_ROOT || 'http://localhost:8099';
   await t.click('#tabBuild'); await t.check('#wsSelf'); await t.click('#linkBtn'); await t.waitForSelector('#linkBox:not([hidden])'); const link2 = await t.inputValue('#linkOut');
   const s2 = await (await b.newContext()).newPage(); await s2.goto(link2); await s2.waitForSelector('#sheet:not([hidden])'); await s2.fill('#stuName', 'Bo'); await s2.fill('#a0', '9'); await s2.click('#checkBtn');
     ok((await s2.textContent('#v0')).includes('Correct') && (await s2.textContent('#v1')).includes('No answer'), 'practice mode checks answers on the page');
+  // timed worksheet: gate, countdown, automatic lock and code at zero, time shown in the gradebook
+  await t.uncheck('#wsSelf'); await t.fill('#wsTime', '2'); await t.click('#linkBtn'); await t.waitForSelector('#linkBox:not([hidden])'); const link3 = await t.inputValue('#linkOut');
+  ok(await t.isVisible('#qrBox'), 'the QR code is drawn for the student link');
+  const tctx = await b.newContext(); const st = await tctx.newPage(); await st.clock.install({ time: new Date('2030-01-01T10:00:00') }); await st.goto(link3); await st.waitForSelector('#gate:not([hidden])');
+  ok(!(await st.isVisible('#qs')), 'questions stay hidden until the timer is started');
+  await st.click('#startBtn'); ok((await st.textContent('#gateErr')).includes('name'), 'starting needs a name');
+  await st.fill('#stuName', 'Timed Tim'); await st.click('#startBtn'); await st.waitForSelector('#qs', { state: 'visible' });
+  ok((await st.textContent('#timerText')).trim() === '2:00', 'timer starts at the limit');
+  await st.fill('#a0', '9'); await st.clock.runFor(61000); ok(/^(0:5\d)$/.test((await st.textContent('#timerText')).trim()) && /danger/.test(await st.getAttribute('#timerBar', 'class')), 'timer counts down and warns in the last minute');
+  await st.reload(); await st.waitForSelector('#timerText'); await st.clock.runFor(1000); ok(/^0:[45]\d$/.test((await st.textContent('#timerText')).trim()), 'the timer keeps running across a reload');
+  await st.clock.runFor(70000); await st.waitForSelector('#done:not([hidden])'); const lateCode = await st.inputValue('#codeBox');
+  ok(/^CSW1\./.test(lateCode) && (await st.$$eval('#qs input, #qs textarea', e => e.every(x => x.disabled))), 'at zero the answers lock and the code is made automatically');
+  await st.reload(); await st.waitForSelector('#done:not([hidden])'); ok((await st.inputValue('#codeBox')) === lateCode, 'a finished timed attempt cannot be restarted by reloading');
+  const tctx2 = await b.newContext(); const st2 = await tctx2.newPage(); await st2.clock.install({ time: new Date('2030-01-01T10:00:00') }); await st2.goto(link3); await st2.waitForSelector('#gate:not([hidden])');
+  await st2.fill('#stuName', 'Quick Quinn'); await st2.click('#startBtn'); await st2.fill('#a0', '9'); await st2.clock.runFor(30000); st2.once('dialog', d => d.accept()); await st2.click('#finishBtn'); await st2.waitForSelector('#done:not([hidden])'); const earlyCode = await st2.inputValue('#codeBox');
+  await t.click('#tabGrade'); await t.fill('#codes', lateCode + '\n' + earlyCode); await t.click('#addCodes'); await t.waitForSelector('#grades tbody tr');
+  const rows = await t.$$eval('#grades tbody tr:not(.sum):not(:has(.detail))', trs => trs.map(r => r.textContent));
+  ok(rows.some(r => /Timed Tim/.test(r) && /ran out/.test(r)) && rows.some(r => /Quick Quinn/.test(r) && /0:30/.test(r) && !/ran out/.test(r)), 'the gradebook shows time used and who ran out: ' + rows.map(r => r.slice(-22)).join(' | '));
   // bad / truncated links
   const s3 = await ctx.newPage(); await s3.goto(BASE + '/worksheet.html#w=' + link.split('#w=')[1].slice(0, 40)); await s3.waitForSelector('#problem:not([hidden])'); ok(true, 'a truncated link shows a friendly message');
   const s4 = await ctx.newPage(); await s4.goto(BASE + '/worksheet.html'); await s4.waitForSelector('#problem:not([hidden])'); ok(true, 'a missing link shows a friendly message');
