@@ -25,7 +25,7 @@
     function countDone() { const n = answers.filter(a => String(a || '').trim()).length; $('progress').textContent = `${n} of ${ws.questions.length} answered`; }
 
     function build() {
-        document.title = ws.title + ' – Calculus Suite Pro';
+        document.title = ws.title + ' – Calculus Suite';
         $('wsTitle').textContent = ws.title; $('wsInstr').textContent = ws.instructions; $('wsInstr').hidden = !ws.instructions;
         $('calcRow').hidden = !ws.calculator; $('selfNote').hidden = !ws.selfCheck; $('checkBtn').hidden = !ws.selfCheck;
         const old = saved(); $('stuName').value = old.name || ''; answers = ws.questions.map((_, i) => (old.a && typeof old.a[i] === 'string' ? old.a[i] : '')); seed = /^[0-9a-f]{8}$/.test(old.seed || '') ? old.seed : null;
@@ -84,7 +84,7 @@
         const auto = !!(opts && opts.auto);
         const err = $('finishErr'); err.textContent = '';
         const name = ($('stuName').value.trim()) || (tstate && tstate.name) || ''; if (!name) { err.textContent = 'Type your name at the top first.'; $('stuName').focus(); return; }
-        if (ws.timeLimit && tstate && !auto && !tstate.done && !confirm('Finish now? This ends your attempt and you will not be able to change your answers.')) return;
+        if (ws.timeLimit && tstate && !auto && !tstate.done && !(opts && opts.confirmed)) { csDialog.confirm('Finish now? This ends your attempt and you will not be able to change your answers.', { ok: 'Finish now' }).then(yes => { if (yes) finish({ confirmed: true }); }); return; }
         let meta = null; if (ws.timeLimit && tstate) { const used = Math.min(elapsed(), ws.timeLimit * 60 + (ws.timeLock ? 0 : 86400)); const limit = ws.timeLimit * 60; meta = { used: ws.timeLock ? Math.min(used, limit) : used, over: auto || used >= limit - 0.5 }; if (!ws.timeLock) meta.over = used > limit; }
         if (seed) meta = Object.assign({}, meta || {}, { seed }); let code; try { code = C.makeSubmission(ws, name, answers, meta); } catch (e) { err.textContent = e.message; return; }
         if (ws.timeLimit && tstate && !tstate.done) { tstate.done = true; tstate.code = code; tstate.used = meta && meta.used; tstate.over = meta && meta.over; store.set(tkey(), tstate); clearInterval(tick); lockAll(); renderDoneTimer(); }
@@ -135,7 +135,7 @@
         step(); clearInterval(tick); tick = setInterval(step, 500);
     }
     $('startBtn').addEventListener('click', startNow);
-    $('renameBtn').addEventListener('click', () => { if (!confirm('Start again under a different name? Your answers on this device will be cleared.')) return; try { localStorage.removeItem(key); } catch (e) { /* ignore */ } location.reload(); });
+    $('renameBtn').addEventListener('click', async () => { if (!(await csDialog.confirm('Start again under a different name? Your answers on this device will be cleared.', { ok: 'Start again' }))) return; try { localStorage.removeItem(key); } catch (e) { /* ignore */ } location.reload(); });
     (async function init() {
         const m = /^#w=(.+)$/.exec(location.hash); if (!m) { fail('This page needs a worksheet link from your teacher. Ask them to send the link again.'); return; }
         try { ws = await C.decodeStudent(m[1]); key = 'cs_ws_' + ws.id; build(); } catch (e) { fail(e.message || 'The link looks incomplete. If it was long, it may have been cut off when it was sent; ask for it again.'); }

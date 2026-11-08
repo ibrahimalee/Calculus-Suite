@@ -1,5 +1,5 @@
 /*
- * Calculus Suite Pro – user interface
+ * Calculus Suite – user interface
  *
  * All maths lives in js/engine.js (tested in Node). This file only wires the
  * DOM, plotting, history and sharing around it. Every piece of dynamic text is
@@ -9,6 +9,7 @@
     'use strict';
 
     const $ = id => document.getElementById(id);
+    const bootParams = new URLSearchParams(location.search); // read before setMode() starts rewriting the URL
     const engine = Runner.getEngine();
 
     // ------------------------------------------------------------------
@@ -802,7 +803,7 @@
         info: '<circle cx="12" cy="12" r="10"/><path d="M12 11v6M12 7.5h.01"/>',
         bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
         palette: '<path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 1.5-2.2-.5-1.2.3-2.3 1.6-2.3H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7" r="1"/>',
-        sparkle: '<path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
+        pencil: '<path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19z"/><path d="M14 7l3 3"/>',
         wifi: '<path d="M2 9a15 15 0 0 1 20 0M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0M12 20h.01"/>',
         cpu: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>',
         x: '<path d="M6 6l12 12M18 6 6 18"/>',
@@ -830,7 +831,6 @@
     // ------------------------------------------------------------------
     // Theme
     // ------------------------------------------------------------------
-    const ACCENTS = [['indigo', '#6366f1'], ['violet', '#8b5cf6'], ['cyan', '#06b6d4'], ['emerald', '#10b981'], ['amber', '#f59e0b'], ['rose', '#f43f5e']];
     const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } } };
     let themeMode = 'auto';
 
@@ -838,19 +838,13 @@
         document.body.classList.toggle('dark', dark);
         $('themeToggle').innerHTML = icon(dark ? 'moon' : 'sun');
         $('themeToggle').setAttribute('aria-pressed', String(dark));
-        document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#0b0d16' : '#6366f1');
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#0f1621' : '#f8f7ef');
         if (persistMode) { themeMode = persistMode; store.set('themeMode', persistMode); store.set('theme', dark ? 'dark' : 'light'); }
         document.querySelectorAll('#themeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.theme === themeMode)));
     }
     function systemDark() { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); }
     function setThemeMode(mode) { applyTheme(mode === 'auto' ? systemDark() : mode === 'dark', mode); refreshActivePlot(); }
-    function setAccent(name) {
-        if (name === 'indigo') document.body.removeAttribute('data-accent'); else document.body.setAttribute('data-accent', name);
-        store.set('accent', name);
-        document.querySelectorAll('.swatch').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.accent === name)));
-        requestAnimationFrame(moveIndicator);
-        refreshActivePlot();
-    }
     function initTeaching() {
         const t = $('teachToggle'); if (!t) return;
         let on = false; try { on = localStorage.getItem('cs_teaching') === '1'; } catch (e) { /* blocked */ }
@@ -863,10 +857,7 @@
         applyTheme(themeMode === 'auto' ? systemDark() : themeMode === 'dark', null);
         if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (themeMode === 'auto') { applyTheme(systemDark()); refreshActivePlot(); } });
         $('themeToggle').addEventListener('click', () => setThemeMode(isDark() ? 'light' : 'dark'));
-        $('accentSwatches').innerHTML = ACCENTS.map(([n, c]) => `<button class="swatch" type="button" data-accent="${n}" style="background:${c}" aria-label="${n} accent" title="${n}" aria-pressed="false"></button>`).join('');
-        $('accentSwatches').querySelectorAll('.swatch').forEach(b => b.addEventListener('click', () => setAccent(b.dataset.accent)));
         document.querySelectorAll('#themeSeg button').forEach(b => b.addEventListener('click', () => setThemeMode(b.dataset.theme)));
-        setAccent(store.get('accent') || 'indigo');
         const pop = $('appearPop'), btn = $('appearBtn');
         const close = () => { pop.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
         btn.addEventListener('click', e => { e.stopPropagation(); pop.hidden = !pop.hidden; btn.setAttribute('aria-expanded', String(!pop.hidden)); });
@@ -958,6 +949,7 @@
         if (!keepInput) validateInput();
         saveSession();
         updateModeToggle();
+        try { const u = new URL(location.href); u.searchParams.delete('ask'); u.searchParams.set('tool', mode); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) { /* file:// or sandboxed frame */ }
     }
 
     // ---- phones: collapsible tool list + bottom jump bar ----
@@ -1025,7 +1017,7 @@
         const preview = $('preview');
         state.liveSpec = null;
         const LIMIT = state.mode === 'stats' ? 200000 : 5000;
-        if (src.length > LIMIT) { preview.className = 'preview-box error'; preview.innerHTML = `<strong>⚠</strong> That input is too long (${src.length.toLocaleString()} characters; the limit for this tool is ${LIMIT.toLocaleString()}).`; return false; }
+        if (src.length > LIMIT) { preview.className = 'preview-box error'; preview.innerHTML = `That input is too long (${src.length.toLocaleString()} characters; the limit for this tool is ${LIMIT.toLocaleString()}).`; return false; }
         if (!src.trim()) {
             preview.className = 'preview-box';
             preview.textContent = 'Enter a function to begin…';
@@ -1076,7 +1068,7 @@
             return true;
         } catch (e) {
             preview.className = 'preview-box error';
-            preview.innerHTML = `<strong>⚠</strong> ${esc(e.message)}`;
+            preview.innerHTML = esc(e.message);
             return false;
         }
     }
@@ -1133,6 +1125,8 @@
             resetParams(result);
             displayResult(result);
             switchTab(mode === 'graph' ? 'plot' : 'results');
+            revealResult();
+            if (result.plot || result.plot3 || result.plot2field) idle(() => { window.loadPlotly().catch(() => {}); });
             pushHistory(result);
             updateShareHash();
             prepareAuxiliaryTabs(result);
@@ -1142,7 +1136,7 @@
         } finally {
             state.busy = false;
             btn.classList.remove('loading');
-            btn.innerHTML = `${icon('play', 17)}<span>Compute</span><kbd>Ctrl ↵</kbd>`;
+            btn.innerHTML = '<span>Compute</span><kbd>Ctrl ↵</kbd>';
             document.body.classList.remove('busy');
             $('results').removeAttribute('aria-busy');
         }
@@ -1156,7 +1150,6 @@
     // ------------------------------------------------------------------
     // Result rendering
     // ------------------------------------------------------------------
-    const KIND_ICON = { derivative: '∂', integral: '∫', definite: '∫', series: 'Σ', limit: 'lim', analysis: 'f', ode: 'y′', multivariable: '∇', vector: '∇', graph: '∿', riemann: 'Δx', applications: 'V', root: 'x*', fourier: '∼', matrix: '[ ]', calc: '=', solve: 'x=', sum: 'Σk', laplace: 'ℒ', stats: 'x̄', number: '#', units: '⇄', complex: 'ℂ', algebra: 'p(x)', numerical: '≈', geometry: '△', discrete: '∧' };
 
     /** Metadata lines that are not already shown as trust badges. */
     function metaRest(r) { return r.meta.filter(m => !/^Method: /.test(m) && !/^Verified|cross-?checked|verified against/i.test(m)); }
@@ -1168,26 +1161,25 @@
             <div class="result-card">
                 <div class="result-kicker">${esc((MODES[state.mode] || {}).label || 'Result')}</div>
                 <div class="result-title">
-                    <div class="result-icon">${esc(KIND_ICON[r.kind] || '=')}</div>
                     <span>${esc(r.title)}</span>
                     <div class="result-actions">
-                        <button class="mini-btn" data-act="copy" title="Copy result as text">${icon('copy', 14)}Copy</button>
-                        <button class="mini-btn" data-act="copytex" title="Copy LaTeX">${icon('tex', 14)}LaTeX</button>
-                        <button class="mini-btn" data-act="save" title="Save to your notebook">${icon('bookmark', 14)}Save</button>
-                        <button class="mini-btn" data-act="share" title="Copy a link to this calculation">${icon('link', 14)}Share</button>
-                        <button class="mini-btn" data-act="embed" title="Copy an embed code for a web page or LMS">${icon('link', 14)}Embed</button>
-                        ${'speechSynthesis' in window ? `<button class="mini-btn" data-act="listen" title="Read the result aloud">${icon('sparkle', 14)}Listen</button>` : ''}
-                        <button class="mini-btn" data-act="braille" title="Braille (Nemeth Code) output">${icon('keyboard', 14)}Braille</button>
-                        <button class="mini-btn" data-act="export" title="Download a Markdown report">${icon('file', 14)}Export</button>
+                        <button class="mini-btn" data-act="copy" title="Copy result as text">Copy</button>
+                        <button class="mini-btn" data-act="copytex" title="Copy LaTeX">LaTeX</button>
+                        <button class="mini-btn" data-act="save" title="Save to your notebook">Save</button>
+                        <button class="mini-btn" data-act="share" title="Copy a link to this calculation">Share</button>
+                        <button class="mini-btn" data-act="embed" title="Copy an embed code for a web page or LMS">Embed</button>
+                        ${'speechSynthesis' in window ? `<button class="mini-btn" data-act="listen" title="Read the result aloud">Listen</button>` : ''}
+                        <button class="mini-btn" data-act="braille" title="Braille (Nemeth Code) output">Braille</button>
+                        <button class="mini-btn" data-act="export" title="Download a Markdown report">Export</button>
                     </div>
                 </div>
                 ${r.main ? `<div class="result-content">${r.main.tex ? '' : `<span class="row-label">${esc(r.main.label)}</span> `}${texSpan(r.main.tex, r.main.text, true)}</div>` : ''}
                 ${rows ? `<div class="result-rows">${rows}</div>` : ''}
-                ${(r.badges && r.badges.length) ? `<div class="badges">${r.badges.map(b => `<span class="badge ${esc(b.kind)}">${icon(b.kind === 'ok' ? 'shield' : b.kind === 'warn' ? 'alert' : 'info', 14)}${esc(b.text)}</span>`).join('')}</div>` : ''}
+                ${(r.badges && r.badges.length) ? `<div class="badges">${r.badges.map(b => `<span class="badge ${esc(b.kind)}">${esc(b.text)}</span>`).join('')}</div>` : ''}
                 ${checkBox(r)}
                 ${metaRest(r).length ? `<div class="result-meta">${metaRest(r).map(m => esc(m)).join('<br>')}</div>` : ''}
                 ${r.warnings.map(w => `<div class="alert alert-warning"><span class="alert-icon">${icon('info', 18)}</span><span>${esc(w)}</span></div>`).join('')}
-                <div class="result-foot"><span>${icon('bolt', 14)}${r.ms != null ? `${r.ms} ms` : 'instant'}</span><span>${icon('cpu', 14)}${esc(r.engine || 'worker')}</span><span>${icon('clock', 14)}${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span></div>
+                <div class="result-foot"><span>${r.ms != null ? `${r.ms} ms` : 'instant'}</span><span>${esc(r.engine || 'worker')}</span><span>${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span></div>
             </div>`;
         const container = $('results');
         container.innerHTML = html;
@@ -1220,7 +1212,7 @@
         const el = $('steps');
         if (!steps || !steps.length) {
             el.classList.remove('show-timeline');
-            el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${icon('list', 34)}</div><h3>No steps for this computation</h3><p>Try a different operation</p></div>`;
+            el.innerHTML = `<div class="empty-state"><h3>No steps for this computation</h3><p>Try a different operation.</p></div>`;
             return;
         }
         el.classList.add('show-timeline');
@@ -1312,11 +1304,22 @@
     // ------------------------------------------------------------------
     // Tabs
     // ------------------------------------------------------------------
+    const idle = fn => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 2500 }) : setTimeout(fn, 400));
+
+    /** On a narrow screen the result sits below the inputs: bring it into view after a calculation. */
+    function revealResult() {
+        if (!(window.matchMedia && window.matchMedia('(max-width: 1100px)').matches)) return;
+        const w = document.querySelector('.workspace'); if (!w) return;
+        const top = w.getBoundingClientRect().top;
+        if (top > window.innerHeight * 0.55 || top < -40) w.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    }
+
     function switchTab(name) {
         document.querySelectorAll('.tab').forEach(t => {
             const on = t.dataset.tab === name;
             t.classList.toggle('active', on);
             t.setAttribute('aria-selected', String(on));
+            t.tabIndex = on ? 0 : -1;
         });
         document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === name));
         moveIndicator();
@@ -1337,16 +1340,17 @@
     // ------------------------------------------------------------------
     // Plotting
     // ------------------------------------------------------------------
-    const COLORS = ['#d2501f', '#3a78c2', '#3f9a62', '#c48a1c', '#8a5cb5', '#7a8594'];
+    const COLORS = ['#d6453d', '#3b73c9', '#2f9460', '#c18a1c', '#8b5cc0', '#7a8599'];
 
     function plotTheme() {
         const dark = isDark();
         return {
-            text: dark ? '#f5f5f7' : '#1d1d1f',
-            grid: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.09)',
-            zero: dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)',
-            bg: dark ? 'rgba(10,10,14,0.0)' : 'rgba(255,255,255,0.0)',
-            scene: dark ? 'rgba(5,8,15,0.95)' : 'rgba(255,255,255,0.92)'
+            family: '"Atkinson Hyperlegible", system-ui, sans-serif',
+            text: dark ? '#e8ecf4' : '#15203b',
+            grid: dark ? 'rgba(150,178,230,0.16)' : 'rgba(55,95,165,0.18)',
+            zero: dark ? 'rgba(232,236,244,0.5)' : 'rgba(21,32,59,0.5)',
+            bg: 'rgba(0,0,0,0)',
+            scene: dark ? 'rgba(15,22,35,0.95)' : 'rgba(255,254,250,0.95)'
         };
     }
 
@@ -1398,14 +1402,22 @@
             title: { text: g.title || '', font: { size: 16, color: th.text } },
             xaxis: ax(g.xTitle, g.xRange ? { range: g.xRange } : (g.equal ? { constrain: 'domain' } : {})),
             yaxis: ax(g.yTitle, Object.assign(g.y2 ? { domain: [0, 0.74] } : (g.equal ? { scaleanchor: 'x', scaleratio: 1 } : {}), g.yRange ? { range: g.yRange } : {})),
-            paper_bgcolor: th.bg, plot_bgcolor: th.bg, font: { color: th.text }, colorway: COLORS,
+            paper_bgcolor: th.bg, plot_bgcolor: th.bg, font: { color: th.text, family: th.family }, colorway: COLORS,
             margin: { t: 50, r: 30, b: 55, l: 60 }, legend: { orientation: 'h', y: -0.2 }, hovermode: 'closest', bargap: 0.04
         };
         if (g.y2) layout.yaxis2 = ax('', { domain: [0.8, 1], showticklabels: false });
         Plotly.react(div, g.traces, layout, { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['lasso2d', 'select2d'], toImageButtonOptions: { filename: 'calculus-suite-plot', scale: 2 } });
     }
 
+    const needPlotly = () => (window.Plotly ? Promise.resolve() : window.loadPlotly());
+    const plotLoading = div => { if (!window.Plotly && !div.firstChild) div.innerHTML = '<div class="empty-state"><p>Loading the plotting library…</p></div>'; };
+    const hasPlot2D = () => { const r = state.result; return !!(r && (r.plot || r.plot2field)) || !!liveSpec2D(); };
     function plot2D() {
+        if (!hasPlot2D()) { drawPlot2D(); return; }
+        plotLoading($('plot2d'));
+        needPlotly().then(drawPlot2D, () => { $('plot2d').innerHTML = '<div class="empty-state"><h3>The plotting library did not load</h3><p>Check your connection and reload the page.</p></div>'; });
+    }
+    function drawPlot2D() {
         const div = $('plot2d'), phase = $('plotPhase');
         phase.style.display = 'none';
         const r = state.result;
@@ -1413,8 +1425,8 @@
         let field = r && r.plot2field ? r.plot2field : null;
         if (!spec && !field) spec = liveSpec2D();
         if (!spec && !field) {
-            Plotly.purge(div);
-            div.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${icon('chart', 34)}</div><h3>Nothing to plot yet</h3><p>${state.liveSpec && state.liveSpec.vars.length > 1 ? 'This expression has several variables – see the 3D tab.' : 'Enter a function of one variable or run a computation.'}</p></div>`;
+            if (window.Plotly) Plotly.purge(div);
+            div.innerHTML = `<div class="empty-state"><h3>Nothing to plot yet</h3><p>${state.liveSpec && state.liveSpec.vars.length > 1 ? 'This expression has several variables – see the 3D tab.' : 'Enter a function of one variable or run a computation.'}</p></div>`;
             return;
         }
         if (div.querySelector('.empty-state')) div.innerHTML = '';
@@ -1479,11 +1491,11 @@
                 }
             }
             if (spec.bars && spec.bars.length) {
-                traces.push({ type: 'bar', x: spec.bars.map(b => (b.x0 + b.x1) / 2), y: spec.bars.map(b => b.y), width: spec.bars.map(b => b.x1 - b.x0), marker: { color: 'rgba(99,102,241,.28)', line: { color: '#6366f1', width: 1 } }, name: 'rectangles', hovertemplate: 'f ≈ %{y:.5g}<extra></extra>' });
+                traces.push({ type: 'bar', x: spec.bars.map(b => (b.x0 + b.x1) / 2), y: spec.bars.map(b => b.y), width: spec.bars.map(b => b.x1 - b.x0), marker: { color: 'rgba(29,74,160,.26)', line: { color: '#1d4aa0', width: 1 } }, name: 'rectangles', hovertemplate: 'f ≈ %{y:.5g}<extra></extra>' });
                 spec.bars.forEach(b => allY.push(b.y));
             }
             if (spec.trap && spec.trap.length) {
-                traces.push({ type: 'scatter', mode: 'lines', x: spec.trap.map(p => p.x), y: spec.trap.map(p => p.y), fill: 'tozeroy', fillcolor: 'rgba(99,102,241,.25)', line: { color: '#6366f1', width: 1.5 }, name: 'trapezoids' });
+                traces.push({ type: 'scatter', mode: 'lines', x: spec.trap.map(p => p.x), y: spec.trap.map(p => p.y), fill: 'tozeroy', fillcolor: 'rgba(29,74,160,.24)', line: { color: '#1d4aa0', width: 1.5 }, name: 'trapezoids' });
             }
             if (spec.shade2) {
                 const a2 = Math.max(spec.shade2.a, lo), b2 = Math.min(spec.shade2.b, hi), m2 = 240;
@@ -1544,7 +1556,7 @@
             title: { text: r && r.title && state.result.plot ? r.title : (spec ? 'Graph' : 'Vector field'), font: { size: 16, color: th.text } },
             xaxis: { title: xTitle, gridcolor: th.grid, zerolinecolor: th.zero, color: th.text, range: [lo, hi] },
             yaxis: { title: field ? field.vars[1] : '', gridcolor: th.grid, zerolinecolor: th.zero, color: th.text, ...(yRange ? { range: yRange } : {}), ...(field ? { range: [lo, hi], scaleanchor: 'x' } : {}) },
-            paper_bgcolor: th.bg, plot_bgcolor: th.bg, font: { color: th.text },
+            paper_bgcolor: th.bg, plot_bgcolor: th.bg, font: { color: th.text, family: th.family },
             margin: { t: 50, r: 30, b: 50, l: 55 }, shapes, annotations,
             legend: { orientation: 'h', y: -0.18 }, hovermode: 'closest'
         };
@@ -1561,7 +1573,7 @@
                 title: { text: `Phase portrait (${spec.phase.labels[0]} vs ${spec.phase.labels[1]})`, font: { size: 15, color: th.text } },
                 xaxis: { title: spec.phase.labels[0], gridcolor: th.grid, color: th.text, zerolinecolor: th.zero },
                 yaxis: { title: spec.phase.labels[1], gridcolor: th.grid, color: th.text, zerolinecolor: th.zero },
-                paper_bgcolor: th.bg, plot_bgcolor: th.bg, font: { color: th.text }, margin: { t: 45, r: 30, b: 50, l: 55 }, legend: { orientation: 'h', y: -0.2 }
+                paper_bgcolor: th.bg, plot_bgcolor: th.bg, font: { color: th.text, family: th.family }, margin: { t: 45, r: 30, b: 50, l: 55 }, legend: { orientation: 'h', y: -0.2 }
             }, { responsive: true, displaylogo: false });
         }
     }
@@ -1629,12 +1641,12 @@
         const lines = (r.meta || []).filter(m => /^Verified|^Method:|cross-?checked|agree|independent/i.test(m));
         if (!lines.length) return '';
         const explain = { derivative: 'The derivative is compared with a numerical derivative (central differences) at several sample points.', integral: 'An antiderivative is differentiated and compared with the integrand; definite integrals are also evaluated by numerical quadrature.', definite: 'The exact value is compared with an independent numerical integration.', limit: 'The limit is approached from both sides numerically and compared with the closed form.', laplace: 'The transform is checked by numerically integrating f(t)·e^(−st) at a test value of s.', matrix: 'The decomposition is multiplied back together and compared with the original matrix.', stats: 'Probabilities use exact special functions rather than tables or simulation.', number: 'Factorisations are multiplied back; congruences are substituted back; Diophantine, Pell and RSA results are substituted into their equations, and counts are cross-checked by a second formula.', numerical: 'Interpolants are checked at their nodes and against a second algorithm, splines against their own smoothness conditions, and quadrature and differences against an independent reference value.', geometry: 'Triangles are checked against the laws of sines and cosines and Heron’s formula; conics by generating points from the canonical form and substituting them into your equation.', discrete: 'Minimised Boolean forms are evaluated on every input row; Dijkstra is checked against Bellman–Ford and Kruskal against Prim.', algebra: 'Partial fractions and divisions are recombined and compared; recurrences are checked against their first terms; linear programs against vertex enumeration.', complex: 'Residues are computed two ways; conformal maps are checked by finite differences that angles are preserved; Möbius maps by exact point images and the cross-ratio.', ode: 'Solutions are substituted back, PDEs are compared with exact series, and numerical methods against a high-order reference.' }[r.kind] || 'The engine compares its answer with an independent calculation, shown below. Results that cannot be checked independently are labelled numerical.';
-        return `<details class="check-box"><summary>${icon('shield', 14)}How was this checked?</summary><div class="check-body"><p>${esc(explain)}</p><ul>${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul><p class="check-note">Checks catch most mistakes but are not formal proofs – for anything important, confirm with a second source.</p></div></details>`;
+        return `<details class="check-box"><summary>How was this checked?</summary><div class="check-body"><p>${esc(explain)}</p><ul>${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul><p class="check-note">Checks catch most mistakes but are not formal proofs – for anything important, confirm with a second source.</p></div></details>`;
     }
 
     function embedCode() {
         const url = location.origin + location.pathname + '?embed=1#s=' + encodeHash(snapshot());
-        const code = `<iframe src="${url}" width="760" height="560" style="border:1px solid #bbb;max-width:100%" loading="lazy" title="Calculus Suite Pro – ${(state.result && state.result.title || 'calculation').replace(/"/g, '')}"></iframe>`;
+        const code = `<iframe src="${url}" width="760" height="560" style="border:1px solid #bbb;max-width:100%" loading="lazy" title="Calculus Suite – ${(state.result && state.result.title || 'calculation').replace(/"/g, '')}"></iframe>`;
         copyText(code, 'Embed code copied – paste it into your page');
     }
 
@@ -1793,7 +1805,7 @@
             const act = btn.dataset.nb;
             if (act === 'open') { if (restoreSnapshot(it.s)) compute(); }
             else if (act === 'pin') { it.pinned = !it.pinned; }
-            else if (act === 'note') { const n = window.prompt('Note for this result:', it.note || ''); if (n === null) return; it.note = n.trim().slice(0, 300); }
+            else if (act === 'note') { csDialog.prompt('Note for this result:', { value: it.note || '', maxLength: 300 }).then(n => { if (n === null) return; it.note = n.trim().slice(0, 300); nbSave(); renderNotebook(); }); return; }
             else if (act === 'del') { proj.items = proj.items.filter(x => x.id !== it.id); }
             nbSave(); renderNotebook();
         }));
@@ -1807,7 +1819,7 @@
     function exportNotebook() {
         const p = nbCur();
         if (!p.items.length) { toast('Save some results first', 'err'); return; }
-        const L = [`# ${p.name}`, '', `*Calculus Suite Pro notebook – ${new Date().toISOString().slice(0, 10)}*`, ''];
+        const L = [`# ${p.name}`, '', `*Calculus Suite notebook – ${new Date().toISOString().slice(0, 10)}*`, ''];
         p.items.slice().sort((a, b) => (b.pinned - a.pinned) || (a.ts - b.ts)).forEach((it, i) => {
             L.push(`## ${i + 1}. ${it.pinned ? '★ ' : ''}${(MODES[it.s.m] || {}).label || it.s.m}: \`${it.s.f}\``, '');
             const o = Object.keys(it.s.o || {}).filter(k => String(it.s.o[k]).trim() !== '' && k !== 'digits').map(k => `${k} = ${it.s.o[k]}`);
@@ -1823,10 +1835,10 @@
         if (!$('projSelect')) return;
         renderNotebook();
         $('projSelect').addEventListener('change', e => { nb.cur = e.target.value; nbSave(); renderNotebook(); });
-        $('projNew').addEventListener('click', () => { const n = window.prompt('Name for the new notebook:', 'Homework'); if (!n || !n.trim()) return; const p = { id: uid(), name: n.trim().slice(0, 40), items: [] }; nb.list.push(p); nb.cur = p.id; nbSave(); renderNotebook(); });
-        $('projRename').addEventListener('click', () => { const p = nbCur(); const n = window.prompt('Rename notebook:', p.name); if (!n || !n.trim()) return; p.name = n.trim().slice(0, 40); nbSave(); renderNotebook(); });
-        $('projDelete').addEventListener('click', () => {
-            const p = nbCur(); if (!window.confirm(`Delete “${p.name}” and its ${p.items.length} saved result(s)?`)) return;
+        $('projNew').addEventListener('click', async () => { const n = await csDialog.prompt('Name for the new notebook:', { value: 'Homework', maxLength: 40 }); if (!n || !n.trim()) return; const p = { id: uid(), name: n.trim().slice(0, 40), items: [] }; nb.list.push(p); nb.cur = p.id; nbSave(); renderNotebook(); });
+        $('projRename').addEventListener('click', async () => { const p = nbCur(); const n = await csDialog.prompt('Rename notebook:', { value: p.name, maxLength: 40 }); if (!n || !n.trim()) return; p.name = n.trim().slice(0, 40); nbSave(); renderNotebook(); });
+        $('projDelete').addEventListener('click', async () => {
+            const p = nbCur(); if (!(await csDialog.confirm(`Delete “${p.name}” and its ${p.items.length} saved result(s)?`, { ok: 'Delete', danger: true }))) return;
             nb.list = nb.list.filter(x => x.id !== p.id); nb = (nb.list.length ? nb : { cur: null, list: [{ id: uid(), name: 'My notebook', items: [] }] }); nb.cur = nb.list[0].id; nbSave(); renderNotebook();
         });
         $('projExport').addEventListener('click', exportNotebook);
@@ -1857,7 +1869,7 @@
 
     function exportReport() {
         const r = state.result; if (!r) return;
-        const lines = [`# ${r.title}`, '', `*Calculus Suite Pro – ${new Date().toISOString().slice(0, 10)}*`, '', '## Input', '', '```', $('functionInput').value, '```', ''];
+        const lines = [`# ${r.title}`, '', `*Calculus Suite – ${new Date().toISOString().slice(0, 10)}*`, '', '## Input', '', '```', $('functionInput').value, '```', ''];
         const o = currentValues(); const optLines = Object.keys(o).filter(k => String(o[k]).trim() !== '').map(k => `- ${k}: \`${o[k]}\``);
         if (optLines.length) lines.push('Options:', '', ...optLines, '');
         lines.push('## Result', '');
@@ -1932,7 +1944,13 @@
     function installApp() { if (!deferredInstall) return; deferredInstall.prompt(); deferredInstall.userChoice.finally(() => { deferredInstall = null; $('installBtn').hidden = true; }); }
     function toggleKeypad() { const k = $('keypad'); k.hidden = !k.hidden; $('keypadToggle').setAttribute('aria-expanded', String(!k.hidden)); }
 
+    const hasPlot3D = () => { const r = state.result, info = state.liveSpec; return !!(r && r.plot3) || !!(info && info.vars.length >= 2); };
     function plot3D() {
+        if (!hasPlot3D()) { drawPlot3D(); return; }
+        plotLoading($('plot3dDiv'));
+        needPlotly().then(drawPlot3D, () => { $('plot3dDiv').innerHTML = '<div class="empty-state"><h3>The plotting library did not load</h3><p>Check your connection and reload the page.</p></div>'; });
+    }
+    function drawPlot3D() {
         const div = $('plot3dDiv');
         const r = state.result;
         let spec = r && r.plot3 ? r.plot3 : null;
@@ -1942,7 +1960,7 @@
                 spec = { vars: info.vars.slice(0, 3), fn: engine.compile(info.node, info.vars), live: true };
             }
         }
-        const msg = (ic, title, text) => { Plotly.purge(div); div.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${icon(ic, 34)}</div><h3>${title}</h3><p>${text}</p></div>`; };
+        const msg = (ic, title, text) => { if (window.Plotly) Plotly.purge(div); div.innerHTML = `<div class="empty-state"><h3>${title}</h3><p>${text}</p></div>`; };
         if (!spec) return msg('cube', 'No surface to show', 'Enter a function of two variables, e.g. <code>sin(x)*cos(y)</code>, or use the Multivariable mode.');
         if (div.querySelector('.empty-state')) div.innerHTML = '';
         const th = plotTheme();
@@ -1952,7 +1970,7 @@
             yaxis: { gridcolor: th.grid, zerolinecolor: th.zero, color: th.text },
             zaxis: { gridcolor: th.grid, zerolinecolor: th.zero, color: th.text }
         };
-        const baseLayout = { paper_bgcolor: th.scene, font: { color: th.text }, margin: { t: 50, r: 10, b: 10, l: 10 } };
+        const baseLayout = { paper_bgcolor: th.scene, font: { color: th.text, family: th.family }, margin: { t: 50, r: 10, b: 10, l: 10 } };
         const config = { responsive: true, displaylogo: false, toImageButtonOptions: { filename: 'calculus-suite-3d', scale: 2 } };
 
         const choices = $('view3dChoices'); if (choices) choices.hidden = !!spec.generic;
@@ -2031,38 +2049,33 @@
     }
 
     const FEATURED = [
-        ['derivative', 0, '∂', 'Differentiate with steps', 'x^2*sin(x)'],
-        ['integral', 1, '∫', 'u-substitution, solved', '2x*cos(x^2)'],
-        ['graph', 0, '∿', 'Sliders you can animate', 'a*sin(b*x)'],
-        ['riemann', 1, 'Δx', 'Watch sums converge', 'sin(x), n = 10'],
-        ['ode', 2, 'y′', 'Logistic growth ODE', 'y*(1-y)'],
-        ['fourier', 0, '∼', 'Gibbs phenomenon', 'sign(x)'],
-        ['multivariable', 2, '∇', 'Critical points & saddles', 'x^3-3x+y^2'],
-        ['matrix', 2, '[ ]', 'Eigenvalues, exact', '2 1 ; 1 2'],
-        ['solve', 7, 'x=', 'Inequalities → intervals', '(x-1)/(x+2) >= 0'],
-        ['sums', 0, 'Σk', 'Convergence tests, exact π²/6', '1/k^2']
+        ['derivative', 0, 'Differentiate with steps', 'x^2*sin(x)'],
+        ['integral', 1, 'Integrate by substitution', '2x*cos(x^2)'],
+        ['graph', 0, 'Plot with sliders you can animate', 'a*sin(b*x)'],
+        ['riemann', 1, 'Watch a Riemann sum converge', 'sin(x), n = 10'],
+        ['ode', 2, 'A logistic growth equation', 'y*(1-y)'],
+        ['fourier', 0, 'Gibbs phenomenon on a square wave', 'sign(x)'],
+        ['multivariable', 2, 'Critical points and saddles', 'x^3-3x+y^2'],
+        ['matrix', 2, 'Exact eigenvalues', '2 1 ; 1 2'],
+        ['solve', 7, 'An inequality, solved to intervals', '(x-1)/(x+2) >= 0'],
+        ['sums', 0, 'Convergence tests, exactly π²/6', '1/k^2']
     ];
 
     function welcomeHTML() {
-        return `<div class="welcome">
-            <h2>Calculus, <span>beautifully</span><br>solved &amp; explained.</h2>
-            <p>Sixteen tools, one workspace. Every result comes with the reasoning behind it, live 2D/3D plots, and exact answers wherever they exist. Pick a tile to start – or press <kbd>Ctrl</kbd> <kbd>K</kbd>.</p>
-            <div class="tiles">${FEATURED.map((f, i) => `<button class="tile" type="button" data-i="${i}"><span class="t-ico">${esc(f[2])}</span><b>${esc(f[3])}</b><code>${esc(f[4])}</code></button>`).join('')}</div>
-            <div class="tips">
-                <div class="tip">${icon('command', 20)}<div><b>Command palette</b>Press <kbd>Ctrl</kbd> <kbd>K</kbd> to jump to any tool, example or action.</div></div>
-                <div class="tip">${icon('sliders', 20)}<div><b>Live sliders</b>In <em>Graph &amp; sliders</em> every extra letter becomes a draggable, animatable parameter.</div></div>
-                <div class="tip">${icon('shield', 20)}<div><b>Verified results</b>Antiderivatives and derivatives are cross-checked independently before you see them.</div></div>
-                <div class="tip">${icon('link', 20)}<div><b>Share anything</b>One click copies a link that reproduces the whole calculation.</div></div>
-            </div>
+        return `<div class="start">
+            <h2>Choose a tool, then type a function</h2>
+            <p>Pick a tool on the left, or write a question in plain English in the box at the top of the sidebar. Every result comes with its working and a second check where one exists. These examples open ready to run:</p>
+            <ul class="eg-list">${FEATURED.map((f, i) => `<li><button class="eg" type="button" data-i="${i}"><span class="eg-tool">${esc((MODES[f[0]] || {}).label || f[0])}</span><code>${esc(f[3])}</code><small>${esc(f[2])}</small></button></li>`).join('')}</ul>
+            <p class="keys">Press <kbd>Ctrl</kbd> <kbd>K</kbd> to search every tool, example and action. <kbd>?</kbd> shows the syntax.</p>
         </div>`;
     }
     function showWelcome() {
         const el = $('results');
         el.innerHTML = welcomeHTML();
-        el.querySelectorAll('.tile').forEach(t => t.addEventListener('click', () => { const f = FEATURED[+t.dataset.i]; setMode(f[0], true); loadExample(f[1]); }));
+        el.querySelectorAll('.eg').forEach(t => t.addEventListener('click', () => { const f = FEATURED[+t.dataset.i]; setMode(f[0], true); loadExample(f[1]); }));
         const st = $('steps');
         st.classList.remove('show-timeline');
-        st.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${icon('list', 34)}</div><h3>Step-by-step reasoning</h3><p>Run a computation and every step of the solution appears here.</p></div>`;
+        st.innerHTML = '<div class="empty-state"><h3>The working appears here</h3><p>Run a computation and each step of the solution is listed on this tab.</p></div>';
     }
 
     function clearAll() {
@@ -2071,7 +2084,7 @@
         state.liveSpec = null;
         validateInput();
         showWelcome();
-        try { Plotly.purge($('plot2d')); Plotly.purge($('plot3dDiv')); Plotly.purge($('plotPhase')); } catch (e) { /* ignore */ }
+        try { if (window.Plotly) { Plotly.purge($('plot2d')); Plotly.purge($('plot3dDiv')); Plotly.purge($('plotPhase')); } } catch (e) { /* ignore */ }
         $('plot2d').innerHTML = ''; $('plot3dDiv').innerHTML = ''; $('plotPhase').style.display = 'none'; $('paramBar').innerHTML = '';
         try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ }
         saveSession();
@@ -2106,7 +2119,12 @@
         $('clearBtn').addEventListener('click', clearAll);
         $('clearHistory').addEventListener('click', () => { try { localStorage.removeItem('cs_history'); } catch (e) { /* ignore */ } renderHistory(); });
 
-        document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+        document.querySelectorAll('.tab').forEach(t => { t.addEventListener('click', () => switchTab(t.dataset.tab)); if (t.dataset.tab === 'plot' || t.dataset.tab === 'plot3d') ['pointerenter', 'focus'].forEach(ev => t.addEventListener(ev, () => { if (hasPlot2D() || hasPlot3D()) window.loadPlotly().catch(() => {}); }, { once: true })); });
+        $('tabs').addEventListener('keydown', e => {
+            const tabs = [...document.querySelectorAll('.tab')], i = tabs.indexOf(document.activeElement); if (i < 0) return;
+            const to = e.key === 'ArrowRight' ? (i + 1) % tabs.length : e.key === 'ArrowLeft' ? (i - 1 + tabs.length) % tabs.length : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
+            if (to < 0) return; e.preventDefault(); switchTab(tabs[to].dataset.tab); tabs[to].focus();
+        });
         $('xMin').addEventListener('change', plot2D);
         $('xMax').addEventListener('change', plot2D);
         $('resetRange').addEventListener('click', () => { $('xMin').value = ''; $('xMax').value = ''; plot2D(); });
@@ -2143,7 +2161,7 @@
         });
 
         window.addEventListener('resize', () => {
-            ['plot2d', 'plot3dDiv', 'plotPhase'].forEach(id => { const el = $(id); if (el && el.data) Plotly.Plots.resize(el); });
+            ['plot2d', 'plot3dDiv', 'plotPhase'].forEach(id => { const el = $(id); if (el && el.data && window.Plotly) Plotly.Plots.resize(el); });
         });
         window.addEventListener('hashchange', () => {
             const m = /^#s=(.+)$/.exec(location.hash);
@@ -2338,7 +2356,7 @@
         }
         // deep links from the home page: ?tool=integral  or  ?ask=integrate x squared from 0 to 3
         try {
-            const qp = new URLSearchParams(location.search);
+            const qp = bootParams;
             const ask = (qp.get('ask') || '').slice(0, 500), tool = qp.get('tool');
             if (ask.trim() && !shared) { $('askInput').value = ask; askNL(ask); }
             else if (tool && MODES[tool] && !shared) { setMode(tool, true); }
@@ -2352,7 +2370,12 @@
             $('engineStatus').textContent = ok ? 'Engine ready · background worker' : 'Engine ready · main thread';
         });
         if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
-            navigator.serviceWorker.ready.then(() => { $('offlineStatus').innerHTML = icon('wifi', 14) + ' Ready to work offline'; hydrateIcons(); }).catch(() => {});
+            $('offlineStatus').textContent = 'Preparing to work offline…';
+            navigator.serviceWorker.addEventListener('message', ev => { if (ev.data === 'offline-ready') $('offlineStatus').textContent = 'Ready to work offline'; });
+            navigator.serviceWorker.ready.then(reg => {
+                if (navigator.connection && navigator.connection.saveData) { $('offlineStatus').textContent = 'Offline copy of the plotting library skipped (data saver is on)'; return; }
+                idle(() => { try { (reg.active || navigator.serviceWorker.controller).postMessage('warm'); } catch (e) { /* ignore */ } });
+            }).catch(() => {});
         } else $('offlineStatus').textContent = 'Offline install needs http(s)';
         if (restored) compute(); else showWelcome();
         $('app').classList.add('ready');

@@ -1,139 +1,47 @@
-# Calculus Suite Pro
+# Calculus Suite
 
-A calculus workstation that runs entirely in the browser – no backend, no build step, works offline.
+A calculus workbook that runs in the browser. You type a function or a question, and it gives the answer, the working, and a second check that the answer is right. There is no server and no build step, and once it has been opened it works offline.
 
-> The home page (`index.html`) introduces the app; the calculator itself is `app.html`. Deep links: `app.html?tool=integral` and `app.html?ask=integrate x squared from 0 to 3`.
+Open `index.html` for the home page or `app.html` for the app. Links such as `app.html?tool=integral` and `app.html?ask=integrate x squared from 0 to 3` open a particular tool or run a question.
 
-## Features
+## What it covers
 
-| Mode | What it does |
-|---|---|
-| **Derivative** | Any order, any variable, rule-by-rule explanation (sum / product / quotient / chain / power), tangent line at a point |
-| **Integral** | Indefinite (table, partial fractions, u-substitution, by parts, CAS – every result is verified by differentiation) and definite / improper integrals (`inf`, `pi`, endpoint singularities, divergence detection, exact value when available) |
-| **Taylor series** | Maclaurin / Taylor polynomials with derivative table and overlay plot |
-| **Limit** | Two-sided and one-sided, at finite points and ±∞, with closed-form recognition (`e`, `π`, fractions) |
-| **Function analysis** | Roots, extrema, inflection points, vertical/horizontal asymptotes, monotonicity, concavity |
-| **Differential equations** | 1st-order (linear & separable closed forms), 2nd-order (constant-coefficient closed form), systems; adaptive RK45, slope fields, phase portraits |
-| **Graph & sliders** | Several functions at once, every extra letter becomes a live (animatable) slider, automatic intersections |
-| **Riemann sums** | Left / right / midpoint / trapezoid / Simpson with rectangles drawn and a convergence table |
-| **Area & volume** | Area between curves, arc length, disk/washer & shell volumes, surface area, average value + mean-value point |
-| **Root finding** | Newton, bisection, secant with every iteration shown |
-| **Fourier series** | Coefficients, even/odd detection, Gibbs phenomenon, Parseval check |
-| **Matrices** | det, exact inverse, eigen-decomposition, rank/RREF, charpoly, solve Ax=b, powers |
-| **Calculator** | Variables across lines, `ans`, exact fractions / π / e recognition, complex numbers, prime factorisation, binary & hex |
-| **Equation solver** | All real and complex roots of polynomials, numerical roots for anything else, inequalities → interval notation |
-| **Lagrange multipliers** (in Multivariable) | Constrained maxima and minima with λ, level curves and the constraint plotted, every candidate checked against ∇f = λ∇g |
-| **Curvature** (in Area & volume) | κ, radius and the osculating circle for y = f(x) or a parametric curve, checked against a circle through three nearby points |
-| **Radius of convergence** (in Sums & series) | Ratio-test radius for power series and endpoint-by-endpoint verdicts |
-| **Epsilon–delta** (in Limits) | For a chosen ε, the largest δ that works, with the ε-band and δ-window drawn and 20,000 points checked |
-| **Chi-square and ANOVA** (in Statistics) | Goodness of fit, independence tables, one-way ANOVA with Bonferroni pairwise comparisons; p-values cross-checked by numerical integration |
-| **Heat and wave equations** (in ODEs) | Fixed or insulated ends; finite-difference solutions with a surface plot, checked against the exact Fourier sine or cosine series |
-| **Linear programming** (in Algebra) | Two-phase simplex with optimal, infeasible and unbounded cases, shadow prices and a plot of the feasible region; checked by enumerating every corner point |
-| **Residues and contour integrals** (in Complex) | Poles and residues of rational functions, contour integrals around any circle, and real integrals over the whole line, each cross-checked by direct numerical integration |
-| **Markov chains, Bayes' rule and proportion intervals** (in Statistics) | Stationary distributions, classes and absorption; sequential Bayesian updating with natural frequencies; Wilson, exact, Agresti–Coull and Wald intervals and a two-group comparison |
-| **Gradient descent and Newton** (in Multivariable) | Optimiser paths drawn over the contour map, four methods compared on the same problem, saddle points and divergence flagged |
-| **Z-transforms and difference equations** (in Transforms) | Z-transform of sequences (powers, polynomials, sin/cos) with region of convergence and poles, checked by summing the series directly; inverse Z-transform by partial fractions (repeated and complex poles, impulses), checked against long division; linear difference equations with transfer function, stability, resonance and closed-form response, checked against the recursion |
-| **Padé approximants** (in Taylor series) | Rational approximations [L/M] about any point, with poles, a comparison with the Taylor polynomial and a plot |
-| **Conformal maps and Möbius transformations** (in Complex) | Image of a square or polar grid under f(z), critical points, finite-difference check that angles are preserved; Möbius map through three point pairs with fixed points, type and images of circles |
-| **Numerical methods lab** (in ODEs) | Euler, midpoint, Heun, Kutta, RK4, Dormand–Prince and backward Euler compared: error versus step size and the order of accuracy each really achieves, including a stiff example |
-| **Numerical methods** (new tool) | Polynomial interpolation with divided differences (exact fractions), cubic splines (natural, clamped, not-a-knot, each checked for C² continuity), Chebyshev versus equally spaced nodes (Runge), quadrature rules compared (midpoint, trapezoid, Simpson, Romberg, Gauss–Legendre, adaptive), finite-difference derivatives with truncation versus rounding error |
-| **More number theory and counting** (in Number theory) | Linear Diophantine equations with the general solution, continued fractions and convergents (periodic for √n), Pell's equation, primitive roots, Legendre and Jacobi symbols (reciprocity checked against Euler's criterion), integer partitions, Stirling and Bell numbers, Catalan numbers and derangements, and a classroom RSA demo |
-| **Geometry** (new tool) | Triangle solver for SSS, SAS, ASA/AAS and the ambiguous SSA case (0, 1 or 2 triangles), conic sections with rotation (centre, axes, foci, directrix, asymptotes, focus property verified), circle through three points, polygon area and centroid |
-| **Discrete maths** (new tool) | Boolean expressions: truth table, tautology test, canonical forms and Quine–McCluskey minimisation; graphs: Dijkstra (checked against Bellman–Ford), minimum spanning tree (Kruskal and Prim agree), components, Euler trails, bipartiteness |
-| **Conservative fields** (in Vector calculus) | Tests the cross-partials, builds the potential function in 2D or 3D, and evaluates ∫F·dr between two points as f(B) − f(A), checked by numerical integration |
-| **Piecewise transforms** (in Transforms) | Laplace and Fourier transforms of piecewise functions written as `expression for condition ; …`, with exact closed forms and a numerical-integration check |
-| **Phase portraits** (in ODEs) | For x′ = Ax: node / saddle / spiral / centre classification, eigenvalues and eigenvectors, direction field with trajectories and eigenlines, checked against e^(At) |
-| **Equilibria and stability** (in ODEs) | Finds the equilibria of a nonlinear 2-D system, classifies each from the Jacobian (saddle, node, spiral, star), draws nullclines, direction field and trajectories; flags centres as inconclusive |
-| **Wilcoxon and Kruskal–Wallis** (in Statistics) | Rank-based paired and multi-group tests with exact p-values for small samples and numerical cross-checks |
-| **Generating functions** (in Algebra) | Rational A(x) for a linear recurrence, verified on 56 terms |
-| **Mann–Whitney U** (in Statistics) | Rank-based comparison of two samples: exact p-values for small samples, tie-corrected normal approximation otherwise |
-| **Algebra** | Partial fractions (with a check at 40 points), polynomial long division, factor and expand, polynomial gcd/lcm, closed forms for linear recurrences such as Fibonacci, including extra terms like 3ⁿ or n |
-| **Sums & series** (closed forms) | Symbolic upper limits: Σk^p (Faulhaber), polynomial·rᵏ terms such as k·2^k, telescoping sums (1/(k(k+1)), ln(1+1/k), √(k+1)−√k, …) – each closed form is verified against direct summation |
-| **ODEs** (3-D) | Systems of three equations get a 3-D direction field (cones) with the solution trajectory, e.g. the Lorenz attractor |
-| **ODEs** (series) | Power-series solutions of first- and second-order equations about x₀, checked against RK4 |
-| **Sums & series** | Finite sums (exact when possible); infinite series with nth-term / ratio / p-series / alternating tests and accurate values |
-| **Multivariable** | Gradient (+ tangent plane, directional derivative), partials, Hessian, Laplacian, critical-point classification, double integrals with variable limits, divergence, curl |
-| **Matrices** (extended) | LU, QR, Cholesky, SVD, pseudoinverse, condition number, null/column space, diagonalisation, least squares – each decomposition checks itself (A − LU, QᵀQ − I, …) |
-| **Transforms** | Laplace (including u(t−a) and δ(t−a)) and inverse Laplace (complex and repeated poles, verified by numerical integration), ODEs solved by Laplace with substitution check, Fourier transform with standard-pair recognition and spectrum plot |
-| **Vector calculus** | Jacobian & determinant, line integrals ∫ f ds, work/circulation ∫ F·dr, triple integrals (exact when possible), Green's and divergence theorems checked on both sides, surface integrals and flux through r(u, v) |
-| **Statistics** | Descriptive statistics, regression (linear … exponential, power, log) with R², probability distributions (normal, t, χ², binomial, Poisson …) via exact special functions, one- and two-sample t-tests |
-| **Number theory** | Prime factorisation (Pollard rho), Miller–Rabin, gcd with Bézout, modular inverse/power, totient, C(n,k), Fibonacci, sieve, base conversion, Chinese remainder theorem |
-| **Units** | Dimension-checked conversions (`72 degF to degC`) through a sandboxed parser |
-| **Complex** | Domain colouring of f(z) with zeros/poles, all complex roots, Argand diagram, polar form |
+There are 26 tools, listed in `js/app.js` (`MODES`) and on the home page:
 
-### Ask, scan, save
+- **Calculus:** derivatives, integrals (indefinite, definite, improper), Taylor series and Padé approximants, limits, function analysis, Riemann sums, area, volume and arc length, root finding, Fourier series, multivariable and vector calculus.
+- **Differential equations:** first and second order, systems, series solutions, slope fields, phase portraits, heat and wave equations, and a lab that compares numerical methods.
+- **Algebra and discrete maths:** equation solver, partial fractions, recurrences, sums and series, number theory, logic and graph algorithms, matrices and their decompositions.
+- **Other:** Laplace, Fourier and Z-transforms, complex numbers and conformal maps, statistics, numerical methods, geometry, unit conversion.
 
-* **Plain-English input** – “integrate x squared from 0 to 3”, “limit of sin x over x as x goes to 0”, “5 km/h to m/s”. A rule-based parser (`js/nlp.js`): no AI, no network; it says plainly when it cannot parse something.
-* **Worked solutions** – row operations for matrices, cofactor expansion, L'Hôpital rounds for limits, linear/quadratic equation walk-throughs, and the integration technique (by parts, substitution, partial fractions) behind CAS results.
-* **Scan an expression** – the *Scan* button reads printed text from a photo with Tesseract.js, entirely on the device. The ~11 MB recogniser (`vendor/tesseract/`) is fetched only when someone taps Scan, then cached for offline use. Accuracy on superscripts and fractions is limited, so the text is always shown for correction first. Handwriting is not supported.
-* **Practice & teaching mode** – the ✦ button opens generated practice problems (derivatives, integrals, limits, equations, matrices, number theory, statistics, counting, geometry) with three levels. Answers are checked numerically, so any equivalent form is accepted; hints reveal the engine's worked steps one at a time. *Teaching mode* (Appearance panel) hides answers and steps until you ask.
-* **How was this checked?** – every result lists the independent check that was run; **Embed** gives an `<iframe>` code (`?embed=1`) for blogs and LMS pages; **Listen** reads the result aloud; plots carry a text description for screen readers.
-* **Braille** – every result has a *Braille* button: mathematics in **Nemeth Code** (US) produced by the Speech Rule Engine, plain words in uncontracted Grade 1. Copy the Unicode braille for a refreshable display, or download a `.brf` file for an embosser. The ~1.2 MB engine is fetched only when the dialog is first opened. It is an automatic transcription, not a certified braille document – have a transcriber check it before exams or publication.
-* **Languages** – interface in English, Español, Français, العربية, اردو and हिन्दी (right-to-left layout included). Maths results and step explanations stay in English, and the plain-English parser understands English only. The translations have not been reviewed by native speakers – please help improve `js/i18n.js`.
-* **Phones** – collapsible tool picker and a bottom jump bar; 44-px touch targets.
-* **Library** – the engine also runs in Node: see `LIBRARY.md`.
-* **Notebook** – named projects of saved results with pins and notes, stored on the device; export a notebook as Markdown, back up or import everything as JSON.
+Around the tools: a plain-English input box (a rule-based parser in `js/nlp.js`, no network and no AI), generated practice problems, a notebook for saving results, sharing by link, embedding, export to Markdown, reading results aloud, Nemeth braille output, and six interface languages. Scanning a printed expression from a photo uses Tesseract in the browser; its 11 MB model is only downloaded the first time someone uses it.
 
-Plus: command palette (`Ctrl+K`), installable offline PWA, Markdown report export, PNG plot export, LaTeX rendering, 2D/3D/contour plots, history, shareable links (`#s=…`), copy as text/LaTeX, dark mode, keyboard shortcuts, example gallery, background worker with timeout.
+## How the checks work
 
-## For teachers: worksheets without accounts
+Each tool tests its own answer a second way and says so in the result. An antiderivative is differentiated back, a factorisation is multiplied out, a root is substituted into the equation, an ODE solution is compared with a numerical one. The line that starts with `Verified:` in a result is that check. When a result can't be checked, or is only numerical, it says that instead.
 
-Open `teacher.html`. Build a worksheet (write questions, or generate practice problems with checked answers), press **Create the student link**, and send that one link. Students see only the questions: no calculator unless you allow one. When they finish they get a short `CSW1.…` code to send back. Paste the codes into the **Gradebook** tab and everything is marked on your device, with a class average, per-question percentages and a CSV export.
+## Teachers
 
-- Question types: number, formula (any equivalent form, optional "+C"), multiple choice, short text, list of numbers, matrix, prime factorisation.
-- Nothing is uploaded. The answer key lives in your browser (and in files you export), not in the student link.
-- **Practice mode** puts the key in the link so students get instant ✓/✗; a curious student could read it, so use it for practice only.
-- This is for homework, practice and low-stakes quizzes. It cannot stop a student using another tool, and a code cannot prove who wrote it.
-- **QR code** for the student link (put it on a slide or print it); **time limits** with a start gate, a countdown that survives reloads, automatic lock and code at zero, and time used shown in the gradebook and CSV. The timer runs in the student's browser, so it is a guide, not a proctor.
-- Answers typed by students are never executed: they are parsed by a whitelist of maths functions only.
-- **Try an example** button on the teacher page loads a ready-made worksheet with random numbers so you can see how it works in one click.
-- **Different numbers for every student.** Give a question random numbers (`a = 2..9`, `b = -5..5 except 0`) and write `@{a}`, `@{+b}` or `@{a*b}` in the question and the answer. Each student's numbers are made from their name, so the same student always gets the same version, the answer key follows automatically, and you can also shuffle the question order and the multiple-choice answers. The submission code carries the version, so grading uses exactly what the student saw.
-- **Gradebook tools:** partial credit for lists, matrices and factorisations; click any mark to see the student's answer and change the points (with a comment); a class list that shows who has not handed in and which names do not match; question analysis with common wrong answers, blanks and a score histogram; one-click **review worksheet** from the questions most of the class missed.
-- **Question bank** with tags and search, export/import as a file, a teacher-to-teacher link for sharing questions (it contains the answers, so send it only to colleagues), and **printing** a worksheet with an answer key, one named copy per student.
+`teacher.html` builds a worksheet and gives you one link to send. Students open it, answer, and get a short code to send back. You paste the codes into the gradebook and everything is marked in your browser. Nothing is uploaded, and the answer key stays on your device unless you switch on practice mode, which puts it in the link.
 
-## Design & trust
+Questions can use random numbers per student (made from the student's name), partial credit, time limits, and a shared question bank. A worksheet can be printed with an answer key. This is for homework and low-stakes quizzes: it can't stop a student using another tool, and a code can't prove who wrote it.
 
-- A single stroke-icon set, light / dark / auto themes and six accent colours (Appearance menu), a sliding tab indicator, loading progress bar and live engine status.
-- Every result carries trust badges (e.g. *Verified: the antiderivative was checked by differentiating it*) and shows how long it took and where it ran.
-- WCAG 2.x AA contrast verified with axe-core in every theme/accent combination; keyboard-first (`Ctrl+K` palette, `Alt+1…9`, `Alt+R/P/D/S`).
+## Running it
 
-## Run
+Open `index.html` or `app.html` directly, or run `npm run serve` and visit http://localhost:8080. The libraries (math.js, Algebrite, Plotly, KaTeX) are in `vendor/`; there is no CDN fallback on purpose. Any static host will serve it as it is. On Vercel, `vercel.json` sets the caching and security headers, including a Content-Security-Policy that allows the inline scripts by hash. If you change an inline script in a page, run `npm run csp` to update those hashes; `npm test` fails when they are stale.
 
-Open `index.html` for the home page or `app.html` for the calculator (or `npm run serve` and visit http://localhost:8080). All libraries are vendored in `vendor/` (math.js, Algebrite, Plotly, KaTeX); there is deliberately no CDN fallback. Deploys as-is to any static host; on Vercel the headers in `vercel.json` (including a strict Content-Security-Policy) apply automatically.
-
-## Deploy to Vercel
-
-The app is a static site (`vercel.json` sets caching, security headers and the service-worker rules).
-
-```
-npm i -g vercel
-vercel --prod        # run from the repository root; accept the defaults
-```
-
-or import the GitHub repository at <https://vercel.com/new> (Framework Preset: *Other*; no build command needed). Vercel deploys the repository's production branch – merge the work branch into `main`, or choose it as the production branch in *Project → Settings → Git*.
-
-## Develop
+## Tests
 
 ```
 npm install
-npm test        # unit tests for js/engine.js (Node)
-npm run serve   # then, in another shell:  BASE=http://localhost:8080 npm run e2e   (Playwright UI checks)
+npm test                      # unit tests for the engine, parser, classroom code and CSP hashes
+npm run serve                 # then, in another shell:
+BASE=http://localhost:8080 npm run e2e    # browser tests (needs Playwright's Chromium)
 ```
 
-```
-index.html          home page
-app.html            the calculator app (CalculusSuite.html redirects here)
-js/engine.js        all maths – DOM-free, unit-tested
-js/worker.js        runs the engine off the UI thread
-js/runner.js        worker management, timeout, inline fallback
-js/app.js           UI, plotting, history, sharing
-js/lib-guard.js     library loader with fallbacks
-tests/              node:test suite
-```
+## Limits
 
-## Honest limitations
+Symbolic integration is not complete: `e^(x²)` has no elementary antiderivative, and the app says so. Limits, roots and extrema are numerical, not proofs. Closed-form ODE solutions cover linear and separable first-order equations and constant-coefficient second-order ones; everything else is numerical. The Fourier transform is refused for functions that don't decay. The translations have not been reviewed by native speakers, and the plain-English parser only understands English. Braille is an automatic transcription and should be checked by a transcriber before it is used for exams. Scanning reads printed text only and often misreads exponents, so it always shows the text for correction first.
 
-Symbolic integration is not complete (e.g. `e^(x²)` has no elementary antiderivative; the app says so). Limits, roots and extrema are numerical, not proofs. ODE closed forms cover linear/separable first-order and constant-coefficient homogeneous second-order; everything else is solved numerically. The Laplace table covers sums and products of polynomials, exponentials and sin/cos/sinh/cosh (no step functions or delta impulses). Fourier transforms of non-decaying functions are not ordinary functions and are refused. Braille lines break only at spaces (Nemeth line-breaking rules are not applied) and text outside the maths is Grade 1 only. Image scanning reads printed text only and often mis-reads exponents; always check the recognised text.
+## Licence
 
-## License
-MIT
+MIT. Third-party code and fonts are listed in `THIRD_PARTY_NOTICES.md`. The engine can also be used from Node; see `LIBRARY.md`.

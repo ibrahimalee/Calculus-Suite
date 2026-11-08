@@ -1,5 +1,5 @@
 /*
- * Calculus Suite Pro – extra tools (installed on top of the core engine).
+ * Calculus Suite – extra tools (installed on top of the core engine).
  * DOM-free: works in the page, in the Web Worker and in Node.
  */
 (function (root, factory) {

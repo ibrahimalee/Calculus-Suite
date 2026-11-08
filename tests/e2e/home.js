@@ -15,10 +15,10 @@ const BASE = process.env.BASE_ROOT || 'http://localhost:8099';
       const a = await p.textContent('#rX'); await p.mouse.move(700, 260);
       ok(a !== await p.textContent('#rX'), 'figure readout follows the pointer');
       ok(await p.$$eval('#toc a', e => e.length) === 26, 'tool index lists all 26 tools');
-      await p.click('#chips button >> nth=0'); await p.waitForURL(/app\.html\?ask=/);
+      await p.click('#chips button >> nth=0'); await p.waitForURL(/app\.html/);
       await p.waitForFunction(() => document.querySelector('#results .result-content'), null, { timeout: 30000 });
       ok(true, 'ask chip opens the app and computes');
-      await p.goto(BASE + '/index.html#s=abc'); await p.waitForURL(/app\.html#s=abc/); ok(true, 'old share links forward to the app');
+      await p.goto(BASE + '/index.html#s=abc'); await p.waitForURL(/app\.html(\?[^#]*)?#s=abc/); ok(true, 'old share links forward to the app');
     }
   }
   await b.close(); process.exit(bad ? 1 : 0);

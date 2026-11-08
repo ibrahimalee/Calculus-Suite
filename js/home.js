@@ -35,16 +35,16 @@
         ['units', '⇄', 'Units', 'Convert and check dimensions'],
         ['complex', 'ℂ', 'Complex numbers', 'Arithmetic, polar form, roots and the plane']
     ];
-    var toc = $('toc');
-    if (toc) TOOLS.forEach(function (t, i) {
+    var toc = $('toc'), count = $('toolCount');
+    if (count) count.textContent = TOOLS.length;
+    if (toc) TOOLS.forEach(function (t) {
         var li = doc.createElement('li'), a = doc.createElement('a');
         a.href = 'app.html?tool=' + t[0];
-        a.innerHTML = '<span class="n"></span><span class="g"></span><span><span class="t"></span><span class="d"></span></span>';
+        a.innerHTML = '<span class="g"></span><span><span class="t"></span><span class="d"></span></span>';
         var s = a.children;
-        s[0].textContent = (i < 9 ? '0' : '') + (i + 1);
-        s[1].textContent = t[1];
-        s[2].children[0].textContent = t[2];
-        s[2].children[1].textContent = t[3];
+        s[0].textContent = t[1];
+        s[1].children[0].textContent = t[2];
+        s[1].children[1].textContent = t[3];
         li.appendChild(a); toc.appendChild(li);
     });
 
@@ -69,7 +69,7 @@
         var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
         root.setAttribute('data-theme', next); paintGlyph();
         try { localStorage.setItem('themeMode', next); localStorage.setItem('theme', next); } catch (e) { /* storage blocked */ }
-        var m = doc.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', next === 'dark' ? '#14130f' : '#ece6d8');
+        var m = doc.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', next === 'dark' ? '#0f1621' : '#f8f7ef');
     });
 
     /* ---------- Figure 1 ---------- */
@@ -85,7 +85,7 @@
 
     var defs = el('defs', {});
     var pat = el('pattern', { id: 'hatch', width: 7, height: 7, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
-    el('rect', { width: 7, height: 7, fill: 'var(--ok)', 'fill-opacity': '.08' }, pat);
+    el('rect', { width: 7, height: 7, fill: 'var(--link)', 'fill-opacity': '.07' }, pat);
     el('line', { x1: 0, y1: 0, x2: 0, y2: 7, 'class': 'hatch-line' }, pat);
     var clip = el('clipPath', { id: 'plotclip' }, defs); el('rect', { x: L, y: T, width: R - L, height: B - T }, clip);
 
@@ -133,7 +133,7 @@
     }
     draw(a);
 
-    function take() { if (!touched) { touched = true; auto = false; var h = $('figHint'); if (h) h.textContent = 'Drag, or use ← →'; } }
+    function take() { if (!touched) { touched = true; auto = false; var h = $('figHint'); if (h) h.textContent = 'Drag the point, or use the arrow keys.'; } }
     function fromEvent(e) { var r = svg.getBoundingClientRect(); return ((e.clientX - r.left) / r.width * W - L) / (R - L) * XM; }
     var down = false;
     svg.addEventListener('pointerdown', function (e) { down = true; take(); try { svg.setPointerCapture(e.pointerId); } catch (x) { /* ignore */ } draw(fromEvent(e)); });
@@ -157,5 +157,5 @@
         if (visible && !doc.hidden) { t += Math.min(ts - last, 60) / 1000; draw(0.4 + (XM - 0.8) * (0.5 - 0.5 * Math.cos(t * 0.5 + 1.5))); }
         last = ts; requestAnimationFrame(tick);
     }
-    if (auto) { var hint = $('figHint'); if (hint) hint.textContent = 'Move over it to take control'; requestAnimationFrame(function (ts) { last = ts; tick(ts); }); }
+    if (auto) { var hint = $('figHint'); if (hint) hint.textContent = 'Move your pointer over the graph to take control.'; requestAnimationFrame(function (ts) { last = ts; tick(ts); }); }
 })();

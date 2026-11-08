@@ -3,16 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Calculus Suite Pro – calculus that shows its work</title>
-    <meta name="description" content="A free, open-source calculus workstation that runs in your browser: step-by-step derivatives, integrals, limits, ODEs, matrices and more, each answer checked a second way. Works offline. Nothing is uploaded.">
-    <meta name="theme-color" content="#ece6d8">
-    <meta property="og:title" content="Calculus Suite Pro">
-    <meta property="og:description" content="Calculus that shows its work, and checks it. Free, offline, open source.">
+    <title>Calculus Suite – step-by-step calculus that checks its answers</title>
+    <meta name="description" content="A free, open-source calculus workbook that runs in your browser: derivatives, integrals, limits, ODEs, matrices and more, with the steps shown and each answer checked a second way. Works offline. Nothing is uploaded.">
+    <meta name="theme-color" content="#f8f7ef">
+    <meta property="og:title" content="Calculus Suite">
+    <meta property="og:description" content="Step-by-step calculus that checks its answers. Free, offline, open source.">
     <meta property="og:type" content="website">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="preload" href="vendor/fonts/fraunces-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="vendor/fonts/atkinson-hyperlegible-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="vendor/fonts/source-serif-4-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/home.css">
     <script>
         /* apply the saved theme before first paint, and forward old share links (#s=…) to the app */
@@ -22,7 +24,6 @@
                 var m = localStorage.getItem('themeMode') || localStorage.getItem('theme') || 'auto';
                 var dark = m === 'dark' || (m === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
                 document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-                var a = localStorage.getItem('accent'); if (a) document.documentElement.setAttribute('data-accent', a.replace(/[^a-z]/g, ''));
             } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
         })();
     </script>
@@ -31,36 +32,46 @@
     <a class="skip" href="#main">Skip to content</a>
 
     <header class="bar">
-        <a class="wordmark" href="./" aria-label="Calculus Suite Pro, home">
-            <span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite<small>PRO</small></span>
+        <a class="wordmark" href="./" aria-label="Calculus Suite, home">
+            <span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span>
         </a>
         <nav class="bar-nav" aria-label="Sections">
-            <a href="#ask">Ask</a>
-            <a href="#checked">Checked</a>
-            <a href="#index">The tools</a>
-            <a href="#open">Open source</a>
+            <a href="#checked">How it checks</a>
+            <a href="#tools">Tools</a>
             <a href="teacher.html">Teachers</a>
+            <a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">Source</a>
         </nav>
         <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
-        <a class="btn btn-solid bar-cta" href="app.html">Open the app <span aria-hidden="true">→</span></a>
+        <a class="btn btn-solid bar-cta" href="app.html">Open the app</a>
     </header>
 
     <main id="main">
-        <!-- ===== hero ===== -->
         <section class="hero wrap" aria-labelledby="h1">
             <div class="hero-copy">
-                <p class="kicker"><span class="dot" aria-hidden="true"></span>Free · Offline · Open source</p>
-                <h1 id="h1">Calculus that <em>shows its work</em> and checks&nbsp;it.</h1>
-                <p class="lede">Type a function, or just ask in plain English. You get the answer, the steps behind it, and a second, independent check that the answer is right. It all runs in your browser, so nothing you type is sent anywhere.</p>
-                <div class="cta-row">
-                    <a class="btn btn-solid btn-lg" href="app.html">Open the workstation <span aria-hidden="true">→</span></a>
-                    <a class="btn btn-line btn-lg" href="#checked">See how it checks itself</a>
-                </div>
-                <p class="fine">No account, no install, no ads. Add it to your home screen and it works without a connection.</p>
+                <h1 id="h1">Calculus with the steps shown, and the answer checked.</h1>
+                <p class="lede">Type a function, or ask in plain English. You get the answer, the working, and a second, independent check that the answer is right. It runs in your browser, so nothing you type is sent anywhere.</p>
+
+                <form class="ask" id="askForm" action="app.html" method="get" role="search">
+                    <label for="q">Ask a question</label>
+                    <div class="ask-row">
+                        <input id="q" name="ask" type="text" autocomplete="off" spellcheck="false" maxlength="300" placeholder="integrate x squared from 0 to 3">
+                        <button class="btn btn-solid" type="submit">Work it out</button>
+                    </div>
+                    <p class="ask-note" id="askNote" role="status"></p>
+                </form>
+                <p class="chips-label">For example</p>
+                <ul class="chips" id="chips">
+                    <li><button type="button">derivative of x^2 sin x</button></li>
+                    <li><button type="button">integrate 1/(x^2+1) from 0 to 1</button></li>
+                    <li><button type="button">limit of sin(x)/x as x goes to 0</button></li>
+                    <li><button type="button">solve x^2 - 5x + 6 = 0</button></li>
+                    <li><button type="button">inverse of the matrix [[2,1],[5,3]]</button></li>
+                </ul>
+                <p class="fine">Free. No account, no install. Add it to your home screen and it works without a connection.</p>
             </div>
 
             <figure class="fig" aria-labelledby="figcap">
-                <div class="fig-head"><span>Fig. 1</span><span id="figHint">Drag along the curve</span></div>
+                <p class="fig-hint" id="figHint">Drag the point along the curve.</p>
                 <svg id="fig" viewBox="0 0 640 400" role="group" aria-label="Graph of f of x equals sine x plus 0.35 x, with the tangent line and the shaded area up to the chosen point."></svg>
                 <dl class="readout" aria-live="off">
                     <div><dt>x</dt><dd id="rX">–</dd></div>
@@ -68,149 +79,56 @@
                     <div class="hot"><dt>f′(x), the slope</dt><dd id="rD">–</dd></div>
                     <div class="hot2"><dt>∫₀ˣ f, the area</dt><dd id="rI">–</dd></div>
                 </dl>
-                <figcaption id="figcap">f(x) = sin x + 0.35x. The red line is the tangent; its slope is the derivative. The hatched region is the integral from 0 to x. Move the point and watch both change.</figcaption>
+                <figcaption id="figcap">Figure 1. f(x) = sin x + 0.35x. The red line is the tangent, and its slope is the derivative. The hatched region is the integral from 0 to x.</figcaption>
             </figure>
         </section>
 
-        <!-- ===== ledger ===== -->
-        <section class="ledger" aria-label="At a glance">
-            <div class="wrap ledger-grid">
-                <div><b>26</b><span>tools in one place, from limits to Laplace transforms</span></div>
-                <div><b>0</b><span>accounts, servers or tracking scripts</span></div>
-                <div><b>6</b><span>languages, including right-to-left layouts</span></div>
-                <div><b>✓</b><span>every result says how it was checked, or that it couldn’t be</span></div>
-                <div><b>MIT</b><span>licence. Read it, fork it, embed it</span></div>
-            </div>
-        </section>
-
-        <!-- ===== ask ===== -->
-        <section class="sec wrap" id="ask" aria-labelledby="h-ask">
-            <div class="sec-label"><span>01</span> Ask</div>
-            <div class="sec-body split">
-                <div>
-                    <h2 id="h-ask">Say it the way you’d say it out loud.</h2>
-                    <p>There is no query language to learn. The parser is a plain rule-based one that runs on your device, so it is fast, private and never makes anything up. If it can’t understand you, it says so instead of guessing.</p>
-                </div>
-                <div>
-                    <form class="ask" id="askForm" action="app.html" method="get" role="search">
-                        <label for="q">Your question</label>
-                        <div class="ask-row">
-                            <input id="q" name="ask" type="text" autocomplete="off" spellcheck="false" maxlength="300" placeholder="integrate x squared from 0 to 3">
-                            <button class="btn btn-solid" type="submit">Work it out <span aria-hidden="true">→</span></button>
-                        </div>
-                        <p class="ask-note" id="askNote" role="status"></p>
-                    </form>
-                    <p class="chips-label">Or start from one of these</p>
-                    <ul class="chips" id="chips">
-                        <li><button type="button">derivative of x^2 sin x</button></li>
-                        <li><button type="button">integrate 1/(x^2+1) from 0 to 1</button></li>
-                        <li><button type="button">limit of sin(x)/x as x goes to 0</button></li>
-                        <li><button type="button">solve x^2 - 5x + 6 = 0</button></li>
-                        <li><button type="button">taylor series of e^x to degree 5</button></li>
-                        <li><button type="button">inverse of the matrix [[2,1],[5,3]]</button></li>
-                    </ul>
-                </div>
-            </div>
-        </section>
-
-        <!-- ===== checked ===== -->
         <section class="sec wrap" id="checked" aria-labelledby="h-chk">
-            <div class="sec-label"><span>02</span> Checked</div>
-            <div class="sec-body split split-rev">
-                <article class="specimen" aria-label="Specimen of a result">
-                    <div class="spec-head"><span>Specimen</span><span>Integral · by parts</span></div>
+            <div class="split">
+                <article class="specimen" aria-label="A worked result">
+                    <div class="spec-head">Integral, by parts</div>
                     <p class="spec-q">∫ x · eˣ dx</p>
                     <p class="spec-a">= (x − 1) eˣ + C</p>
                     <ol class="spec-steps">
-                        <li><b>Choose</b> u = x and dv = eˣ dx, so du = dx and v = eˣ.</li>
-                        <li><b>Apply</b> ∫u dv = uv − ∫v du, giving x eˣ − ∫ eˣ dx.</li>
-                        <li><b>Finish</b> the remaining integral: x eˣ − eˣ + C.</li>
+                        <li>Take u = x and dv = eˣ dx, so du = dx and v = eˣ.</li>
+                        <li>Apply ∫u dv = uv − ∫v du, which gives x eˣ − ∫ eˣ dx.</li>
+                        <li>Finish the remaining integral: x eˣ − eˣ + C.</li>
                     </ol>
-                    <p class="spec-ok"><span aria-hidden="true">✓</span> Verified: differentiating the result gives back x · eˣ.</p>
+                    <p class="spec-ok">✓ Checked: differentiating the result gives back x · eˣ.</p>
                 </article>
                 <div>
-                    <h2 id="h-chk">An answer you can see is right.</h2>
-                    <p>Most calculators hand you a result and ask for trust. Here, each tool tests its own answer a second way and tells you what it did.</p>
+                    <h2 id="h-chk">How the answers are checked</h2>
+                    <p>Each tool tests its own answer a second way and says what it did.</p>
                     <ul class="plain">
-                        <li><b>Integrals</b> are differentiated back, or integrated numerically, and compared.</li>
-                        <li><b>Equation roots</b> are substituted into the original equation.</li>
-                        <li><b>Matrix decompositions</b> are multiplied back together to rebuild the input.</li>
-                        <li><b>Differential equations</b> are solved a second time by a numerical method.</li>
+                        <li>Integrals are differentiated back, or integrated numerically, and compared.</li>
+                        <li>Roots of an equation are substituted into the original equation.</li>
+                        <li>Matrix decompositions are multiplied back together to rebuild the input.</li>
+                        <li>Differential equations are solved a second time by a numerical method.</li>
                     </ul>
-                    <p>When something can’t be verified, or is only approximate, the result says that too, in plain words next to the answer rather than buried in the manual.</p>
+                    <p>When something can’t be verified, or is only approximate, the result says so next to the answer.</p>
                 </div>
             </div>
         </section>
 
-        <!-- ===== index of tools ===== -->
-        <section class="sec wrap" id="index" aria-labelledby="h-idx">
-            <div class="sec-label"><span>03</span> The tools</div>
-            <div class="sec-body">
-                <h2 id="h-idx">Twenty-three tools. One page.</h2>
-                <p class="sec-intro">Each entry opens the app on that tool.</p>
-                <ol class="toc" id="toc"></ol>
-            </div>
+        <section class="sec wrap" id="tools" aria-labelledby="h-idx">
+            <h2 id="h-idx">Tools</h2>
+            <p class="sec-intro"><span id="toolCount"></span> tools. Each one opens the app on that tool.</p>
+            <ol class="toc" id="toc"></ol>
         </section>
 
-        <!-- ===== principles ===== -->
-        <section class="sec wrap" id="trust" aria-labelledby="h-trust">
-            <div class="sec-label"><span>04</span> Principles</div>
-            <div class="sec-body">
-                <h2 id="h-trust">Built to be used by anyone, anywhere.</h2>
-                <div class="notes">
-                    <article>
-                        <h3>Private by construction</h3>
-                        <p>All the maths runs in a background worker in your browser. There is no server to send anything to. The photo-of-a-page feature downloads its text-recognition model only when you tap the camera button, and processes the picture on your device.</p>
-                    </article>
-                    <article>
-                        <h3>Works without a connection</h3>
-                        <p>After the first visit the whole app is cached. Install it to a phone or laptop and use it on a train, in an exam hall’s dead zone, or on a bad connection.</p>
-                    </article>
-                    <article>
-                        <h3>Accessible, on purpose</h3>
-                        <p>Keyboard-operable, screen-reader friendly, audited against WCAG&nbsp;2 A and AA. Results can be read aloud, plots can be described in words, and answers export as Nemeth Code braille (Unicode or BRF) for embossers.</p>
-                    </article>
-                    <article>
-                        <h3>Honest about its limits</h3>
-                        <p>It is not a computer-algebra giant, and it says so. Some integrals have no closed form here; the translations still need native-speaker review; braille is an automatic transcription. The README lists what to expect.</p>
-                    </article>
-                </div>
-            </div>
-        </section>
-
-        <!-- ===== open source ===== -->
-        <section class="sec wrap" id="open" aria-labelledby="h-open">
-            <div class="sec-label"><span>05</span> Open source</div>
-            <div class="sec-body split">
-                <div>
-                    <h2 id="h-open">Made to be shared, not rented.</h2>
-                    <p>The code is MIT-licensed and there is no build step: open the folder and it runs. Teachers can embed a worked example in a course page. Developers can use the engine as a library. Everyone can fix a mistake.</p>
-                </div>
-                <ul class="ways">
-                    <li><b>Run a class</b><span>Build a worksheet, share one link, grade the codes students send back. No accounts and no server. <a href="teacher.html">Open the teacher tools</a>.</span></li>
-                    <li><b>Teach with it</b><span>Turn on teaching mode to reveal each step one at a time, or generate practice problems with hints.</span></li>
-                    <li><b>Embed it</b><span>Any result has an embed code for a live, interactive copy in your own page.</span></li>
-                    <li><b>Translate it</b><span>Interface strings live in one file. Corrections from native speakers are the most useful contribution right now.</span></li>
-                    <li><b>Improve it</b><span>Bug reports with a failing input are gold. The test suite and contribution guide make a first patch easy.</span></li>
-                </ul>
-            </div>
-        </section>
-
-        <!-- ===== closing call ===== -->
-        <section class="close" aria-labelledby="h-close">
-            <div class="wrap close-in">
-                <h2 id="h-close">Open it. Type something hard.</h2>
-                <div class="cta-row">
-                    <a class="btn btn-paper btn-lg" href="app.html">Open the workstation <span aria-hidden="true">→</span></a>
-                    <a class="btn btn-ghost btn-lg" href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">View the source</a>
-                </div>
-            </div>
+        <section class="sec wrap notes" aria-labelledby="h-about">
+            <h2 id="h-about">About</h2>
+            <p>Everything runs in your browser. The maths is done in a background worker and nothing you type goes to a server. The photo-to-text feature downloads its recognition model the first time you use the camera button, and it reads the picture on your device. After your first visit the app is cached, so once it is installed it works offline.</p>
+            <p>It can be used from the keyboard and with screen readers, and it has been checked against WCAG 2 A and AA with axe. Results can be read aloud, plots can be described in words, and answers can be exported as Nemeth Code braille.</p>
+            <p>It has limits. Some integrals have no closed form here, the translations still need review by native speakers, and the braille is an automatic transcription that a transcriber should check. The README lists what to expect.</p>
+            <p>Teachers can build a worksheet, share it as one link and grade the codes students send back, with no accounts and no server. See the <a href="teacher.html">teacher tools</a>.</p>
+            <p>The code is MIT-licensed, has no build step, and is on <a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">GitHub</a>. A bug report with an input that fails is the most useful thing you can send.</p>
         </section>
     </main>
 
     <footer class="foot">
         <div class="wrap foot-in">
-            <span>© Calculus Suite Pro · MIT licence</span>
+            <span>Calculus Suite · MIT licence</span>
             <span class="foot-links">
                 <a href="app.html">App</a>
                 <a href="teacher.html">For teachers</a>

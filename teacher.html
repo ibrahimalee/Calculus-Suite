@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>For teachers – Calculus Suite Pro</title>
+    <title>For teachers – Calculus Suite</title>
     <meta name="description" content="Build a worksheet, share one link, and grade the answer codes your students send back. No accounts, no server, free.">
-    <meta name="theme-color" content="#ece6d8">
+    <meta name="theme-color" content="#f8f7ef">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/home.css">
     <link rel="stylesheet" href="css/classroom.css">
     <script>
@@ -17,14 +18,13 @@
 <body>
     <a class="skip" href="#main">Skip to content</a>
     <header class="bar">
-        <a class="wordmark" href="./" aria-label="Calculus Suite Pro, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite<small>PRO</small></span></a>
+        <a class="wordmark" href="./" aria-label="Calculus Suite, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span></a>
         <span class="sub-bar-tag spacer">For teachers</span>
         <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
         <a class="btn btn-line bar-cta" href="app.html">Calculator</a>
     </header>
     <main id="main" class="wrap page wide">
-        <p class="kicker"><span class="dot" aria-hidden="true"></span>Classroom · no accounts · no server</p>
-        <h1>Set a worksheet. Share one link. Grade the codes.</h1>
+        <h1>Class worksheets</h1>
         <p class="lead">Students open your link and see only the questions, with no calculator unless you allow one. When they finish they get a short code to send back. Paste the codes into the gradebook here and everything is marked on your device. Nothing is uploaded anywhere.</p>
         <p class="notice">This is meant for homework, practice and low-stakes quizzes. It can’t stop a student from using another tool, and a code can’t prove who wrote it. Your answer key stays in this browser (and in any file you export), never in the student link, unless you switch on practice mode.</p>
 
@@ -58,7 +58,7 @@
                     <label class="field"><span>Instructions for students (optional)</span><textarea id="wsInstr" maxlength="2000" rows="3" placeholder="Give answers in simplest form. Use * for multiplication, ^ for powers."></textarea></label>
                 </div>
                 <div>
-                    <label class="field"><span>Your email (optional)</span><input class="in" id="wsEmail" type="email" maxlength="120" placeholder="teacher@school.org" autocomplete="email"><span class="small" style="text-transform:none;letter-spacing:0">Adds an “Email it to my teacher” button for students.</span></label>
+                    <label class="field"><span>Your email (optional)</span><input class="in" id="wsEmail" type="email" maxlength="120" placeholder="you@example.com" autocomplete="email"><span class="small" style="text-transform:none;letter-spacing:0">Adds an “Email it to my teacher” button for students.</span></label>
                     <div class="checks">
                         <label><input type="checkbox" id="wsCalc"><span>Show a link to the calculator <span class="small">(off by default)</span></span></label>
                         <label style="flex-basis:100%"><span class="row" style="gap:10px"><input class="in" id="wsTime" type="number" min="0" max="600" step="1" value="0" style="width:90px" aria-label="Time limit in minutes, 0 for none"><span>Time limit in minutes <span class="small">(0 = untimed)</span></span></span></label>
@@ -97,7 +97,7 @@
                     <label class="field grow" style="margin:0"><span>Search the bank</span><input class="in" id="bankSearch" type="search" placeholder="derivative, week 3, …" autocomplete="off"></label>
                     <label class="field grow" style="margin:0"><span>Tags for new saves</span><input class="in" id="bankTags" maxlength="80" placeholder="e.g. derivatives, easy" autocomplete="off"></label>
                 </div>
-                <div id="bankList" class="bank-list" role="list"></div>
+                <div id="bankList" class="bank-list"></div>
                 <div class="row" style="margin-top:12px">
                     <button class="btn btn-line btn-sm" id="bankSaveAll" type="button">Save this worksheet’s questions to the bank</button>
                     <button class="btn btn-line btn-sm" id="bankExport" type="button">Export the bank</button>
@@ -116,7 +116,7 @@
 
             <div class="card" id="printCard">
                 <h3>Print or save as PDF</h3>
-                <label class="field"><span>One copy per student (optional)</span><textarea id="printNames" rows="3" placeholder="Ada Lovelace&#10;Alan Turing&#10;(leave empty for a single copy)"></textarea><span class="small" style="text-transform:none;letter-spacing:0">With random numbers or shuffling, each named copy is exactly the version that student would get online, so you can grade their paper from the same key.</span></label>
+                <label class="field"><span>One copy per student (optional)</span><textarea id="printNames" rows="3" placeholder="One name per line&#10;(leave empty for a single copy)"></textarea><span class="small" style="text-transform:none;letter-spacing:0">With random numbers or shuffling, each named copy is exactly the version that student would get online, so you can grade their paper from the same key.</span></label>
                 <div class="checks"><label><input type="checkbox" id="printKey" checked><span>Add an answer key at the end</span></label><label><input type="checkbox" id="printSpace" checked><span>Leave space to write under each question</span></label></div>
                 <div class="row"><button class="btn btn-line btn-sm" id="printBtn" type="button">Print worksheet</button></div>
                 <p class="err" id="printErr" role="alert"></p>
@@ -124,14 +124,14 @@
 
             <div class="card">
                 <h3>Share with students</h3>
-                <div class="row"><button class="btn btn-solid" id="linkBtn" type="button">Create the student link <span aria-hidden="true">→</span></button></div>
+                <div class="row"><button class="btn btn-solid" id="linkBtn" type="button">Create the student link</button></div>
                 <p class="err" id="linkErr" role="alert"></p>
                 <div id="linkBox" hidden>
                     <label class="field"><span>Student link</span><textarea id="linkOut" readonly rows="4"></textarea></label>
                     <div class="row">
                         <button class="btn btn-solid btn-sm" id="copyLink" type="button">Copy link</button>
                         <a class="btn btn-line btn-sm" id="openLink" href="#" target="_blank" rel="noopener">Preview as a student ↗</a>
-                        <button class="btn btn-line btn-sm" id="toGrade" type="button">Go to the gradebook →</button>
+                        <button class="btn btn-line btn-sm" id="toGrade" type="button">Go to the gradebook</button>
                     </div>
                     <p class="small" id="linkNote" role="status"></p>
                     <div id="qrBox" class="qr-box" hidden>
@@ -163,7 +163,7 @@
                     <div class="row"><button class="btn btn-solid btn-sm" id="addCodes" type="button">Add and grade</button>
                         <label class="btn btn-line btn-sm" style="cursor:pointer">Open files<input id="codeFiles" type="file" accept=".txt,.json,text/plain" multiple hidden></label></div>
                     <p class="err" id="gradeErr" role="status" aria-live="polite"></p>
-                    <label class="field" style="margin-top:14px"><span>Class list (optional, one name per line)</span><textarea id="roster" rows="4" maxlength="20000" placeholder="Ada Lovelace&#10;Alan Turing"></textarea></label>
+                    <label class="field" style="margin-top:14px"><span>Class list (optional, one name per line)</span><textarea id="roster" rows="4" maxlength="20000" placeholder="One name per line"></textarea></label>
                     <p class="small" id="rosterNote" role="status"></p>
                 </div>
                 <div>
@@ -186,6 +186,7 @@
     <script src="js/engine.js"></script>
     <script src="js/extras.js"></script>
     <script src="js/practice.js"></script>
+    <script src="js/dialog.js"></script>
     <script src="js/classroom.js"></script>
     <script src="js/teacher.js"></script>
 </body>

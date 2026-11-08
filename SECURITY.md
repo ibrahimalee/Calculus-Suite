@@ -1,17 +1,12 @@
-# Security policy
+# Security
 
-The app runs entirely in the browser; it has no server, accounts or tracking, and user input is never executed (expressions are parsed through a math.js AST whitelist, and all text shown is HTML-escaped).
+The app runs in the browser. It has no server, accounts or analytics, and nothing a user types is executed: expressions go through a math.js whitelist and everything shown is HTML-escaped.
 
-If you find a vulnerability (for example script injection through an input, a shared link, an imported notebook file or a scanned image), please **do not open a public issue**. Report it privately through GitHub's *Security → Report a vulnerability* for this repository, with steps to reproduce. We aim to acknowledge reports within a few days.
+If you find a vulnerability (script injection through an input, a shared link, an imported notebook or worksheet file, or a scanned image), please report it privately with GitHub's "Report a vulnerability" on this repository rather than in a public issue, and include steps to reproduce.
 
-## What is in place
+What is in place:
 
-- **No server, no accounts, no analytics.** Nothing a user types leaves their browser. Classroom worksheets travel inside links and student answers travel back as codes the teacher pastes in; the answer key stays on the teacher's device unless the teacher switches on practice mode.
-- **Untrusted input is never executed.** Expressions (including students' answers) go through a math.js AST whitelist; text is HTML-escaped; worksheet and notebook files are validated and size-limited; mode names from links and files are looked up in a prototype-free table.
-- **Content-Security-Policy** (see `vercel.json`): scripts only from this origin plus three pinned inline-script hashes, no plugins, no external connections, no `<base>` tricks, forms only to this origin. The classroom pages cannot be framed by other sites; the calculator can (on purpose, for the embed feature).
-- **No third-party scripts at runtime.** Every library is vendored, and there is no CDN fallback.
-- **Known trade-off:** the policy needs `'unsafe-eval'` because the maths library compiles expressions with `new Function`; this is why input is parsed through the whitelist first. `'unsafe-inline'` is allowed for styles only (KaTeX and Plotly set inline styles).
-- **Shared question links** (`teacher.html#q=…`) contain the answer key and are meant for teachers only; they are validated and size-limited on opening, shown as text (never as HTML), and cleared from the address bar once imported. Random per-student numbers come from the student's typed name, so they are a convenience, not a secret.
-- **Classroom limits (by design):** a student can read the key in practice-mode worksheets, can fabricate a submission code, and can bypass the browser-side timer. Use it for homework, practice and low-stakes quizzes.
-
-Last reviewed with a manual and automated scan: dependency audit (no known advisories for the shipped versions), static analysis, fuzzing of every tool, hostile-link and hostile-file probes, and a full browser run under the policy.
+- A Content-Security-Policy in `vercel.json`: scripts only from this origin plus pinned hashes for the inline ones, no external connections, no plugins. `'unsafe-eval'` is needed because the maths library compiles expressions with `new Function`, which is why input is parsed through the whitelist first.
+- Every library is vendored, with no CDN fallback.
+- Worksheet, notebook and question-bank files and links are validated and size-limited, and shown as text.
+- The classroom tools are for homework and low-stakes quizzes. In practice mode a student can read the answer key, a student can fabricate a submission code, and the timer runs in the student's browser.

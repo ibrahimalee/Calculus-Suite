@@ -1,6 +1,6 @@
 # Third-party software
 
-Calculus Suite Pro itself is MIT licensed (see `LICENSE`). It bundles these components in `vendor/`; each remains under its own licence.
+Calculus Suite itself is MIT licensed (see `LICENSE`). It bundles these components in `vendor/`; each remains under its own licence.
 
 | Component | Version | Licence | Where |
 |---|---|---|---|
@@ -12,8 +12,8 @@ Calculus Suite Pro itself is MIT licensed (see `LICENSE`). It bundles these comp
 | English trained data (`tessdata_best`, via `@tesseract.js-data/eng`) | 4.0.0 | Apache-2.0 (package: MIT) | `vendor/tesseract/lang/` |
 | [Speech Rule Engine](https://github.com/Speech-Rule-Engine/speech-rule-engine) (Nemeth braille rules; bundles xmldom and wicked-good-xpath, both MIT) | 4.1.5 | Apache-2.0 | `vendor/sre/` (loaded only when *Braille* is opened) |
 | [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (Kazuhiko Arase) | 2.0.4 | MIT | `vendor/qrcode/` (used by the teacher page to draw the worksheet QR code) |
-| [Fraunces](https://github.com/undercasetype/Fraunces) (variable) | via `@fontsource-variable/fraunces` 5.3.0 | SIL OFL 1.1 | `vendor/fonts/` |
-| [IBM Plex Sans / Mono](https://github.com/IBM/plex) | via `@fontsource` 5.3.0 | SIL OFL 1.1 | `vendor/fonts/` |
+| [Source Serif 4](https://github.com/adobe-fonts/source-serif) (variable) | via `@fontsource-variable/source-serif-4` 5.3.1 | SIL OFL 1.1 | `vendor/fonts/` |
+| [Atkinson Hyperlegible and Atkinson Hyperlegible Mono](https://brailleinstitute.org/freefont) | via `@fontsource/atkinson-hyperlegible` and `@fontsource/atkinson-hyperlegible-mono` 5.3.0 | SIL OFL 1.1 | `vendor/fonts/` |
 
 Development-only: [axe-core](https://github.com/dequelabs/axe-core) (MPL-2.0) and [Playwright](https://playwright.dev) (Apache-2.0) are used by the test scripts and are not shipped to users.
 

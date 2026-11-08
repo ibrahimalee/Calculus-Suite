@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Worksheet – Calculus Suite Pro</title>
+    <title>Worksheet – Calculus Suite</title>
     <meta name="description" content="A worksheet shared by your teacher. Answer the questions and send back your code.">
     <meta name="robots" content="noindex">
-    <meta name="theme-color" content="#ece6d8">
+    <meta name="theme-color" content="#f8f7ef">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/home.css">
     <link rel="stylesheet" href="css/classroom.css">
     <script>
@@ -18,7 +19,7 @@
 <body>
     <a class="skip" href="#main">Skip to the questions</a>
     <header class="bar">
-        <a class="wordmark" href="./" aria-label="Calculus Suite Pro, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite<small>PRO</small></span></a>
+        <a class="wordmark" href="./" aria-label="Calculus Suite, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span></a>
         <span class="sub-bar-tag spacer">Worksheet</span>
         <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
     </header>
@@ -30,7 +31,6 @@
             <p><a class="btn btn-line" href="./">Go to the home page</a></p>
         </div>
         <article id="sheet" hidden>
-            <p class="kicker"><span class="dot" aria-hidden="true"></span>Worksheet</p>
             <h1 id="wsTitle"></h1>
             <p class="lead" id="wsInstr"></p>
             <p class="notice" id="selfNote" hidden>This is a practice worksheet: it checks your answers on this page as soon as you press <b>Check my answers</b>.</p>
@@ -41,14 +41,14 @@
                 <h2 id="gateH" style="font-size:1.4rem;margin:0 0 8px">This worksheet is timed</h2>
                 <p id="gateText" style="margin:0 0 12px">You have <b id="gateMin"></b> minutes. The timer starts when you press the button and keeps running if you reload the page. <span id="gateLock">When time is up your answers are locked and your code is made for you.</span> Type your name above first.</p>
                 <p id="gateRand" style="margin:0 0 12px" hidden>This worksheet gives each student their own numbers (and sometimes a different order), made from the name you type. Use the name your teacher knows you by, spelled the same way each time. Type it above, then start.</p>
-                <button class="btn btn-solid" id="startBtn" type="button">Start the timer <span aria-hidden="true">→</span></button>
+                <button class="btn btn-solid" id="startBtn" type="button">Start the timer</button>
                 <p class="err" id="gateErr" role="alert"></p>
             </section>
             <div id="timerBar" class="timer-bar" hidden><span class="lab" style="margin:0">Time left</span><span id="timerText" class="timer-text" role="timer" aria-live="off">--:--</span></div>
             <p class="sr-only" id="timerLive" role="status" aria-live="polite"></p>
             <ol class="qs" id="qs"></ol>
             <div class="finish">
-                <button class="btn btn-solid btn-lg" id="finishBtn" type="button">Finish and get my code <span aria-hidden="true">→</span></button>
+                <button class="btn btn-solid btn-lg" id="finishBtn" type="button">Finish and get my code</button>
                 <button class="btn btn-line btn-lg" id="checkBtn" type="button" hidden>Check my answers</button>
                 <span class="progress" id="progress" role="status"></span>
             </div>
@@ -66,11 +66,12 @@
                 </div>
                 <p class="small" id="copyNote" role="status"></p>
             </section>
-            <p class="small" style="margin-top:40px">Your answers are saved in this browser as you type. This worksheet was made by whoever sent you the link; never type passwords or private details into it. <a href="./">About Calculus Suite Pro</a></p>
+            <p class="small" style="margin-top:40px">Your answers are saved in this browser as you type. This worksheet was made by whoever sent you the link; never type passwords or private details into it. <a href="./">About Calculus Suite</a></p>
         </article>
     </main>
     <script src="vendor/math.min.js"></script>
     <script src="vendor/katex/katex.min.js"></script>
+    <script src="js/dialog.js"></script>
     <script src="js/classroom.js"></script>
     <script src="js/worksheet.js"></script>
 </body>

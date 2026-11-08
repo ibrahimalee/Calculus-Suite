@@ -3,39 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Calculus Suite Pro – the calculus workstation</title>
+    <title>Calculus Suite</title>
     <meta name="description" content="Free, offline-capable calculus workstation: step-by-step derivatives, integrals, limits, series, ODEs, Riemann sums, Fourier series, matrices, a parametric grapher and 3D plots – all in your browser.">
-    <meta name="theme-color" content="#6366f1">
+    <meta name="theme-color" content="#f8f7ef">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="preload" href="vendor/fonts/atkinson-hyperlegible-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="vendor/fonts/atkinson-hyperlegible-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="css/tokens.css">
     <link rel="stylesheet" href="css/styles.css">
+    <script src="js/theme-init.js"></script>
     <script src="js/lib-guard.js"></script>
 </head>
 <body>
-    <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
     <a class="skip-link" href="#functionInput">Skip to input</a>
 
     <header class="appbar">
-        <a class="brand" href="./" aria-label="Calculus Suite Pro home">
+        <a class="brand" href="./" aria-label="Calculus Suite, home">
             <span class="brand-mark" aria-hidden="true">∫</span>
-            <span class="brand-name">Calculus Suite<small>PRO</small></span>
+            <span class="brand-name">Calculus Suite</span>
         </a>
         <div class="appbar-spacer"></div>
         <button class="cmd-btn" id="paletteBtn" type="button" aria-label="Open command palette">
             <span data-icon="search" data-size="16"></span><span>Search tools, examples, actions…</span><kbd>Ctrl K</kbd>
         </button>
-        <button class="icon-btn" id="installBtn" type="button" title="Install as an app" aria-label="Install app" hidden><span data-icon="download"></span></button>
-        <button class="icon-btn" id="practiceBtn" type="button" title="Practice problems" aria-label="Open practice mode"><span data-icon="sparkle"></span></button>
-        <button class="icon-btn" id="helpBtn" type="button" title="Syntax help (?)" aria-label="Open syntax help"><span data-icon="help"></span></button>
+        <button class="icon-btn" id="installBtn" type="button" title="Install as an app" aria-label="Install app" hidden><span class="lbl">Install</span><span data-icon="download"></span></button>
+        <button class="icon-btn" id="practiceBtn" type="button" title="Practice problems" aria-label="Open practice mode"><span class="lbl">Practice</span><span data-icon="pencil"></span></button>
+        <button class="icon-btn" id="helpBtn" type="button" title="Syntax help (?)" aria-label="Open syntax help"><span class="lbl">Help</span><span data-icon="help"></span></button>
         <div class="pop-wrap">
-            <button class="icon-btn" id="appearBtn" type="button" title="Appearance" aria-label="Appearance settings" aria-expanded="false" aria-controls="appearPop"><span data-icon="palette"></span></button>
+            <button class="icon-btn" id="appearBtn" type="button" title="Appearance and language" aria-label="Appearance settings" aria-expanded="false" aria-controls="appearPop"><span class="lbl">Settings</span><span data-icon="sliders"></span></button>
             <div class="popover" id="appearPop" role="dialog" aria-label="Appearance" hidden>
                 <h4>Theme</h4>
-                <div class="seg" id="themeSeg"><button type="button" data-theme="light"><span data-icon="sun" data-size="15"></span>Light</button><button type="button" data-theme="dark"><span data-icon="moon" data-size="15"></span>Dark</button><button type="button" data-theme="auto"><span data-icon="sparkle" data-size="15"></span>Auto</button></div>
-                <h4>Accent colour</h4>
-                <div class="swatches" id="accentSwatches"></div>
+                <div class="seg" id="themeSeg"><button type="button" data-theme="light">Light</button><button type="button" data-theme="dark">Dark</button><button type="button" data-theme="auto">Auto</button></div>
                 <h4>Language</h4>
                 <select id="langSelect" aria-label="Language"></select>
                 <h4>Learning</h4>
@@ -43,11 +44,12 @@
                 <p class="density-note">Your choices are remembered on this device. Plots follow the theme automatically.</p>
             </div>
         </div>
-        <button class="icon-btn" id="themeToggle" type="button" aria-label="Toggle dark mode"><span data-icon="sun"></span></button>
+        <button class="icon-btn square" id="themeToggle" type="button" aria-label="Toggle dark mode"><span data-icon="sun"></span></button>
     </header>
 
     <div class="container" id="app">
-        <noscript><div class="alert alert-error"><span class="alert-icon">⚠</span><span>Calculus Suite Pro needs JavaScript to run.</span></div></noscript>
+        <h1 class="sr-only">Calculus Suite</h1>
+        <noscript><div class="alert alert-error"><span>Calculus Suite needs JavaScript to run.</span></div></noscript>
 
         <div class="main-grid">
             <aside class="sidebar" aria-label="Inputs">
@@ -55,8 +57,8 @@
                     <form id="askForm" autocomplete="off">
                         <label class="field-label" for="askInput">Ask in plain English</label>
                         <div class="ask-row">
-                            <input id="askInput" type="text" spellcheck="false" placeholder="e.g. integrate x squared from 0 to 3">
-                            <button class="btn btn-primary ask-go" type="submit" aria-label="Run this question"><span data-icon="play" data-size="16"></span></button>
+                            <input id="askInput" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" enterkeyhint="go" aria-describedby="askNote" placeholder="e.g. integrate x squared from 0 to 3">
+                            <button class="btn btn-primary ask-go" type="submit" aria-label="Run this question">Ask</button>
                         </div>
                         <div class="ask-note" id="askNote" aria-live="polite">Try: “derivative of sin x times e to the x”, “limit of sin x over x as x goes to 0”, “5 km/h to m/s”.</div>
                     </form>
@@ -64,34 +66,34 @@
 
                 <section class="panel" aria-label="Choose a tool">
                     <button class="mode-toggle" id="modeToggle" type="button" aria-expanded="true" aria-controls="modeGrid"><span class="mode-toggle-label"><small>Tool</small><b id="modeToggleName">Derivative</b></span><span class="mode-toggle-chev" aria-hidden="true">▾</span></button>
-                    <div id="modeGrid"></div>
+                    <div id="modeGrid"><div class="mode-skel" aria-hidden="true"></div></div>
                 </section>
 
                 <section class="panel">
                     <div class="label-row"><label class="field-label" for="functionInput"><span id="inputLabel">f(x)</span></label>
-                        <button class="mini-btn" id="scanBtn" type="button" title="Read a printed expression from a photo"><span data-icon="camera" data-size="14"></span>Scan</button></div>
-                    <textarea id="functionInput" rows="2" maxlength="250000" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="e.g. x^2 * sin(x)"></textarea>
+                        <button class="mini-btn" id="scanBtn" type="button" title="Read a printed expression from a photo">Scan a photo</button></div>
+                    <textarea id="functionInput" rows="2" maxlength="250000" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" enterkeyhint="done" aria-describedby="inputHint" placeholder="e.g. x^2 * sin(x)"></textarea>
                     <div class="input-hint" id="inputHint"></div>
                     <div id="preview" class="preview-box" aria-live="polite">Enter a function to begin…</div>
-                    <button class="mini-btn keypad-toggle" id="keypadToggle" type="button" aria-expanded="false"><span data-icon="keyboard" data-size="15"></span>Symbols</button>
+                    <button class="mini-btn keypad-toggle" id="keypadToggle" type="button" aria-expanded="false">Symbols</button>
                     <div class="keypad" id="keypad" aria-label="Symbol keypad" hidden></div>
                     <select id="examples" class="examples-select" aria-label="Load an example"></select>
                     <div class="templates-grid" id="templates" style="margin-top:10px" aria-label="Quick templates"></div>
                 </section>
 
                 <section class="panel" id="optionsPanel">
-                    <div class="panel-title"><span data-icon="sliders" data-size="15"></span><span>Options</span></div>
+                    <div class="panel-title">Options</div>
                     <div id="modeOptions" class="mode-options"></div>
                 </section>
 
                 <div class="btn-grid">
-                    <button class="btn btn-primary" id="computeBtn" type="button"><span data-icon="play" data-size="17"></span><span>Compute</span><kbd>Ctrl ↵</kbd></button>
-                    <button class="btn btn-secondary" id="clearBtn" type="button" aria-label="Clear" title="Clear (Ctrl+Shift+K)"><span data-icon="trash" data-size="18"></span></button>
+                    <button class="btn btn-primary" id="computeBtn" type="button"><span>Compute</span><kbd>Ctrl ↵</kbd></button>
+                    <button class="btn btn-secondary" id="clearBtn" type="button" title="Clear (Ctrl+Shift+K)">Clear</button>
                 </div>
                 <div class="shortcut-hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> compute · <kbd>Ctrl</kbd>+<kbd>K</kbd> palette · <kbd>?</kbd> help</div>
 
                 <details class="panel">
-                    <summary><span data-icon="sliders" data-size="15"></span>Precision &amp; plots</summary>
+                    <summary>Precision &amp; plots</summary>
                     <div class="setting-row">
                         <div class="setting-label"><label for="precision">Precision (digits)</label><span class="setting-value" id="precisionValue">6</span></div>
                         <input type="range" class="slider" id="precision" min="2" max="12" value="6">
@@ -103,7 +105,7 @@
                 </details>
 
                 <details class="panel" id="projectPanel" open>
-                    <summary><span data-icon="bookmark" data-size="15"></span>Notebook</summary>
+                    <summary>Notebook</summary>
                     <div class="proj-bar">
                         <select id="projSelect" aria-label="Choose notebook"></select>
                         <button class="mini-btn" id="projNew" type="button">New</button>
@@ -120,7 +122,7 @@
                 </details>
 
                 <details class="panel" id="historyPanel" open>
-                    <summary><span data-icon="clock" data-size="15"></span>History</summary>
+                    <summary>History</summary>
                     <div style="display:flex;justify-content:flex-end"><button class="mini-btn" id="clearHistory" type="button">Clear history</button></div>
                     <div id="historyList" class="history-list"></div>
                 </details>
@@ -128,23 +130,23 @@
 
             <main class="workspace">
                 <div class="tabs" role="tablist" id="tabs"><span class="tab-indicator" id="tabIndicator" aria-hidden="true"></span>
-                    <button class="tab active" id="tab-results" data-tab="results" role="tab" aria-selected="true" type="button"><span data-icon="grid" data-size="16"></span>Results</button>
-                    <button class="tab" id="tab-plot" data-tab="plot" role="tab" aria-selected="false" type="button"><span data-icon="chart" data-size="16"></span>2D Plot</button>
-                    <button class="tab" id="tab-plot3d" data-tab="plot3d" role="tab" aria-selected="false" type="button"><span data-icon="cube" data-size="16"></span>3D Plot</button>
-                    <button class="tab" id="tab-steps" data-tab="steps" role="tab" aria-selected="false" type="button"><span data-icon="list" data-size="16"></span>Steps</button>
+                    <button class="tab active" id="tab-results" data-tab="results" role="tab" aria-selected="true" aria-controls="results" tabindex="0" type="button">Results</button>
+                    <button class="tab" id="tab-plot" data-tab="plot" role="tab" aria-selected="false" aria-controls="plot" tabindex="-1" type="button">2D plot</button>
+                    <button class="tab" id="tab-plot3d" data-tab="plot3d" role="tab" aria-selected="false" aria-controls="plot3d" tabindex="-1" type="button">3D plot</button>
+                    <button class="tab" id="tab-steps" data-tab="steps" role="tab" aria-selected="false" aria-controls="steps" tabindex="-1" type="button">Steps</button>
                 </div>
 
                 <div class="progress" id="progress" aria-hidden="true"></div>
 
-                <div id="results" class="tab-content active" role="tabpanel" aria-live="polite"></div>
+                <div id="results" class="tab-content active" role="tabpanel" aria-labelledby="tab-results" aria-live="polite"><div class="skeleton" aria-hidden="true"><i></i><i></i><i></i><i></i></div></div>
 
-                <div id="plot" class="tab-content" role="tabpanel">
+                <div id="plot" class="tab-content" role="tabpanel" aria-labelledby="tab-plot">
                     <div class="plot-container">
                         <div class="plot-controls">
                             <label>x from <input type="text" id="xMin" placeholder="auto" inputmode="decimal"></label>
                             <label>to <input type="text" id="xMax" placeholder="auto" inputmode="decimal"></label>
                             <button class="mini-btn" id="resetRange" type="button">Reset range</button>
-                            <button class="mini-btn" id="downloadPlot" type="button"><span data-icon="camera" data-size="14"></span>Save PNG</button>
+                            <button class="mini-btn" id="downloadPlot" type="button">Save PNG</button>
                             <span class="plot-tip">Drag to pan · scroll to zoom · double-click to reset</span>
                         </div>
                         <div id="plot2d" class="plot-area"></div>
@@ -153,7 +155,7 @@
                     </div>
                 </div>
 
-                <div id="plot3d" class="tab-content" role="tabpanel">
+                <div id="plot3d" class="tab-content" role="tabpanel" aria-labelledby="tab-plot3d">
                     <div class="plot-container">
                         <div class="plot-controls">
                             <span id="view3dChoices"><label><input type="radio" name="view3d" value="surface" checked> Surface</label>
@@ -164,23 +166,23 @@
                     </div>
                 </div>
 
-                <div id="steps" class="tab-content" role="tabpanel"></div>
+                <div id="steps" class="tab-content" role="tabpanel" aria-labelledby="tab-steps"></div>
 
-                <div class="statusbar" role="status"><span><i class="dot" id="engineDot"></i><span id="engineStatus">Starting engine…</span></span><span id="offlineStatus">Checking offline support…</span><span>math.js · Algebrite · Plotly · KaTeX</span></div>
+                <div class="statusbar" role="status"><span><i class="dot" id="engineDot"></i><span id="engineStatus">Starting engine…</span></span><span id="offlineStatus">Checking offline support…</span></div>
             </main>
         </div>
     </div>
 
     <nav class="bottom-nav" id="bottomNav" aria-label="Jump to section">
-        <button type="button" data-jump="tools"><span aria-hidden="true">∫</span>Tools</button>
-        <button type="button" data-jump="input"><span aria-hidden="true">✎</span>Input</button>
-        <button type="button" data-jump="result"><span aria-hidden="true">▤</span>Result</button>
-        <button type="button" data-jump="top"><span aria-hidden="true">↑</span>Top</button>
+        <button type="button" data-jump="tools">Tools</button>
+        <button type="button" data-jump="input">Input</button>
+        <button type="button" data-jump="result">Result</button>
+        <button type="button" data-jump="top">Top</button>
     </nav>
 
     <footer class="footer">
         <div class="footer-inner">
-            <div>Crafted for people who care about every pixel and decimal. Runs 100% in your browser – nothing is uploaded.</div>
+            <div>Runs in your browser; nothing you type is uploaded.</div>
             <div class="footer-contact">
                 <a href="mailto:crankyhydra@gmail.com">crankyhydra@gmail.com</a>
                 <a href="https://github.com/ibrahimalee" target="_blank" rel="noopener">github.com/ibrahimalee</a>
@@ -190,7 +192,7 @@
 
     <dialog id="practiceDialog" aria-labelledby="practiceTitle">
         <div class="sheet practice-sheet">
-            <div class="sheet-head"><h2 id="practiceTitle">Practice</h2><button class="icon-btn" id="practiceClose" type="button" aria-label="Close"><span data-icon="x"></span></button></div>
+            <div class="sheet-head"><h2 id="practiceTitle">Practice</h2><button class="icon-btn square" id="practiceClose" type="button" aria-label="Close"><span data-icon="x"></span></button></div>
             <div class="practice-controls">
                 <label>Topic <select id="pracTopic"></select></label>
                 <label>Level <select id="pracLevel"><option value="1">1 · Warm-up</option><option value="2">2 · Standard</option><option value="3">3 · Challenge</option></select></label>
@@ -215,7 +217,7 @@
 
     <dialog id="brailleDialog" aria-labelledby="brailleTitle">
         <div class="sheet braille-sheet">
-            <div class="sheet-head"><h2 id="brailleTitle">Braille</h2><button class="icon-btn" id="brailleClose" type="button" aria-label="Close"><span data-icon="x"></span></button></div>
+            <div class="sheet-head"><h2 id="brailleTitle">Braille</h2><button class="icon-btn square" id="brailleClose" type="button" aria-label="Close"><span data-icon="x"></span></button></div>
             <p class="scan-help">Mathematics is written in <b>Nemeth Code</b> (US); plain words are uncontracted Grade 1. Use it with a refreshable braille display, a screen reader, or download a BRF file for an embosser. The braille engine (about 1.2&nbsp;MB) downloads only the first time you open this.</p>
             <div class="scan-status" id="brailleStatus" role="status" aria-live="polite"></div>
             <pre id="brailleOut" class="braille-out" lang="und-Brai" dir="ltr" tabindex="0" aria-label="Braille output"></pre>
@@ -234,10 +236,10 @@
 
     <dialog id="scanDialog" aria-labelledby="scanTitle">
         <div class="sheet scan-sheet">
-            <div class="sheet-head"><h2 id="scanTitle">Scan an expression</h2><button class="icon-btn" id="scanClose" type="button" aria-label="Close"><span data-icon="x"></span></button></div>
+            <div class="sheet-head"><h2 id="scanTitle">Scan an expression</h2><button class="icon-btn square" id="scanClose" type="button" aria-label="Close"><span data-icon="x"></span></button></div>
             <p class="scan-help">Photograph or upload <b>printed or typed</b> maths on a plain background. Recognition runs on your device and the picture is never uploaded. The recogniser (about 11&nbsp;MB) downloads only the first time you use this.</p>
             <div class="scan-actions">
-                <label class="btn btn-primary scan-pick"><span data-icon="camera" data-size="16"></span><span>Take photo or choose image</span><input id="scanFile" type="file" accept="image/*" capture="environment" hidden></label>
+                <label class="btn btn-primary scan-pick"><span>Take photo or choose image</span><input id="scanFile" type="file" accept="image/*" capture="environment" hidden></label>
             </div>
             <canvas id="scanPreview" class="scan-preview" width="10" height="10" hidden aria-label="Processed image preview"></canvas>
             <div class="scan-status" id="scanStatus" role="status" aria-live="polite">No image yet.</div>
@@ -253,7 +255,7 @@
 
     <dialog id="paletteDialog" aria-label="Command palette">
         <div class="sheet">
-            <div class="palette-input"><span aria-hidden="true">🔎</span><input id="paletteInput" type="text" placeholder="Type a command, mode or example…" autocomplete="off" spellcheck="false"></div>
+            <div class="palette-input"><span data-icon="search" data-size="18"></span><input id="paletteInput" type="text" placeholder="Type a command, mode or example…" autocomplete="off" spellcheck="false"></div>
             <div class="palette-list" id="paletteList" role="listbox"></div>
             <div class="palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>Enter</kbd> run</span><span><kbd>Esc</kbd> close</span></div>
         </div>
@@ -261,7 +263,7 @@
 
     <dialog id="helpDialog" aria-labelledby="helpTitle">
         <div class="sheet">
-            <div class="help-head"><h2 id="helpTitle">Syntax, shortcuts &amp; tips</h2><button class="mini-btn" id="helpClose" type="button">Close ✕</button></div>
+            <div class="help-head"><h2 id="helpTitle">Syntax, shortcuts &amp; tips</h2><button class="mini-btn" id="helpClose" type="button">Close</button></div>
             <div class="help-body">
                 <table>
                     <tr><th>You type</th><th>Meaning</th></tr>
@@ -286,9 +288,9 @@
                 <ul>
                     <li><strong>Symbolic results are verified</strong> by differentiating them numerically before they are shown.</li>
                     <li><strong>Limits, roots and extrema are numerical</strong> – great for exploring, not formal proofs.</li>
-                    <li>In the <strong>Graph</strong> tool every extra letter (<code>a</code>, <code>b</code>, …) becomes a live slider – press ▶ to animate it.</li>
+                    <li>In the <strong>Graph</strong> tool every extra letter (<code>a</code>, <code>b</code>, …) becomes a live slider – press the play button to animate it.</li>
                     <li><strong>Share</strong> copies a link that reproduces the entire calculation. <strong>Export</strong> saves a Markdown report.</li>
-                    <li>Install it from your browser menu (or the ⬇ button) to use it offline like a native app.</li>
+                    <li>Install it from your browser menu (or the Install button) to use it offline like a native app.</li>
                 </ul>
             </div>
         </div>

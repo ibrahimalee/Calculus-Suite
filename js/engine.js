@@ -1,5 +1,5 @@
 /*
- * Calculus Suite Pro – computation engine
+ * Calculus Suite – computation engine
  *
  * Pure logic, no DOM access. Works in the browser (window.CalcEngine) and in
  * Node (module.exports) so that every feature can be unit-tested.
@@ -1337,8 +1337,8 @@
         r.badges = r.badges || [];
         r.meta.forEach(m => {
             let x;
-            if ((x = /^Method: (.+)$/.exec(m))) r.badges.push({ kind: 'info', text: x[1].length > 90 ? x[1].slice(0, 87) + '…' : x[1] });
-            else if (/^Verified|cross-?checked|verified against/i.test(m)) r.badges.push({ kind: 'ok', text: m.replace(/^Verified: /, 'Verified: ').slice(0, 110) });
+            if ((x = /^Method: (.+)$/.exec(m))) r.badges.push({ kind: 'info', text: x[1] });
+            else if (/^Verified|cross-?checked|verified against/i.test(m)) r.badges.push({ kind: 'ok', text: m });
         });
         const lines = [r.title];
         if (r.main) lines.push(`${r.main.label} ${r.main.text}`);
