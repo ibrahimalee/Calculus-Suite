@@ -106,6 +106,15 @@
         m = s.match(/^(?:the )?jacobian(?: matrix)?(?: of)? (.+)$/);
         if (m) return { mode: 'vector', fn: mathify(m[1]).replace(/,/g, ' ; '), opts: { op: 'jacobian', vars: '', point: '' }, say: 'Jacobian matrix' };
 
+        // ---- implicit differentiation: an equation in x and y ----------------
+        m = s.match(/^(?:find |compute |work out |what is )?(?:the )?(?:implicit(?:ly)? (?:differentiat(?:e|ion)|derivative)(?: of)?|differentiate implicitly|dy ?\/ ?dx (?:of|for|if|when|given|from)) (.+)$/);
+        if (m && /=|\bequals\b/.test(m[1])) {
+            let body = m[1], point = '';
+            const at = body.match(/^(.*?)\s+at\s+(?:the point )?\(?\s*(-?[\w./^]+)\s*,\s*(-?[\w./^]+)\s*\)?$/);
+            if (at) { body = at[1]; point = mathify(at[2]) + ', ' + mathify(at[3]); }
+            return { mode: 'derivative', fn: mathify(body.replace(/\bequals\b/g, '=')), opts: { order: '1', point, variable: '' }, say: 'implicit differentiation' };
+        }
+
         // ---- derivatives ---------------------------------------------------
         m = s.match(/^(?:the )?(?:(\w+) )?(?:derivative|differentiate|differentiation)(?: of)? (.+)$/) || s.match(/^d\/d([a-z]) (.+)$/);
         if (m) {

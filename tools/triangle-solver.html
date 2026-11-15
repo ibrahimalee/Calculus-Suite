@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Triangle Solver and Conic Sections Calculator | Calculus Suite</title>
+    <meta name="description" content="Solve triangles from SSS, SAS, ASA, AAS or SSA (the ambiguous case), analyse conic sections, and find circles through three points.">
+    <meta name="theme-color" content="#f8f7ef">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Calculus Suite">
+    <meta property="og:title" content="Triangle Solver and Conic Sections Calculator | Calculus Suite">
+    <meta property="og:description" content="Solve triangles from SSS, SAS, ASA, AAS or SSA (the ambiguous case), analyse conic sections, and find circles through three points.">
+    <meta property="og:image" content="../og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="../manifest.webmanifest">
+    <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="../css/tokens.css">
+    <link rel="stylesheet" href="../css/home.css">
+    <script src="../js/theme-init.js"></script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Triangle solver and geometry – Calculus Suite","description":"Solve triangles from SSS, SAS, ASA, AAS or SSA (the ambiguous case), analyse conic sections, and find circles through three points.","applicationCategory":"EducationalApplication","operatingSystem":"Any (runs in a web browser)","browserRequirements":"Requires JavaScript","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is the ambiguous case?","acceptedAnswer":{"@type":"Answer","text":"With two sides and an angle not between them (SSA) there can be zero, one or two triangles. The tool lists every one."}}]}</script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="bar">
+        <a class="wordmark" href="../" aria-label="Calculus Suite, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span></a>
+        <nav class="bar-nav" aria-label="Sections"><a href="./">All tools</a><a href="../teacher.html">Teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">Source</a></nav>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
+        <a class="btn btn-solid bar-cta" href="../app.html">Open the app</a>
+    </header>
+    <main id="main" class="wrap tool-page">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <a href="./">Tools</a> <span aria-hidden="true">›</span> <span aria-current="page">Triangle solver and geometry</span></nav>
+        <h1>Triangle solver and geometry</h1>
+        <p class="lede">Solve any triangle from three of its parts, including the ambiguous SSA case with zero, one or two solutions, and analyse conic sections with their foci and axes.</p>
+        <p class="cta-row"><a class="btn btn-solid btn-lg" href="../app.html?tool=geometry">Open the geometry tool</a><span class="fine">Free, no account. Runs in your browser and works offline.</span></p>
+
+        <section class="sec" aria-labelledby="h-eg">
+            <h2 id="h-eg">Worked examples</h2>
+            <p>Each answer below was computed by the tool itself. Open one to see the steps and the plot.</p>
+            <ol class="eg-table">
+                <li><div class="eg-q"><b>Triangle: 3-4-5 (SSS)</b><code>a = 3, b = 4, c = 5</code></div><div class="eg-a"><code>Solution: a = 3, b = 4, c = 5, A = 36.8698976°, B = 53.1301024°, C = 90°</code><small class="eg-check">✓ Checked: for each solution the angles add up to 180°, the law of sines and the law of cosines hold, and the area from Heron's formula equals ½·side·side·sin(angle) for all three vertices (largest gap 3.0e-16).</small></div><a class="eg-open" href="../app.html#s=eyJtIjoiZ2VvbWV0cnkiLCJmIjoiYSA9IDMsIGIgPSA0LCBjID0gNSIsIm8iOnsib3AiOiJ0cmlhbmdsZSIsInVuaXQiOiJkZWcifX0">Open with steps</a></li>
+                <li><div class="eg-q"><b>Triangle: two sides and the angle between (SAS)</b><code>a = 7, b = 5, C = 60</code></div><div class="eg-a"><code>Solution: a = 7, b = 5, c = 6.244998, A = 76.1021138°, B = 43.8978862°, C = 60°</code><small class="eg-check">✓ Checked: for each solution the angles add up to 180°, the law of sines and the law of cosines hold, and the area from Heron's formula equals ½·side·side·sin(angle) for all three vertices (largest gap 3.8e-16).</small></div><a class="eg-open" href="../app.html#s=eyJtIjoiZ2VvbWV0cnkiLCJmIjoiYSA9IDcsIGIgPSA1LCBDID0gNjAiLCJvIjp7Im9wIjoidHJpYW5nbGUiLCJ1bml0IjoiZGVnIn19">Open with steps</a></li>
+                <li><div class="eg-q"><b>Triangle: the ambiguous case, two solutions</b><code>a = 8, b = 10, A = 30</code></div><div class="eg-a"><code>2 triangles fit: a = 8, b = 10, c = 14.905252, A = 30°, B = 38.6821875°, C = 111.3178125°   or   a = 8, b = 10, c = 2.415256, A = 30°, B = 141.3178125°, C = 8.6821875°</code><small class="eg-check">✓ Checked: for each solution the angles add up to 180°, the law of sines and the law of cosines hold, and the area from Heron's formula equals ½·side·side·sin(angle) for all three vertices (largest gap 3.7e-15).</small></div><a class="eg-open" href="../app.html#s=eyJtIjoiZ2VvbWV0cnkiLCJmIjoiYSA9IDgsIGIgPSAxMCwgQSA9IDMwIiwibyI6eyJvcCI6InRyaWFuZ2xlIiwidW5pdCI6ImRlZyJ9fQ">Open with steps</a></li>
+                <li><div class="eg-q"><b>Conic: ellipse 9x² + 4y² − 18x + 16y − 11 = 0</b><code>9x^2 + 4y^2 - 18x + 16y - 11 = 0</code></div><div class="eg-a"><code>Ellipse: centre (1, -2), semi-axes 3 and 2</code><small class="eg-check">✓ Checked: 25 points generated from the canonical form satisfy the original equation (relative residual 1.7e-16), and the focus property holds at each of them (distances to the two foci add to 2a; error 3.0e-16).</small></div><a class="eg-open" href="../app.html#s=eyJtIjoiZ2VvbWV0cnkiLCJmIjoiOXheMiArIDR5XjIgLSAxOHggKyAxNnkgLSAxMSA9IDAiLCJvIjp7Im9wIjoiY29uaWMiLCJ1bml0IjoiZGVnIn19">Open with steps</a></li>
+                <li><div class="eg-q"><b>Circle through (0,0), (4,0), (0,3)</b><code>(0,0), (4,0), (0,3)</code></div><div class="eg-a"><code>Circle: centre (2, 3/2), radius 5/2</code><small class="eg-check">✓ Checked: all three points lie at distance R from the centre (largest gap 0.0e+0), and R agrees with abc/(4·area) = 2.5 from the triangle they form.</small></div><a class="eg-open" href="../app.html#s=eyJtIjoiZ2VvbWV0cnkiLCJmIjoiKDAsMCksICg0LDApLCAoMCwzKSIsIm8iOnsib3AiOiJjaXJjbGUzIiwidW5pdCI6ImRlZyJ9fQ">Open with steps</a></li>
+            </ol>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-how">
+            <h2 id="h-how">How it works</h2>
+            <p>Triangles are solved with the laws of sines and cosines; conics are classified and put in standard form, with rotation removed where needed.</p>
+            <h3>How the answer is checked</h3>
+            <p>Solved triangles are checked against both laws and the angle sum; conic foci against the focus–directrix property.</p>
+            <h3>Typing your input</h3>
+            <ul class="plain">
+                <li>Give known sides as a, b, c and angles as A, B, C.</li>
+            </ul>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-faq">
+            <h2 id="h-faq">Questions</h2>
+            <h3>What is the ambiguous case?</h3>
+            <p>With two sides and an angle not between them (SSA) there can be zero, one or two triangles. The tool lists every one.</p>
+        </section>
+
+        <section class="sec" aria-labelledby="h-rel">
+            <h2 id="h-rel">Related tools</h2>
+            <ul class="rel"><li><a href="scientific-calculator.html">Calculator with exact fractions</a></li><li><a href="graphing-calculator.html">Graphing calculator with sliders</a></li><li><a href="./">All 31 tool pages</a></li></ul>
+        </section>
+    </main>
+    <footer class="foot">
+        <div class="wrap foot-in">
+            <span>Calculus Suite · MIT licence · free, no account, works offline</span>
+            <span class="foot-links"><a href="../">Home</a><a href="./">All tools</a><a href="../app.html">App</a><a href="../teacher.html">For teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">GitHub</a></span>
+        </div>
+    </footer>
+    <script src="../js/home.js"></script>
+</body>
+</html>

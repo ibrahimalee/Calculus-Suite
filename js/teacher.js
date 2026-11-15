@@ -1,3 +1,4 @@
+/* global csDialog */
 /* Teacher page: worksheet builder and gradebook. Everything stays in this browser. */
 (function () {
     'use strict';

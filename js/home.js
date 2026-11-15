@@ -36,8 +36,9 @@
         ['complex', 'ℂ', 'Complex numbers', 'Arithmetic, polar form, roots and the plane']
     ];
     var toc = $('toc'), count = $('toolCount');
-    if (count) count.textContent = TOOLS.length;
-    if (toc) TOOLS.forEach(function (t) {
+    // the index is written into the page by scripts/build-seo.js; this only fills it if that is missing
+    if (count && !count.textContent) count.textContent = TOOLS.length;
+    if (toc && !toc.querySelector('li')) TOOLS.forEach(function (t) {
         var li = doc.createElement('li'), a = doc.createElement('a');
         a.href = 'app.html?tool=' + t[0];
         a.innerHTML = '<span class="g"></span><span><span class="t"></span><span class="d"></span></span>';

@@ -10,6 +10,23 @@
     const { CalcError, nice, fmt } = engine;
     const I = engine.internals;
     const added = {};
+    /** "(s + 1)" -> "s + 1" when the outer brackets wrap the whole string. */
+    function stripOuterParens(str) {
+        str = String(str).trim();
+        while (str[0] === '(' && str[str.length - 1] === ')') {
+            let depth = 0, whole = true;
+            for (let i = 0; i < str.length; i++) { if (str[i] === '(') depth++; else if (str[i] === ')') depth--; if (depth === 0 && i < str.length - 1) { whole = false; break; } }
+            if (!whole) break; str = str.slice(1, -1).trim();
+        }
+        return str;
+    }
+    /** Bracket one side of a fraction only when it needs it: "s^3" stays, "s + 1" becomes "(s + 1)". */
+    function groupFrac(str) {
+        const t = stripOuterParens(str);
+        let depth = 0;
+        for (let i = 0; i < t.length; i++) { const c = t[i]; if (c === '(') depth++; else if (c === ')') depth--; else if (depth === 0 && (c === ' ' || ((c === '+' || c === '-' || c === '*' || c === '/') && i > 0))) return `(${t})`; }
+        return t;
+    }
     function register(map) { Object.assign(added, map); Object.assign(engine.run, I.wrapRuns(map)); }
     engine.extras = { register };
 
@@ -322,7 +339,7 @@
         if (!terms.length) { r.main = { label: `ℒ{f}(s) =`, text: '0', tex: '\\mathcal{L}\\{f\\}(s)=0' }; r.meta.push('Verified: after expansion every term cancels, so f(t) = 0 identically.'); return I.finalizeText(r); }
         const L = laplaceOfTerms(terms);
         const nStr = polyStr(L.num, 's'), dStr = facStr(L.fac, 's'), nTex = polyStr(L.num, 's', true), dTex = facStr(L.fac, 's', true);
-        r.main = { label: 'F(s) =', text: `(${nStr}) / (${dStr})`, tex: `F(s)=\\dfrac{${nTex}}{${dTex}}` };
+        r.main = { label: 'F(s) =', text: `${groupFrac(nStr)} / ${groupFrac(dStr)}`, tex: `F(s)=\\dfrac{${stripOuterParens(nTex)}}{${stripOuterParens(dTex)}}` };
         r.items.push({ label: 'Region of convergence:', text: `Re(s) > ${nice(L.sigma, 8, 1e-9).text}`, tex: `\\operatorname{Re}(s)>${nice(L.sigma, 8, 1e-9).tex}` });
         r.items.push({ label: 'Expanded denominator:', text: polyStr(L.den, 's'), tex: `D(s)=${polyStr(L.den, 's', true)}` });
         // independent numeric check: ∫₀^∞ f(t)e^{-s t} dt at a point to the right of every pole
@@ -2792,7 +2809,7 @@
         const gauss = (n, lo, hi) => { const R = glRule(n), mid = (lo + hi) / 2, half = (hi - lo) / 2; let s = 0; for (let i = 0; i < n; i++) s += R.w[i] * g(mid + half * R.x[i]); return s * half; };
         const composite = (n, panels) => { let s = 0; for (let k = 0; k < panels; k++) s += gauss(n, a + (b - a) * k / panels, a + (b - a) * (k + 1) / panels); return s; };
         const ref1 = composite(16, 24), ref2 = composite(20, 64); let refGap = Math.abs(ref1 - ref2) / Math.max(1, Math.abs(ref2)); let ref = ref2, roughNote = '';
-        if (refGap > 1e-9) { let alt = NaN; try { const q = engine.integrateRobust(x => { const v = f(x); return Number.isFinite(v) ? v : NaN; }, a, b); alt = q && Number.isFinite(q.value) ? q.value : NaN; } catch (e) { alt = NaN; } if (!Number.isFinite(alt) || Math.abs(alt - ref2) > 1e-4 * Math.max(1, Math.abs(alt))) throw new CalcError('Could not compute a trustworthy reference value: the integrand is not smooth enough on this interval, or the integral diverges.'); ref = alt; refGap = Math.abs(alt - ref2) / Math.max(1, Math.abs(alt)); roughNote = 'The integrand is not smooth at an endpoint or inside the interval, so the reference value comes from adaptive integration and every rule converges more slowly than its textbook order.'; } let exactTxt = ''; try { const F = I.runAlgebrite ? null : null; void F; } catch (e) { /* none */ }
+        if (refGap > 1e-9) { let alt = NaN; try { const q = engine.integrateRobust(x => { const v = f(x); return Number.isFinite(v) ? v : NaN; }, a, b); alt = q && Number.isFinite(q.value) ? q.value : NaN; } catch (e) { alt = NaN; } if (!Number.isFinite(alt) || Math.abs(alt - ref2) > 1e-4 * Math.max(1, Math.abs(alt))) throw new CalcError('Could not compute a trustworthy reference value: the integrand is not smooth enough on this interval, or the integral diverges.'); ref = alt; refGap = Math.abs(alt - ref2) / Math.max(1, Math.abs(alt)); roughNote = 'The integrand is not smooth at an endpoint or inside the interval, so the reference value comes from adaptive integration and every rule converges more slowly than its textbook order.'; }
         if (!Number.isFinite(ref) || Math.abs(ref) > 1e150) throw new CalcError('The integral is too large to compare numerically.');
         const trap = N => { const h = (b - a) / N; let s = (g(a) + g(b)) / 2; for (let i = 1; i < N; i++) s += g(a + i * h); return s * h; };
         const simp = N => { const h = (b - a) / N; let s = g(a) + g(b); for (let i = 1; i < N; i++) s += g(a + i * h) * (i % 2 ? 4 : 2); return s * h / 3; };
@@ -3175,6 +3192,148 @@
     }
     const prevVectorP = engine.run.vector;
     register({ vector: (src, opt) => opt.op === 'potential' ? runPotential(src, opt) : prevVectorP(src, opt) });
+
+    // ======================================================================
+    // Implicit differentiation: an equation in x and y, e.g. x^2 + y^2 = 25
+    // ======================================================================
+    function runImplicit(src, opt) {
+        // "6xy" or "x y" mean 6·x·y here: split names made only of x and y into products
+        src = src.replace(/(?<![A-Za-z_])([xy]{2,})(?![A-Za-z_\d])(?!\s*\()/g, w => w.split('').join('*'));
+        const sides = src.split('=');
+        if (sides.length !== 2 || !sides[0].trim() || !sides[1].trim() || /[<>!]$/.test(sides[0].trim())) throw new CalcError('Write one equation with a single =, for example  x^2 + y^2 = 25');
+        const L = engine.parse(sides[0]), R = engine.parse(sides[1]);
+        const vars = [...new Set([...engine.freeVars(L), ...engine.freeVars(R)])];
+        const want = String(opt.variable || '').trim();
+        if (want && !/^[a-zA-Z]\w*$/.test(want)) throw new CalcError('The variable must be a name such as x or t.');
+        const x = want || (vars.includes('x') ? 'x' : vars.filter(v => v !== 'y')[0] || 'x');
+        const others = vars.filter(v => v !== x);
+        if (others.length !== 1 || !vars.includes(x)) throw new CalcError(`Implicit differentiation needs an equation in exactly two variables, ${x} and the one that depends on it (e.g. x^2 + y^2 = 25). Found: ${vars.join(', ') || 'none'}.`);
+        const y = others[0];
+        const order = Math.round(Number(opt.order) || 1);
+        if (!(order >= 1 && order <= 3)) throw new CalcError('For an equation, the order can be 1, 2 or 3.');
+        const sub = (a, b) => new math.OperatorNode('-', 'subtract', [a, b]);
+        const simp = n => { try { return I.simplifyNode(I.foldConstants(n)); } catch (e) { return n; } };
+        const F = simp(sub(L, R));
+        const Fx = engine.diff(F, x), Fy = engine.diff(F, y);
+        if (engine.strOf(Fy) === '0') throw new CalcError(`${y} does not appear in a way that changes the equation, so d${y}/d${x} is not defined.`);
+        const neg = n => new math.OperatorNode('-', 'unaryMinus', [n]);
+        const div = (a, b) => new math.OperatorNode('/', 'divide', [a, b]);
+        const add = (a, b) => new math.OperatorNode('+', 'add', [a, b]);
+        const mul = (a, b) => new math.OperatorNode('*', 'multiply', [a, b]);
+        // y' = -Fx/Fy ; higher orders: D(g) = g_x + g_y · y'
+        // several equivalent forms; keep the shortest one that is still correct
+        const shortest = cands => cands.filter(Boolean).reduce((b, c) => (engine.strOf(c).length < engine.strOf(b).length ? c : b));
+        const tryS = f => { try { return f(); } catch (e) { return null; } };
+        const ders = [shortest([simp(neg(div(Fx, Fy))), simp(div(neg(Fx), Fy)), tryS(() => simp(div(simp(neg(Fx)), Fy))), tryS(() => math.simplify(div(neg(Fx), Fy))), tryS(() => { const t = String(Algebrite.run('simplify(' + I.toAlgebrite(div(neg(Fx), Fy)) + ')')); return /Stop|rror|nil/.test(t) ? null : I.fromAlgebrite(t); })])];
+        for (let k = 1; k < order; k++) { const g = ders[k - 1]; ders.push(simp(add(engine.diff(g, x), mul(engine.diff(g, y), ders[0])))); }
+        const tooBig = ders.some(d => engine.strOf(d).length > 4000); if (tooBig) throw new CalcError('The higher derivative becomes too large to show. Try a lower order.');
+        const Ff = engine.compile(F, [x, y]), Fyf = engine.compile(Fy, [x, y]), Df = ders.map(d => engine.compile(d, [x, y]));
+        const num = v => (typeof v === 'number' ? v : (v && typeof v.re === 'number' && Math.abs(v.im) < 1e-12 ? v.re : NaN));
+        const fv = (fn, a, b) => { try { return num(fn(a, b)); } catch (e) { return NaN; } };
+        // y values on the curve at a given x: scan for sign changes, then refine
+        const solveY = (x0, around) => {
+            const out = [], lo = around === undefined ? -60 : around - 6, hi = around === undefined ? 60 : around + 6, N = 2400;
+            let pY = lo, pF = fv(Ff, x0, lo);
+            for (let i = 1; i <= N && out.length < 6; i++) {
+                const yy = lo + (hi - lo) * i / N, fy = fv(Ff, x0, yy);
+                if (Number.isFinite(pF) && Number.isFinite(fy)) {
+                    if (fy === 0) out.push(yy);
+                    else if (pF * fy < 0) { let a = pY, b = yy, fa = pF; for (let it = 0; it < 80; it++) { const m = (a + b) / 2, fm = fv(Ff, x0, m); if (fa * fm <= 0) b = m; else { a = m; fa = fm; } } const r = (a + b) / 2; if (Math.abs(fv(Ff, x0, r)) < 1e-6 * Math.max(1, Math.abs(fv(Ff, x0, r + 1)))) out.push(r); }
+                }
+                pY = yy; pF = fy;
+            }
+            return out;
+        };
+        const yNear = (x0, y0) => { const c = solveY(x0, y0); if (!c.length) return NaN; return c.reduce((b, v) => (Math.abs(v - y0) < Math.abs(b - y0) ? v : b)); };
+        const r = I.makeResult('derivative', order === 1 ? 'Implicit differentiation' : `Implicit differentiation, order ${order}`);
+        const dTxt = k => (k === 1 ? `d${y}/d${x}` : `d${k > 1 ? '^' + k : ''}${y}/d${x}^${k}`);
+        const dTex = k => (k === 1 ? `\\frac{d${y}}{d${x}}` : `\\frac{d^{${k}}${y}}{d${x}^{${k}}}`);
+        r.items.push({ label: 'Equation:', text: `${engine.strOf(L)} = ${engine.strOf(R)}`, tex: `${engine.texOf(L)}=${engine.texOf(R)}` });
+        r.main = { label: `${dTxt(order)} =`, text: engine.strOf(ders[order - 1]), tex: `${dTex(order)}=${engine.texOf(ders[order - 1])}` };
+        if (order > 1) r.items.push({ label: `${dTxt(1)} =`, text: engine.strOf(ders[0]), tex: `${dTex(1)}=${engine.texOf(ders[0])}` });
+        r.steps.push({ title: 'Put everything on one side', text: `F(${x}, ${y}) = ${engine.strOf(F)} = 0`, tex: `F(${x},${y})=${engine.texOf(F)}=0` });
+        r.steps.push({ title: `Differentiate both sides with respect to ${x}`, text: `Treat ${y} as a function of ${x}; the chain rule gives F_${x} + F_${y} · ${y}′ = 0, with F_${x} = ${engine.strOf(Fx)} and F_${y} = ${engine.strOf(Fy)}.`, tex: `F_{${x}}+F_{${y}}\\,${y}'=0` });
+        r.steps.push({ title: `Solve for ${y}′`, text: `${y}′ = −F_${x} / F_${y} = ${engine.strOf(ders[0])}`, tex: `${y}'=-\\frac{F_{${x}}}{F_{${y}}}=${engine.texOf(ders[0])}` });
+        if (order > 1) r.steps.push({ title: 'Higher derivatives', text: `Differentiate again, replacing every ${y}′ that appears by the expression above: d/d${x}[g(${x}, ${y})] = g_${x} + g_${y} · ${y}′.`, tex: '' });
+        // the point: "3, 4", or just an x value
+        const ptxt = String(opt.point || '').trim(); let pts = [];
+        if (ptxt) {
+            const vals = ptxt.replace(/^\(|\)$/g, '').split(/\s*[,;]\s*|\s+/).filter(Boolean).map(t => I.parseLimit(t, 'The point').value);
+            if (!vals.every(Number.isFinite) || vals.length < 1 || vals.length > 2) throw new CalcError(`Give the point as ${x}, ${y} (for example 3, 4), or just a value of ${x}.`);
+            if (vals.length === 2) {
+                const resid = fv(Ff, vals[0], vals[1]), scale = Math.max(1, Math.abs(fv(engine.compile(L, [x, y]), vals[0], vals[1])), Math.abs(fv(engine.compile(R, [x, y]), vals[0], vals[1])));
+                if (!Number.isFinite(resid)) throw new CalcError('The equation is not defined at that point.');
+                if (Math.abs(resid) > 1e-6 * scale) r.warnings.push(`(${fmt(vals[0], 6)}, ${fmt(vals[1], 6)}) is not on the curve: the two sides differ by ${fmt(resid, 6)}. The slope formula is still evaluated there.`);
+                pts = [[vals[0], vals[1]]];
+            } else {
+                const ys = solveY(vals[0]);
+                if (!ys.length) throw new CalcError(`No point of the curve was found with ${x} = ${fmt(vals[0], 6)} (searched ${y} from −60 to 60).`);
+                pts = ys.slice(0, 4).map(v => [vals[0], v]);
+            }
+            pts.forEach(([a, b]) => {
+                const fy = fv(Fyf, a, b), m = fv(Df[0], a, b), P = `(${fmt(a, 6)}, ${fmt(b, 6)})`;
+                if (Math.abs(fy) < 1e-12 || !Number.isFinite(m)) { r.items.push({ label: `At ${P}:`, text: `F_${y} = 0, so the tangent is vertical (${x} = ${fmt(a, 6)}) or the curve has a singular point`, tex: '' }); return; }
+                r.items.push({ label: `Slope at ${P}:`, text: `${dTxt(1)} = ${nice(m, 8, 1e-9).text}`, tex: '' });
+                r.items.push({ label: 'Tangent line:', text: `${y} = ${fmt(m, 6)}·(${x} ${a < 0 ? '+' : '−'} ${fmt(Math.abs(a), 6)})${b === 0 ? '' : ` ${b < 0 ? '−' : '+'} ${fmt(Math.abs(b), 6)}`}`.replace(/·\(x − 0\)/, '·' + x), tex: '' });
+                for (let k = 2; k <= order; k++) { const v = fv(Df[k - 1], a, b); if (Number.isFinite(v)) r.items.push({ label: `${dTxt(k)} at ${P}:`, text: nice(v, 8, 1e-9).text, tex: '' }); }
+            });
+        }
+        // independent check: follow the curve numerically and difference it
+        let checkPts = pts.filter(([a, b]) => Math.abs(fv(Ff, a, b)) < 1e-6 * Math.max(1, Math.abs(b)) && Math.abs(fv(Fyf, a, b)) > 1e-6);
+        if (!checkPts.length) for (const a of [0.37, 1.13, -0.71, 2.3, -1.9, 0.05, 3.7, -3.3]) { const ys = solveY(a).filter(v => Math.abs(fv(Fyf, a, v)) > 1e-6); if (ys.length) checkPts.push([a, ys[0]]); if (checkPts.length >= 3) break; }
+        let worst = 0, checked = 0;
+        checkPts.slice(0, 3).forEach(([a, b]) => {
+            const h = 1e-4 * Math.max(1, Math.abs(a)), yp = yNear(a + h, b), ym = yNear(a - h, b);
+            if (!Number.isFinite(yp) || !Number.isFinite(ym)) return;
+            const numSlope = (yp - ym) / (2 * h), m = fv(Df[0], a, b);
+            if (!Number.isFinite(m)) return;
+            worst = Math.max(worst, Math.abs(numSlope - m) / Math.max(1, Math.abs(m))); checked++;
+        });
+        if (checked) {
+            if (worst > 1e-3) r.warnings.push(`The numerical check disagreed with the formula by ${worst.toExponential(1)} (relative). The curve may be very steep or nearly singular near the points tested.`);
+            else r.meta.push(`Verified: solving the equation numerically for ${y} just either side of ${checked} point${checked > 1 ? 's' : ''} on the curve gives the same slope as the formula (largest relative gap ${worst.toExponential(1)}).`);
+        } else r.meta.push(`No point of the curve with a finite slope was found to check the formula numerically.`);
+        // the curve F = 0 as a contour, with the tangent line
+        // show the origin and the chosen point(s) with room around them; far-away points get a window centred on them
+        const far = pts.length && Math.max(Math.abs(pts[0][0]), Math.abs(pts[0][1])) > 25;
+        const cx = far ? pts[0][0] : 0, cy = far ? pts[0][1] : 0;
+        const half = far ? 6 : Math.max(6, 1.4 * Math.max(0, ...pts.map(([a, b]) => Math.max(Math.abs(a), Math.abs(b)))));
+        const n = 140, xs = [], ys = [], zs = [];
+        for (let i = 0; i <= n; i++) { xs.push(cx - half + 2 * half * i / n); ys.push(cy - half + 2 * half * i / n); }
+        let finite = 0;
+        for (let j = 0; j <= n; j++) { const row = []; for (let i = 0; i <= n; i++) { const v = fv(Ff, xs[i], ys[j]); row.push(Number.isFinite(v) ? Math.max(-1e6, Math.min(1e6, v)) : null); if (Number.isFinite(v)) finite++; } zs.push(row); }
+        if (finite > 20) {
+            const traces = [{ type: 'contour', x: xs, y: ys, z: zs, contours: { start: 0, end: 0, size: 1, coloring: 'lines' }, colorscale: [[0, '#d6453d'], [1, '#d6453d']], line: { width: 2.6, color: '#d6453d' }, showscale: false, showlegend: true, name: `${engine.strOf(L)} = ${engine.strOf(R)}`, hoverinfo: 'skip' }];
+            pts.forEach(([a, b], k) => { const m = fv(Df[0], a, b); if (Number.isFinite(m) && Math.abs(fv(Fyf, a, b)) > 1e-12) traces.push({ type: 'scatter', mode: 'lines', x: [a - half, a + half], y: [b - m * half, b + m * half], line: { color: '#3b73c9', width: 2, dash: 'dash' }, name: k ? `tangent ${k + 1}` : 'tangent line' }); traces.push({ type: 'scatter', mode: 'markers', x: [a], y: [b], marker: { size: 10, color: '#3b73c9' }, name: `(${fmt(a, 4)}, ${fmt(b, 4)})`, showlegend: false }); });
+            r.plot = { generic: { title: 'The curve and its tangent', traces, xTitle: x, yTitle: y, equal: true, xRange: [cx - half, cx + half], yRange: [cy - half, cy + half] } };
+        }
+        return I.finalizeText(r);
+    }
+    const prevDerivativeI = engine.run.derivative;
+    register({
+        derivative: (src, opt) => {
+            if (typeof src !== 'string') return prevDerivativeI(src, opt);
+            const named = /^\s*[a-zA-Z]\w*\s*\(\s*([a-zA-Z])\s*\)\s*=(?!=)(.*)$/s.exec(src); // f(x) = …  is an ordinary function
+            if (named) return prevDerivativeI(named[2], Object.assign({}, opt, { variable: opt.variable || named[1] }));
+            return /^[^=<>!]*[^=<>!]=[^=][^=]*$/.test(src.trim()) ? runImplicit(src, opt) : prevDerivativeI(src, opt);
+        }
+    });
+
+    // ======================================================================
+    // Guard: a transform or complex-plane picture of a non-finite constant (∞, 1e5000) is meaningless
+    // ======================================================================
+    function nonFiniteConstant(src) {
+        if (typeof src !== 'string' || /[;=]|->/.test(src)) return false;
+        let node; try { node = engine.parse(src); } catch (e) { return false; }
+        if (engine.freeVars(node).length) return false;
+        let v; try { v = engine.compile(node, [])(); } catch (e) { return false; }
+        if (v && typeof v === 'object' && 're' in v) return !(Number.isFinite(v.re) && Number.isFinite(v.im));
+        return typeof v === 'number' && !Number.isFinite(v);
+    }
+    ['laplace', 'complex'].forEach(tool => {
+        const prev = engine.run[tool]; if (!prev) return;
+        register({ [tool]: (src, opt) => { if (nonFiniteConstant(src)) throw new CalcError('That input is infinite or too large to be a finite number, so there is nothing to transform or plot. Enter a function or a finite number.'); return prev(src, opt); } });
+    });
 
     return engine;
 });

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Newton's Method, Bisection and Secant Calculator | Calculus Suite</title>
+    <meta name="description" content="Find roots with Newton's method, bisection or the secant method, with every iteration in a table and the convergence plotted.">
+    <meta name="theme-color" content="#f8f7ef">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Calculus Suite">
+    <meta property="og:title" content="Newton's Method, Bisection and Secant Calculator | Calculus Suite">
+    <meta property="og:description" content="Find roots with Newton's method, bisection or the secant method, with every iteration in a table and the convergence plotted.">
+    <meta property="og:image" content="../og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="../manifest.webmanifest">
+    <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="../css/tokens.css">
+    <link rel="stylesheet" href="../css/home.css">
+    <script src="../js/theme-init.js"></script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Root finding: Newton's method, bisection and secant – Calculus Suite","description":"Find roots with Newton's method, bisection or the secant method, with every iteration in a table and the convergence plotted.","applicationCategory":"EducationalApplication","operatingSystem":"Any (runs in a web browser)","browserRequirements":"Requires JavaScript","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why did Newton's method not converge?","acceptedAnswer":{"@type":"Answer","text":"It can fail when f′ is zero or small near the iterates, or when there is no real root, as in x² + 1. The example shows what happens."}}]}</script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="bar">
+        <a class="wordmark" href="../" aria-label="Calculus Suite, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span></a>
+        <nav class="bar-nav" aria-label="Sections"><a href="./">All tools</a><a href="../teacher.html">Teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">Source</a></nav>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
+        <a class="btn btn-solid bar-cta" href="../app.html">Open the app</a>
+    </header>
+    <main id="main" class="wrap tool-page">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <a href="./">Tools</a> <span aria-hidden="true">›</span> <span aria-current="page">Root finding: Newton's method, bisection and secant</span></nav>
+        <h1>Root finding: Newton's method, bisection and secant</h1>
+        <p class="lede">Find a root of f(x) = 0 and see every iteration of Newton's method, bisection or the secant method, including when and why a method fails.</p>
+        <p class="cta-row"><a class="btn btn-solid btn-lg" href="../app.html?tool=root">Open the root finding tool</a><span class="fine">Free, no account. Runs in your browser and works offline.</span></p>
+
+        <section class="sec" aria-labelledby="h-eg">
+            <h2 id="h-eg">Worked examples</h2>
+            <p>Each answer below was computed by the tool itself. Open one to see the steps and the plot.</p>
+            <ol class="eg-table">
+                <li><div class="eg-q"><b>√2 by Newton: x² − 2</b><code>x^2-2</code></div><div class="eg-a"><span class="tex"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:0.4831em;"></span><span class="mord mathnormal">x</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">1.414213562373</span></span></span></span></span></div><a class="eg-open" href="../app.html#s=eyJtIjoicm9vdCIsImYiOiJ4XjItMiIsIm8iOnsibWV0aG9kIjoibmV3dG9uIiwieDAiOiIxIiwieDEiOiIyIiwiYSI6IjAiLCJiIjoiMiIsInN0ZXBzIjoiOCJ9fQ">Open with steps</a></li>
+                <li><div class="eg-q"><b>Dottie number: cos x − x (bisection)</b><code>cos(x)-x</code></div><div class="eg-a"><span class="tex"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:0.4831em;"></span><span class="mord mathnormal">x</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">0.739085133215</span></span></span></span></span></div><a class="eg-open" href="../app.html#s=eyJtIjoicm9vdCIsImYiOiJjb3MoeCkteCIsIm8iOnsibWV0aG9kIjoiYmlzZWN0aW9uIiwieDAiOiIxIiwieDEiOiIyIiwiYSI6IjAiLCJiIjoiMSIsInN0ZXBzIjoiNDAifX0">Open with steps</a></li>
+                <li><div class="eg-q"><b>Secant on x³ − x − 2</b><code>x^3-x-2</code></div><div class="eg-a"><span class="tex"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:0.4831em;"></span><span class="mord mathnormal">x</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">1.521379706805</span></span></span></span></span></div><a class="eg-open" href="../app.html#s=eyJtIjoicm9vdCIsImYiOiJ4XjMteC0yIiwibyI6eyJtZXRob2QiOiJzZWNhbnQiLCJ4MCI6IjEiLCJ4MSI6IjIiLCJhIjoiMCIsImIiOiIyIiwic3RlcHMiOiIxMiJ9fQ">Open with steps</a></li>
+                <li><div class="eg-q"><b>Newton failing: x² + 1</b><code>x^2+1</code></div><div class="eg-a"><code>No root found: the iteration did not converge (last iterate x ≈ 0, where f = 1)</code></div><a class="eg-open" href="../app.html#s=eyJtIjoicm9vdCIsImYiOiJ4XjIrMSIsIm8iOnsibWV0aG9kIjoibmV3dG9uIiwieDAiOiIxIiwieDEiOiIyIiwiYSI6IjAiLCJiIjoiMiIsInN0ZXBzIjoiOCJ9fQ">Open with steps</a></li>
+            </ol>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-how">
+            <h2 id="h-how">How it works</h2>
+            <p>Each method starts from your guess or bracket and records x, f(x) and the change at every step. Newton's method uses the exact derivative; bisection keeps a bracket; the secant method needs two starting points.</p>
+            <h3>How the answer is checked</h3>
+            <p>The final root is substituted into f, and the rate of convergence is shown in the table.</p>
+            <h3>Typing your input</h3>
+            <ul class="plain">
+                <li>Solve f(x) = 0 iteratively and watch every step. Move terms to one side first.</li>
+                <li>Bisection needs an interval [a, b] where f changes sign.</li>
+            </ul>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-faq">
+            <h2 id="h-faq">Questions</h2>
+            <h3>Why did Newton's method not converge?</h3>
+            <p>It can fail when f′ is zero or small near the iterates, or when there is no real root, as in x² + 1. The example shows what happens.</p>
+        </section>
+
+        <section class="sec" aria-labelledby="h-rel">
+            <h2 id="h-rel">Related tools</h2>
+            <ul class="rel"><li><a href="equation-solver.html">Equation and inequality solver</a></li><li><a href="numerical-methods-calculator.html">Numerical methods calculator</a></li><li><a href="critical-points-calculator.html">Function analysis: critical points, extrema and asymptotes</a></li><li><a href="./">All 31 tool pages</a></li></ul>
+        </section>
+    </main>
+    <footer class="foot">
+        <div class="wrap foot-in">
+            <span>Calculus Suite · MIT licence · free, no account, works offline</span>
+            <span class="foot-links"><a href="../">Home</a><a href="./">All tools</a><a href="../app.html">App</a><a href="../teacher.html">For teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">GitHub</a></span>
+        </div>
+    </footer>
+    <script src="../js/home.js"></script>
+</body>
+</html>

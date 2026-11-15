@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Fourier Series Calculator with Coefficients | Calculus Suite</title>
+    <meta name="description" content="Fourier coefficients, even and odd detection, partial sums you can watch converge, the Gibbs phenomenon and a Parseval check.">
+    <meta name="theme-color" content="#f8f7ef">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Calculus Suite">
+    <meta property="og:title" content="Fourier Series Calculator with Coefficients | Calculus Suite">
+    <meta property="og:description" content="Fourier coefficients, even and odd detection, partial sums you can watch converge, the Gibbs phenomenon and a Parseval check.">
+    <meta property="og:image" content="../og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="../manifest.webmanifest">
+    <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="../css/tokens.css">
+    <link rel="stylesheet" href="../css/home.css">
+    <script src="../js/theme-init.js"></script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Fourier series calculator – Calculus Suite","description":"Fourier coefficients, even and odd detection, partial sums you can watch converge, the Gibbs phenomenon and a Parseval check.","applicationCategory":"EducationalApplication","operatingSystem":"Any (runs in a web browser)","browserRequirements":"Requires JavaScript","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is the Gibbs phenomenon?","acceptedAnswer":{"@type":"Answer","text":"Near a jump, partial sums overshoot by about 9% of the jump however many terms you take. The square-wave example shows it."}}]}</script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="bar">
+        <a class="wordmark" href="../" aria-label="Calculus Suite, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span></a>
+        <nav class="bar-nav" aria-label="Sections"><a href="./">All tools</a><a href="../teacher.html">Teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">Source</a></nav>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
+        <a class="btn btn-solid bar-cta" href="../app.html">Open the app</a>
+    </header>
+    <main id="main" class="wrap tool-page">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <a href="./">Tools</a> <span aria-hidden="true">›</span> <span aria-current="page">Fourier series calculator</span></nav>
+        <h1>Fourier series calculator</h1>
+        <p class="lede">Compute the Fourier coefficients of a function on an interval and see the partial sums converge, including the overshoot at jumps known as the Gibbs phenomenon.</p>
+        <p class="cta-row"><a class="btn btn-solid btn-lg" href="../app.html?tool=fourier">Open the fourier series tool</a><span class="fine">Free, no account. Runs in your browser and works offline.</span></p>
+
+        <section class="sec" aria-labelledby="h-eg">
+            <h2 id="h-eg">Worked examples</h2>
+            <p>Each answer below was computed by the tool itself. Open one to see the steps and the plot.</p>
+            <ol class="eg-table">
+                <li><div class="eg-q"><b>Square wave sign(x) – Gibbs phenomenon</b><code>sign(x)</code></div><div class="eg-a"><code>k = 1: aₖ = 0,   bₖ = 1.27324</code><br><code>k = 2: aₖ = 0,   bₖ = 0</code><br><code>k = 3: aₖ = 0,   bₖ = 0.424413</code></div><a class="eg-open" href="../app.html#s=eyJtIjoiZm91cmllciIsImYiOiJzaWduKHgpIiwibyI6eyJsb3dlciI6Ii1waSIsInVwcGVyIjoicGkiLCJ0ZXJtcyI6IjE1In19">Open with steps</a></li>
+                <li><div class="eg-q"><b>Sawtooth f(x) = x</b><code>x</code></div><div class="eg-a"><code>k = 1: aₖ = 0,   bₖ = 2</code><br><code>k = 2: aₖ = 0,   bₖ = -1</code><br><code>k = 3: aₖ = 0,   bₖ = 2/3</code></div><a class="eg-open" href="../app.html#s=eyJtIjoiZm91cmllciIsImYiOiJ4IiwibyI6eyJsb3dlciI6Ii1waSIsInVwcGVyIjoicGkiLCJ0ZXJtcyI6IjEwIn19">Open with steps</a></li>
+                <li><div class="eg-q"><b>Triangle wave |x|</b><code>abs(x)</code></div><div class="eg-a"><code>k = 1: aₖ = -1.27324,   bₖ = 0</code><br><code>k = 2: aₖ = 0,   bₖ = 0</code><br><code>k = 3: aₖ = -0.141471,   bₖ = 0</code></div><a class="eg-open" href="../app.html#s=eyJtIjoiZm91cmllciIsImYiOiJhYnMoeCkiLCJvIjp7Imxvd2VyIjoiLXBpIiwidXBwZXIiOiJwaSIsInRlcm1zIjoiNiJ9fQ">Open with steps</a></li>
+                <li><div class="eg-q"><b>Parabola x² on [−π, π]</b><code>x^2</code></div><div class="eg-a"><code>k = 1: aₖ = -4,   bₖ = 0</code><br><code>k = 2: aₖ = 1,   bₖ = 0</code><br><code>k = 3: aₖ = -4/9,   bₖ = 0</code></div><a class="eg-open" href="../app.html#s=eyJtIjoiZm91cmllciIsImYiOiJ4XjIiLCJvIjp7Imxvd2VyIjoiLXBpIiwidXBwZXIiOiJwaSIsInRlcm1zIjoiNSJ9fQ">Open with steps</a></li>
+            </ol>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-how">
+            <h2 id="h-how">How it works</h2>
+            <p>The coefficients a₀, aₙ and bₙ are computed by integration, using symmetry to skip terms that vanish for even or odd functions. The plot shows the function with successive partial sums.</p>
+            <h3>How the answer is checked</h3>
+            <p>Parseval's identity is checked: the energy of the function equals the sum of the squared coefficients.</p>
+            <h3>Typing your input</h3>
+            <ul class="plain">
+                <li>Fourier coefficients and the partial-sum approximation of a periodic extension.</li>
+                <li>The default interval is [−π, π]; change it with the limits.</li>
+            </ul>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-faq">
+            <h2 id="h-faq">Questions</h2>
+            <h3>What is the Gibbs phenomenon?</h3>
+            <p>Near a jump, partial sums overshoot by about 9% of the jump however many terms you take. The square-wave example shows it.</p>
+        </section>
+
+        <section class="sec" aria-labelledby="h-rel">
+            <h2 id="h-rel">Related tools</h2>
+            <ul class="rel"><li><a href="laplace-transform-calculator.html">Laplace transform calculator</a></li><li><a href="z-transform-calculator.html">Z-transform calculator</a></li><li><a href="integral-calculator.html">Integral calculator with steps</a></li><li><a href="./">All 31 tool pages</a></li></ul>
+        </section>
+    </main>
+    <footer class="foot">
+        <div class="wrap foot-in">
+            <span>Calculus Suite · MIT licence · free, no account, works offline</span>
+            <span class="foot-links"><a href="../">Home</a><a href="./">All tools</a><a href="../app.html">App</a><a href="../teacher.html">For teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">GitHub</a></span>
+        </div>
+    </footer>
+    <script src="../js/home.js"></script>
+</body>
+</html>

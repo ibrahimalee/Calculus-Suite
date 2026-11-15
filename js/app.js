@@ -1,3 +1,4 @@
+/* global csDialog */
 /*
  * Calculus Suite – user interface
  *
@@ -32,10 +33,10 @@
     const MODES = {
         derivative: {
             label: 'Derivative', icon: '∂',
-            input: () => ({ label: 'f(x)', placeholder: 'e.g. x^2 * sin(x)', hint: 'Differentiate any expression. Use another variable via the option below.' }),
+            input: () => ({ label: 'f(x)', placeholder: 'e.g. x^2 * sin(x)   or   x^2 + y^2 = 25', hint: 'Differentiate any expression. Type an equation in x and y (such as x^2 + y^2 = 25) to differentiate it implicitly.' }),
             fields: [
                 { key: 'order', label: 'Order of derivative', type: 'number', def: '1', min: 1, max: 10 },
-                { key: 'point', label: 'Evaluate / tangent line at (optional)', type: 'text', def: '', placeholder: 'e.g. 2 or pi/4' },
+                { key: 'point', label: 'Evaluate / tangent line at (optional)', type: 'text', def: '', placeholder: 'e.g. 2 or pi/4; for an equation 3, 4' },
                 { key: 'variable', label: 'Variable (blank = auto)', type: 'text', def: '', placeholder: 'x' }
             ],
             examples: [
@@ -43,7 +44,10 @@
                 { label: 'Second derivative of eˣ·cos(x)', fn: 'e^x*cos(x)', opts: { order: '2' } },
                 { label: 'xˣ (logarithmic differentiation)', fn: 'x^x', opts: { point: '2' } },
                 { label: 'arctan(x)·ln(x)', fn: 'atan(x)*ln(x)', opts: {} },
-                { label: 'Partial: x²y with respect to y', fn: 'x^2*y', opts: { variable: 'y' } }
+                { label: 'Partial: x²y with respect to y', fn: 'x^2*y', opts: { variable: 'y' } },
+                { label: 'Implicit: circle x² + y² = 25 at (3, 4)', fn: 'x^2 + y^2 = 25', opts: { point: '3, 4' } },
+                { label: 'Implicit: folium x³ + y³ = 6xy at (3, 3)', fn: 'x^3 + y^3 = 6*x*y', opts: { point: '3, 3' } },
+                { label: 'Implicit second derivative: x² + y² = 25', fn: 'x^2 + y^2 = 25', opts: { order: '2' } }
             ]
         },
         integral: {
@@ -1049,6 +1053,14 @@
                 const m = engine.run.matrix(src, { op: 'transpose' });
                 preview.className = 'preview-box valid';
                 preview.innerHTML = `<span class="preview-tex">${texSpan(m.items[0].tex, m.items[0].text, false)}</span><span class="preview-meta">${esc(m.meta[0] || '')}</span>`;
+                renderTex(preview);
+                return true;
+            }
+            if (state.mode === 'derivative' && /^[^=<>!]*[^=<>!]=[^=][^=]*$/.test(src.trim()) && !/^\s*[a-zA-Z]\w*\s*\(\s*[a-zA-Z]\s*\)\s*=/.test(src)) {
+                const sides = src.split('=').map(x => engine.inspect(x));
+                const vs = [...new Set(sides.flatMap(i => i.vars))];
+                preview.className = 'preview-box valid';
+                preview.innerHTML = `<span class="preview-tex">${texSpan(sides.map(i => i.tex).join('='), src, false)}</span><span class="preview-meta">equation in ${esc(vs.join(', ') || 'no variables')} · implicit differentiation</span>`;
                 renderTex(preview);
                 return true;
             }

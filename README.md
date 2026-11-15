@@ -29,6 +29,14 @@ Questions can use random numbers per student (made from the student's name), par
 
 Open `index.html` or `app.html` directly, or run `npm run serve` and visit http://localhost:8080. The libraries (math.js, Algebrite, Plotly, KaTeX) are in `vendor/`; there is no CDN fallback on purpose. Any static host will serve it as it is. On Vercel, `vercel.json` sets the caching and security headers, including a Content-Security-Policy that allows the inline scripts by hash. If you change an inline script in a page, run `npm run csp` to update those hashes; `npm test` fails when they are stale.
 
+## Search engines
+
+`tools/` holds one page per tool (what it does, worked examples computed by the engine, FAQ and structured data), and `tools/index.html` lists them. They, `robots.txt`, the sitemap and the canonical/Open Graph tags in the main pages are generated from the app by `npm run seo`, so they always match it; `npm test` fails if they are stale. Once the site has its public address, run it once with the address so canonical links and `sitemap.xml` are written:
+
+```
+npm run seo -- --url https://your-domain.example
+```
+
 ## Tests
 
 ```

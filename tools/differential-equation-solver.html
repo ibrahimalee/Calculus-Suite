@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Differential Equation Solver (ODEs) with Steps | Calculus Suite</title>
+    <meta name="description" content="Solve first- and second-order ODEs in closed form where possible, numerically otherwise, with slope fields, phase portraits, systems and series solutions.">
+    <meta name="theme-color" content="#f8f7ef">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Calculus Suite">
+    <meta property="og:title" content="Differential Equation Solver (ODEs) with Steps | Calculus Suite">
+    <meta property="og:description" content="Solve first- and second-order ODEs in closed form where possible, numerically otherwise, with slope fields, phase portraits, systems and series solutions.">
+    <meta property="og:image" content="../og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="../manifest.webmanifest">
+    <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="../css/tokens.css">
+    <link rel="stylesheet" href="../css/home.css">
+    <script src="../js/theme-init.js"></script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Differential equation solver – Calculus Suite","description":"Solve first- and second-order ODEs in closed form where possible, numerically otherwise, with slope fields, phase portraits, systems and series solutions.","applicationCategory":"EducationalApplication","operatingSystem":"Any (runs in a web browser)","browserRequirements":"Requires JavaScript","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does it give a formula or numbers?","acceptedAnswer":{"@type":"Answer","text":"A formula when one exists for the equation type, together with a numerical solution and its plot. Otherwise the numerical solution, clearly labelled."}},{"@type":"Question","name":"Can it solve systems of ODEs?","acceptedAnswer":{"@type":"Answer","text":"Yes, including 3-D systems such as the Lorenz equations, with phase portraits and equilibrium classification for 2-D systems."}}]}</script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="bar">
+        <a class="wordmark" href="../" aria-label="Calculus Suite, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span></a>
+        <nav class="bar-nav" aria-label="Sections"><a href="./">All tools</a><a href="../teacher.html">Teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">Source</a></nav>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
+        <a class="btn btn-solid bar-cta" href="../app.html">Open the app</a>
+    </header>
+    <main id="main" class="wrap tool-page">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <a href="./">Tools</a> <span aria-hidden="true">›</span> <span aria-current="page">Differential equation solver</span></nav>
+        <h1>Differential equation solver</h1>
+        <p class="lede">Solve ordinary differential equations: linear and separable first-order equations, constant-coefficient second-order equations, systems, and anything else numerically, with slope fields and phase portraits.</p>
+        <p class="cta-row"><a class="btn btn-solid btn-lg" href="../app.html?tool=ode">Open the odes tool</a><span class="fine">Free, no account. Runs in your browser and works offline.</span></p>
+
+        <section class="sec" aria-labelledby="h-eg">
+            <h2 id="h-eg">Worked examples</h2>
+            <p>Each answer below was computed by the tool itself. Open one to see the steps and the plot.</p>
+            <ol class="eg-table">
+                <li><div class="eg-q"><b>Linear: y′ = x + y</b><code>x+y</code></div><div class="eg-a"><code>General solution: y = -1 - x + C * exp(x)</code><br><code>Particular solution: y = -1 - x + 2 * exp(x)</code></div><a class="eg-open" href="../app.html#s=eyJtIjoib2RlIiwiZiI6IngreSIsIm8iOnsib2RlVHlwZSI6ImZpcnN0IiwieDAiOiIwIiwieEVuZCI6IjMiLCJyYW5nZSI6IjQiLCJwZGVMIjoicGkiLCJwZGVCQyI6ImRpcmljaGxldCIsInBkZVQiOiIxIiwicGRlSyI6IjEiLCJwZGVWIjoiMCIsInkwIjoiMSIsInYwIjoiMCIsInNlcmllcyI6Im5vIiwidGVybXMiOiI4IiwiaW5pdGlhbCI6IjEsIDAifX0">Open with steps</a></li>
+                <li><div class="eg-q"><b>Separable: y′ = x·y</b><code>x*y</code></div><div class="eg-a"><code>General solution: y = C * exp(1 / 2 * x ^ 2)</code><br><code>Particular solution: y = exp(1 / 2 * x ^ 2)</code></div><a class="eg-open" href="../app.html#s=eyJtIjoib2RlIiwiZiI6IngqeSIsIm8iOnsib2RlVHlwZSI6ImZpcnN0IiwieDAiOiIwIiwieEVuZCI6IjIiLCJyYW5nZSI6IjQiLCJwZGVMIjoicGkiLCJwZGVCQyI6ImRpcmljaGxldCIsInBkZVQiOiIxIiwicGRlSyI6IjEiLCJwZGVWIjoiMCIsInkwIjoiMSIsInYwIjoiMCIsInNlcmllcyI6Im5vIiwidGVybXMiOiI4IiwiaW5pdGlhbCI6IjEsIDAifX0">Open with steps</a></li>
+                <li><div class="eg-q"><b>Logistic growth: y′ = y(1 − y)</b><code>y*(1-y)</code></div><div class="eg-a"><span class="tex"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:1.2772em;vertical-align:-0.345em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.9322em;"><span style="top:-2.655em;"><span class="pstrut" style="height:3em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">d</span><span class="mord mathnormal mtight">x</span></span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.4461em;"><span class="pstrut" style="height:3em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">d</span><span class="mord mathnormal mtight" style="margin-right:0.0359em;">y</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.345em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6389em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">y</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">⋅</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:1em;vertical-align:-0.25em;"></span><span class="minner"><span class="mopen delimcenter" style="top:0em;">(</span><span class="mord">1</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">y</span><span class="mclose delimcenter" style="top:0em;">)</span></span></span></span></span></span></div><a class="eg-open" href="../app.html#s=eyJtIjoib2RlIiwiZiI6InkqKDEteSkiLCJvIjp7Im9kZVR5cGUiOiJmaXJzdCIsIngwIjoiMCIsInhFbmQiOiI4IiwicmFuZ2UiOiI0IiwicGRlTCI6InBpIiwicGRlQkMiOiJkaXJpY2hsZXQiLCJwZGVUIjoiMSIsInBkZUsiOiIxIiwicGRlViI6IjAiLCJ5MCI6IjAuMSIsInYwIjoiMCIsInNlcmllcyI6Im5vIiwidGVybXMiOiI4IiwiaW5pdGlhbCI6IjEsIDAifX0">Open with steps</a></li>
+                <li><div class="eg-q"><b>Spring: y″ = −y</b><code>-y</code></div><div class="eg-a"><code>General solution: y = C₁·cos(x) + C₂·sin(x)</code></div><a class="eg-open" href="../app.html#s=eyJtIjoib2RlIiwiZiI6Ii15IiwibyI6eyJvZGVUeXBlIjoic2Vjb25kIiwieDAiOiIwIiwieEVuZCI6IjEyIiwicmFuZ2UiOiI0IiwicGRlTCI6InBpIiwicGRlQkMiOiJkaXJpY2hsZXQiLCJwZGVUIjoiMSIsInBkZUsiOiIxIiwicGRlViI6IjAiLCJ5MCI6IjEiLCJ2MCI6IjAiLCJzZXJpZXMiOiJubyIsInRlcm1zIjoiOCIsImluaXRpYWwiOiIxLCAwIn19">Open with steps</a></li>
+                <li><div class="eg-q"><b>Power series: y′ = x + y</b><code>x+y</code></div><div class="eg-a"><code>y ≈ 1 + x + x^2 + 1/3*x^3 + 1/12*x^4 + 1/60*x^5 + 1/360*x^6 + 1/2520*x^7 + 1/20160*x^8 + O(x^9)</code><small class="eg-check">✓ Checked: the polynomial agrees with an independent RK4 integration within 1.1e-11 for |x − x₀| ≤ 0.233.</small></div><a class="eg-open" href="../app.html#s=eyJtIjoib2RlIiwiZiI6IngreSIsIm8iOnsib2RlVHlwZSI6ImZpcnN0IiwieDAiOiIwIiwieEVuZCI6IjIiLCJyYW5nZSI6IjQiLCJwZGVMIjoicGkiLCJwZGVCQyI6ImRpcmljaGxldCIsInBkZVQiOiIxIiwicGRlSyI6IjEiLCJwZGVWIjoiMCIsInkwIjoiMSIsInYwIjoiMCIsInNlcmllcyI6InllcyIsInRlcm1zIjoiOCIsImluaXRpYWwiOiIxLCAwIn19">Open with steps</a></li>
+            </ol>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-how">
+            <h2 id="h-how">How it works</h2>
+            <p>Closed forms are found for linear and separable first-order equations and for constant-coefficient second-order equations, with the integrating factor or characteristic equation shown. Other equations are solved with an adaptive Runge–Kutta method.</p>
+            <p>Systems get phase portraits, equilibria are classified from the Jacobian, and power-series solutions are available about a point. The heat and wave equations are solved too.</p>
+            <h3>How the answer is checked</h3>
+            <p>A closed-form solution is substituted back into the equation, and compared with a numerical solution from the initial condition.</p>
+            <h3>Typing your input</h3>
+            <ul class="plain">
+                <li>Type the right-hand side of y′ = f(x, y), for example x + y.</li>
+                <li>For second-order equations use yp for y′.</li>
+                <li>Separate the equations of a system with ;</li>
+            </ul>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-faq">
+            <h2 id="h-faq">Questions</h2>
+            <h3>Does it give a formula or numbers?</h3>
+            <p>A formula when one exists for the equation type, together with a numerical solution and its plot. Otherwise the numerical solution, clearly labelled.</p>
+            <h3>Can it solve systems of ODEs?</h3>
+            <p>Yes, including 3-D systems such as the Lorenz equations, with phase portraits and equilibrium classification for 2-D systems.</p>
+        </section>
+
+        <section class="sec" aria-labelledby="h-rel">
+            <h2 id="h-rel">Related tools</h2>
+            <ul class="rel"><li><a href="laplace-transform-calculator.html">Laplace transform calculator</a></li><li><a href="numerical-methods-calculator.html">Numerical methods calculator</a></li><li><a href="derivative-calculator.html">Derivative calculator with steps</a></li><li><a href="./">All 31 tool pages</a></li></ul>
+        </section>
+    </main>
+    <footer class="foot">
+        <div class="wrap foot-in">
+            <span>Calculus Suite · MIT licence · free, no account, works offline</span>
+            <span class="foot-links"><a href="../">Home</a><a href="./">All tools</a><a href="../app.html">App</a><a href="../teacher.html">For teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">GitHub</a></span>
+        </div>
+    </footer>
+    <script src="../js/home.js"></script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Unit Converter with Dimension Checks | Calculus Suite</title>
+    <meta name="description" content="Convert speed, temperature, length, volume, pressure, energy and time, with a check that the units are compatible.">
+    <meta name="theme-color" content="#f8f7ef">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Calculus Suite">
+    <meta property="og:title" content="Unit Converter with Dimension Checks | Calculus Suite">
+    <meta property="og:description" content="Convert speed, temperature, length, volume, pressure, energy and time, with a check that the units are compatible.">
+    <meta property="og:image" content="../og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="../manifest.webmanifest">
+    <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="../css/tokens.css">
+    <link rel="stylesheet" href="../css/home.css">
+    <script src="../js/theme-init.js"></script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Unit converter – Calculus Suite","description":"Convert speed, temperature, length, volume, pressure, energy and time, with a check that the units are compatible.","applicationCategory":"EducationalApplication","operatingSystem":"Any (runs in a web browser)","browserRequirements":"Requires JavaScript","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why does it refuse my conversion?","acceptedAnswer":{"@type":"Answer","text":"Because the dimensions differ, for example metres to seconds."}}]}</script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="bar">
+        <a class="wordmark" href="../" aria-label="Calculus Suite, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span></a>
+        <nav class="bar-nav" aria-label="Sections"><a href="./">All tools</a><a href="../teacher.html">Teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">Source</a></nav>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
+        <a class="btn btn-solid bar-cta" href="../app.html">Open the app</a>
+    </header>
+    <main id="main" class="wrap tool-page">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <a href="./">Tools</a> <span aria-hidden="true">›</span> <span aria-current="page">Unit converter</span></nav>
+        <h1>Unit converter</h1>
+        <p class="lede">Convert between units by typing naturally, such as 5 km/h to m/s or 72 degF to degC. Incompatible units are refused with an explanation.</p>
+        <p class="cta-row"><a class="btn btn-solid btn-lg" href="../app.html?tool=units">Open the units tool</a><span class="fine">Free, no account. Runs in your browser and works offline.</span></p>
+
+        <section class="sec" aria-labelledby="h-eg">
+            <h2 id="h-eg">Worked examples</h2>
+            <p>Each answer below was computed by the tool itself. Open one to see the steps and the plot.</p>
+            <ol class="eg-table">
+                <li><div class="eg-q"><b>5 km/h → m/s</b><code>5 km/h to m/s</code></div><div class="eg-a"><code>Result: 1.3888888889 m / s</code></div><a class="eg-open" href="../app.html#s=eyJtIjoidW5pdHMiLCJmIjoiNSBrbS9oIHRvIG0vcyIsIm8iOnt9fQ">Open with steps</a></li>
+                <li><div class="eg-q"><b>72 °F → °C</b><code>72 degF to degC</code></div><div class="eg-a"><code>Result: 22.2222222222 degC</code></div><a class="eg-open" href="../app.html#s=eyJtIjoidW5pdHMiLCJmIjoiNzIgZGVnRiB0byBkZWdDIiwibyI6e319">Open with steps</a></li>
+                <li><div class="eg-q"><b>100 mph → km/h</b><code>100 mph to km/h</code></div><div class="eg-a"><code>Result: 160.9344 km / h</code></div><a class="eg-open" href="../app.html#s=eyJtIjoidW5pdHMiLCJmIjoiMTAwIG1waCB0byBrbS9oIiwibyI6e319">Open with steps</a></li>
+                <li><div class="eg-q"><b>2.5 L → US gallons</b><code>2.5 liter to gallon</code></div><div class="eg-a"><code>Result: 0.6604300932 gallon</code></div><a class="eg-open" href="../app.html#s=eyJtIjoidW5pdHMiLCJmIjoiMi41IGxpdGVyIHRvIGdhbGxvbiIsIm8iOnt9fQ">Open with steps</a></li>
+                <li><div class="eg-q"><b>1 atm → psi</b><code>1 atm to psi</code></div><div class="eg-a"><code>Result: 14.6959487764 psi</code></div><a class="eg-open" href="../app.html#s=eyJtIjoidW5pdHMiLCJmIjoiMSBhdG0gdG8gcHNpIiwibyI6e319">Open with steps</a></li>
+            </ol>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-how">
+            <h2 id="h-how">How it works</h2>
+            <p>Units are parsed with their dimensions, so compound units such as km/h or kg·m/s² convert correctly.</p>
+            <h3>How the answer is checked</h3>
+            <p>The dimensions of both sides are compared before converting.</p>
+            <h3>Typing your input</h3>
+            <ul class="plain">
+                <li>Length, mass, time, temperature (degC, degF, K), speed, area, volume, energy, power, pressure … with + − × ÷ and “to”.</li>
+                <li>Write value unit to unit, for example 1 mile to km.</li>
+            </ul>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-faq">
+            <h2 id="h-faq">Questions</h2>
+            <h3>Why does it refuse my conversion?</h3>
+            <p>Because the dimensions differ, for example metres to seconds.</p>
+        </section>
+
+        <section class="sec" aria-labelledby="h-rel">
+            <h2 id="h-rel">Related tools</h2>
+            <ul class="rel"><li><a href="scientific-calculator.html">Calculator with exact fractions</a></li><li><a href="./">All 31 tool pages</a></li></ul>
+        </section>
+    </main>
+    <footer class="foot">
+        <div class="wrap foot-in">
+            <span>Calculus Suite · MIT licence · free, no account, works offline</span>
+            <span class="foot-links"><a href="../">Home</a><a href="./">All tools</a><a href="../app.html">App</a><a href="../teacher.html">For teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">GitHub</a></span>
+        </div>
+    </footer>
+    <script src="../js/home.js"></script>
+</body>
+</html>

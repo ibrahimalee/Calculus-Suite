@@ -2253,19 +2253,25 @@
         const D = a * a - 4 * b;
         let basis, text, tex;
         const r1 = (-a + Math.sqrt(Math.max(D, 0))) / 2, r2 = (-a - Math.sqrt(Math.max(D, 0))) / 2;
+        // tidy coefficients: 1·x → x, e^(0·x) → (nothing)
+        const kx = k => (Math.abs(k - 1) < 1e-12 ? 'x' : Math.abs(k + 1) < 1e-12 ? '-x' : `${fmt(k)}·x`);
+        const kxT = k => (Math.abs(k - 1) < 1e-12 ? 'x' : Math.abs(k + 1) < 1e-12 ? '-x' : `${fmt(k)}x`);
+        const ex = k => (Math.abs(k) < 1e-12 ? '' : `e^(${kx(k)})`), exT = k => (Math.abs(k) < 1e-12 ? '' : `e^{${kxT(k)}}`);
+        const term = (c, k) => (Math.abs(k) < 1e-12 ? c : `${c}·${ex(k)}`), termT = (c, k) => (Math.abs(k) < 1e-12 ? c : `${c}${exT(k)}`);
         if (Math.abs(D) < 1e-12) {
             const r = -a / 2;
             basis = [x => Math.exp(r * x), x => x * Math.exp(r * x)];
-            text = `y = (C₁ + C₂·x)·e^(${fmt(r)}·x)`; tex = `y=(C_1+C_2x)e^{${fmt(r)}x}`;
+            text = Math.abs(r) < 1e-12 ? 'y = C₁ + C₂·x' : `y = (C₁ + C₂·x)·${ex(r)}`; tex = Math.abs(r) < 1e-12 ? 'y=C_1+C_2x' : `y=(C_1+C_2x)${exT(r)}`;
             info.steps.push({ title: 'Repeated root', text: `r = ${fmt(r)} (double root)`, tex: `r=${fmt(r)}` });
         } else if (D > 0) {
             basis = [x => Math.exp(r1 * x), x => Math.exp(r2 * x)];
-            text = `y = C₁·e^(${fmt(r1)}·x) + C₂·e^(${fmt(r2)}·x)`; tex = `y=C_1e^{${fmt(r1)}x}+C_2e^{${fmt(r2)}x}`;
+            text = `y = ${term('C₁', r1)} + ${term('C₂', r2)}`; tex = `y=${termT('C_1', r1)}+${termT('C_2', r2)}`;
             info.steps.push({ title: 'Two real roots', text: `r₁ = ${fmt(r1)}, r₂ = ${fmt(r2)}`, tex: `r_1=${fmt(r1)},\\;r_2=${fmt(r2)}` });
         } else {
             const al = -a / 2, be = Math.sqrt(-D) / 2;
             basis = [x => Math.exp(al * x) * Math.cos(be * x), x => Math.exp(al * x) * Math.sin(be * x)];
-            text = `y = e^(${fmt(al)}·x)·(C₁·cos(${fmt(be)}·x) + C₂·sin(${fmt(be)}·x))`; tex = `y=e^{${fmt(al)}x}\\left(C_1\\cos(${fmt(be)}x)+C_2\\sin(${fmt(be)}x)\\right)`;
+            const inner = `C₁·cos(${kx(be)}) + C₂·sin(${kx(be)})`, innerT = `C_1\\cos(${kxT(be)})+C_2\\sin(${kxT(be)})`;
+            text = Math.abs(al) < 1e-12 ? `y = ${inner}` : `y = ${ex(al)}·(${inner})`; tex = Math.abs(al) < 1e-12 ? `y=${innerT}` : `y=${exT(al)}\\left(${innerT}\\right)`;
             info.steps.push({ title: 'Complex roots', text: `r = ${fmt(al)} ± ${fmt(be)}i`, tex: `r=${fmt(al)}\\pm ${fmt(be)}i` });
         }
         info.generalText = text; info.generalTex = tex;
@@ -2768,7 +2774,11 @@
         }
         const nv = nice(value, opt.digits);
         const unit = { area: '', arclength: '', volumex: '', volumey: '', surface: '', average: '' }[op];
-        r.main = { label, text: (exact ? strOf(exact) + ' ≈ ' : '') + fmt(value, opt.digits), tex: `${exact ? texOf(exact) + '\\approx ' : ''}${fmt(value, opt.digits)}${unit}` };
+        // an "exact" form that is only a long decimal, or that prints the same as the rounded value, adds nothing
+        const exactShown = exact && !/^-?\d+(\.\d+)?(e[-+]?\d+)?$/i.test(strOf(exact).trim()) ? exact : (exact && /^-?\d+$/.test(strOf(exact).trim()) ? exact : null);
+        const sameAsValue = exactShown && strOf(exactShown).trim() === fmt(value, opt.digits);
+        const ex2 = sameAsValue ? null : exactShown;
+        r.main = { label, text: (ex2 ? strOf(ex2) + ' ≈ ' : '') + fmt(value, opt.digits), tex: `${ex2 ? texOf(ex2) + '\\approx ' : ''}${fmt(value, opt.digits)}${unit}` };
         r.items.push({ label: 'Integrand:', text: strOf(integrand), tex: `${texOf(integrand)}` });
         r.items.push({ label: 'Interval:', text: `[${strOf(a.node)}, ${strOf(b.node)}]`, tex: '' });
         if (nv.text !== fmt(value, opt.digits) && !exact) r.items.push({ label: 'Recognised as:', text: nv.text, tex: nv.tex });
@@ -2849,7 +2859,8 @@
         }
         const last = rows[rows.length - 1];
         const conv = last && Number.isFinite(last.fx) && Math.abs(last.fx) < 1e-8 * Math.max(1, Math.abs(last.x));
-        r.main = { label: conv ? 'Root ≈' : 'Last iterate ≈', text: fmt(x, 12), tex: `${v}\\approx ${fmt(x, 12)}` };
+        r.main = conv ? { label: 'Root ≈', text: fmt(x, 12), tex: `${v}\\approx ${fmt(x, 12)}` }
+            : { label: 'No root found:', text: `the iteration did not converge (last iterate ${v} ≈ ${fmt(x, 8)}, where f = ${Number.isFinite(f(x)) ? fmt(f(x), 6) : 'undefined'})`, tex: '' };
         r.items.push({ label: 'f(root):', text: Number.isFinite(f(x)) ? f(x).toExponential(3) : 'undefined', tex: '' });
         if (conv) { const nv = nice(x, 10, 1e-9); if (nv.text !== fmt(x, 12)) r.items.push({ label: 'Recognised as:', text: nv.text, tex: nv.tex }); }
         else r.warnings.push('The iteration did not converge within the step limit.');
@@ -3135,11 +3146,25 @@
     }
 
     // ------------------------------------ Calculator ------------------------------------
+    let fracMath = null;
+    /** The exact value of `expr` as a fraction, or null when it is not a rational number (or cannot be evaluated exactly). */
+    function exactFraction(expr, scope, exactVars) {
+        try {
+            if (!fracMath) fracMath = math.create(math.all, { number: 'Fraction' });
+            const fs = {}; Object.keys(scope).forEach(k => { const v = scope[k]; if (v && v.isFraction) fs[k] = v; else if (typeof v === 'number' && Number.isInteger(v)) fs[k] = fracMath.fraction(v); });
+            Object.assign(fs, exactVars || {});
+            const v = fracMath.evaluate(expr, fs);
+            if (!v || !v.isFraction || Number(v.d) === 1 || Number(v.d) > 1e12) return null;
+            const n = Number(v.s) * Number(v.n), d = Number(v.d);
+            return { value: v, text: `${n}/${d}`, tex: `${n < 0 ? '-' : ''}\\frac{${Math.abs(n)}}{${d}}` };
+        } catch (e) { return null; }
+    }
     function runCalc(src, opt) {
         const lines = String(src).split(/\n|;(?![^(]*\))/).map(t => t.trim()).filter(Boolean);
         if (!lines.length) throw new CalcError('Type an expression, e.g.  2^10 + sqrt(2)');
         if (lines.length > 40) throw new CalcError('Up to 40 lines at a time');
         const scope = { deg: Math.PI / 180, ans: 0, i: math.complex(0, 1) };
+        const exactVars = {}; // variables whose value is an exact fraction, so a = 2/3 then a^2 stays exact
         const r = makeResult('calc', 'Calculator');
         let last = null;
         const digits = opt.digits || 12;
@@ -3163,9 +3188,14 @@
                 num = val;
                 const n = nice(val, digits, 1e-12), c = recogniseConst(val);
                 text = Number.isFinite(val) ? (Number.isInteger(val) && Math.abs(val) <= 9007199254740992 ? String(val) : fmt(val, digits)) : fmt(val);
-                const exact = Number.isInteger(val) ? null : (c ? c.text : (/^-?\d+\/\d+$/.test(n.text) ? n.text : null));
+                // a fraction is shown only when the input really is rational (evaluated in exact fraction arithmetic);
+                // a decimal that merely looks like a fraction, such as 2^10 + sqrt(2), is not turned into one
+                const fr = Number.isInteger(val) ? null : exactFraction(expr, scope, exactVars);
+                if (fr) exactVars[name || 'ans'] = fr.value; else delete exactVars[name || 'ans'];
+                const exact = Number.isInteger(val) ? null : (fr ? fr.text : (c ? c.text : null));
                 if (exact) text = `${exact} ≈ ${fmt(val, digits)}`;
-                tex = exact ? `${(c ? c.tex : n.tex)}\\approx ${fmt(val, digits)}` : '';
+                tex = exact ? `${(fr ? fr.tex : c.tex)}\\approx ${fmt(val, digits)}` : '';
+                void n;
                 if (Number.isInteger(val) && Math.abs(val) > 9007199254740992) text = val.toExponential(digits - 1);
                 if (val !== 0 && Math.abs(val) < 1e-14 && !name) text = `0   (floating-point noise: ${val.toExponential(3)})`;
             } else {

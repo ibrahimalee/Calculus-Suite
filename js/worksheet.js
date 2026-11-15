@@ -1,3 +1,4 @@
+/* global csDialog */
 /* Student worksheet page: reads the worksheet from the link, collects answers, produces the submission code. */
 (function () {
     'use strict';

@@ -20,7 +20,8 @@ test('every inline script is allowed by hash in the Content-Security-Policy of e
 test('no page loads a script or stylesheet from another origin', () => {
     for (const f of ['index.html', 'app.html', 'teacher.html', 'worksheet.html']) {
         const html = fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
-        const urls = [...html.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)].map(m => m[1]).filter(u => !/github\.com\/ibrahimalee/.test(u));
+        // resources the page loads: script/img src, and stylesheet, preload, icon and manifest links (canonical links are not loads)
+        const urls = [...html.matchAll(/\bsrc="(https?:\/\/[^"]+)"/g), ...html.matchAll(/<link\b(?=[^>]*\brel="(?:stylesheet|preload|modulepreload|icon|apple-touch-icon|manifest)")[^>]*\bhref="(https?:\/\/[^"]+)"/g)].map(m => m[1]);
         assert.deepEqual(urls, [], f + ' references external resources');
     }
 });

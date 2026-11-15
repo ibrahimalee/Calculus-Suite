@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Prime Factorisation, GCD and Modular Arithmetic Calculator | Calculus Suite</title>
+    <meta name="description" content="Prime factorisation, primality tests, gcd with Bézout coefficients, modular inverses and powers, CRT, Diophantine equations, continued fractions and Pell equations.">
+    <meta name="theme-color" content="#f8f7ef">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Calculus Suite">
+    <meta property="og:title" content="Prime Factorisation, GCD and Modular Arithmetic Calculator | Calculus Suite">
+    <meta property="og:description" content="Prime factorisation, primality tests, gcd with Bézout coefficients, modular inverses and powers, CRT, Diophantine equations, continued fractions and Pell equations.">
+    <meta property="og:image" content="../og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="../manifest.webmanifest">
+    <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="../css/tokens.css">
+    <link rel="stylesheet" href="../css/home.css">
+    <script src="../js/theme-init.js"></script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Number theory calculator – Calculus Suite","description":"Prime factorisation, primality tests, gcd with Bézout coefficients, modular inverses and powers, CRT, Diophantine equations, continued fractions and Pell equations.","applicationCategory":"EducationalApplication","operatingSystem":"Any (runs in a web browser)","browserRequirements":"Requires JavaScript","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How large a number can it factor?","acceptedAnswer":{"@type":"Answer","text":"Numbers far beyond 64 bits are handled with exact big-integer arithmetic; very hard numbers with two large prime factors can take a while."}}]}</script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="bar">
+        <a class="wordmark" href="../" aria-label="Calculus Suite, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span></a>
+        <nav class="bar-nav" aria-label="Sections"><a href="./">All tools</a><a href="../teacher.html">Teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">Source</a></nav>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
+        <a class="btn btn-solid bar-cta" href="../app.html">Open the app</a>
+    </header>
+    <main id="main" class="wrap tool-page">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <a href="./">Tools</a> <span aria-hidden="true">›</span> <span aria-current="page">Number theory calculator</span></nav>
+        <h1>Number theory calculator</h1>
+        <p class="lede">Factor large integers, test for primes, find gcds with Bézout coefficients, work modulo n, and solve Diophantine and Pell equations.</p>
+        <p class="cta-row"><a class="btn btn-solid btn-lg" href="../app.html?tool=number">Open the number theory tool</a><span class="fine">Free, no account. Runs in your browser and works offline.</span></p>
+
+        <section class="sec" aria-labelledby="h-eg">
+            <h2 id="h-eg">Worked examples</h2>
+            <p>Each answer below was computed by the tool itself. Open one to see the steps and the plot.</p>
+            <ol class="eg-table">
+                <li><div class="eg-q"><b>Factorise 360</b><code>360</code></div><div class="eg-a"><span class="tex"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">360</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.8141em;"></span><span class="mord"><span class="mord">2</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">3</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">⋅</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.8141em;"></span><span class="mord"><span class="mord">3</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">⋅</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">5</span></span></span></span></span><small class="eg-check">✓ Checked: the factors multiply back to 360.</small></div><a class="eg-open" href="../app.html#s=eyJtIjoibnVtYmVyIiwiZiI6IjM2MCIsIm8iOnsib3AiOiJmYWN0b3IifX0">Open with steps</a></li>
+                <li><div class="eg-q"><b>Factorise 600851475143</b><code>600851475143</code></div><div class="eg-a"><span class="tex"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">600851475143</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">71</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">⋅</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">839</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">⋅</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">1471</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">⋅</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">6857</span></span></span></span></span><small class="eg-check">✓ Checked: the factors multiply back to 600851475143.</small></div><a class="eg-open" href="../app.html#s=eyJtIjoibnVtYmVyIiwiZiI6IjYwMDg1MTQ3NTE0MyIsIm8iOnsib3AiOiJmYWN0b3IifX0">Open with steps</a></li>
+                <li><div class="eg-q"><b>Is 10⁹+7 prime?</b><code>1000000007</code></div><div class="eg-a"><code>1000000007 is prime</code></div><a class="eg-open" href="../app.html#s=eyJtIjoibnVtYmVyIiwiZiI6IjEwMDAwMDAwMDciLCJvIjp7Im9wIjoiaXNwcmltZSJ9fQ">Open with steps</a></li>
+                <li><div class="eg-q"><b>gcd(48, 18) with Bézout</b><code>48, 18</code></div><div class="eg-a"><code>gcd(48, 18) = 6</code></div><a class="eg-open" href="../app.html#s=eyJtIjoibnVtYmVyIiwiZiI6IjQ4LCAxOCIsIm8iOnsib3AiOiJnY2QifX0">Open with steps</a></li>
+                <li><div class="eg-q"><b>3⁻¹ mod 11</b><code>3, 11</code></div><div class="eg-a"><span class="tex"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:0.8141em;"></span><span class="mord"><span class="mord">3</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">−</span><span class="mord mtight">1</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">≡</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">4</span><span class="mspace allowbreak"></span><span class="mspace" style="margin-right:0.4444em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord"><span class="mord"><span class="mord mathrm">mod</span></span></span><span class="mspace" style="margin-right:0.3333em;"></span><span class="mord">11</span><span class="mclose">)</span></span></span></span></span><small class="eg-check">✓ Checked: 3·4 ≡ 1 (mod 11).</small></div><a class="eg-open" href="../app.html#s=eyJtIjoibnVtYmVyIiwiZiI6IjMsIDExIiwibyI6eyJvcCI6Im1vZGludiJ9fQ">Open with steps</a></li>
+                <li><div class="eg-q"><b>Diophantine: 12x + 18y = 60</b><code>12, 18, 60</code></div><div class="eg-a"><span class="tex"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:0.4306em;"></span><span class="mord mathnormal">x</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">−</span><span class="mord">10</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.8389em;vertical-align:-0.1944em;"></span><span class="mord">3</span><span class="mord mathnormal">t</span><span class="mpunct">,</span><span class="mspace"> </span><span class="mspace"> </span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">y</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">10</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">2</span><span class="mord mathnormal">t</span></span></span></span></span><small class="eg-check">✓ Checked: the extended Euclidean algorithm gave a particular solution, and seven members of the general solution were substituted back into 12x + 18y = 60.</small></div><a class="eg-open" href="../app.html#s=eyJtIjoibnVtYmVyIiwiZiI6IjEyLCAxOCwgNjAiLCJvIjp7Im9wIjoiZGlvcGgifX0">Open with steps</a></li>
+            </ol>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-how">
+            <h2 id="h-how">How it works</h2>
+            <p>Factorisation uses trial division and Pollard's rho; primality uses Miller–Rabin. The extended Euclidean algorithm is shown step by step.</p>
+            <h3>How the answer is checked</h3>
+            <p>Factorisations are multiplied back, and modular answers are verified by substitution.</p>
+            <h3>Typing your input</h3>
+            <ul class="plain">
+                <li>Separate several numbers with commas.</li>
+            </ul>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-faq">
+            <h2 id="h-faq">Questions</h2>
+            <h3>How large a number can it factor?</h3>
+            <p>Numbers far beyond 64 bits are handled with exact big-integer arithmetic; very hard numbers with two large prime factors can take a while.</p>
+        </section>
+
+        <section class="sec" aria-labelledby="h-rel">
+            <h2 id="h-rel">Related tools</h2>
+            <ul class="rel"><li><a href="scientific-calculator.html">Calculator with exact fractions</a></li><li><a href="truth-table-generator.html">Truth tables, Boolean algebra and graphs</a></li><li><a href="./">All 31 tool pages</a></li></ul>
+        </section>
+    </main>
+    <footer class="foot">
+        <div class="wrap foot-in">
+            <span>Calculus Suite · MIT licence · free, no account, works offline</span>
+            <span class="foot-links"><a href="../">Home</a><a href="./">All tools</a><a href="../app.html">App</a><a href="../teacher.html">For teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">GitHub</a></span>
+        </div>
+    </footer>
+    <script src="../js/home.js"></script>
+</body>
+</html>

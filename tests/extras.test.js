@@ -16,7 +16,7 @@ test('matrix row operations', () => {
 const close = (a, b, tol = 1e-6) => assert.ok(Math.abs(a - b) <= tol * Math.max(1, Math.abs(b)), `${a} vs ${b}`);
 const num = t => parseFloat(String(t).replace(/[^\d.eE+-]/g, ' ').trim().split(/\s+/)[0]);
 test('Laplace transform table', () => {
-  assert.equal(E.run.laplace('t^2*exp(-3t)', {}).main.text, '(2) / ((s + 3)^3)');
+  assert.equal(E.run.laplace('t^2*exp(-3t)', {}).main.text, '2 / (s + 3)^3');
   assert.ok(E.run.laplace('sin(2t)*cos(t)', {}).meta.some(m => /Verified/.test(m)));
   assert.ok(E.run.laplace('(s+3)/(s^2+2s+5)', { op: 'inverse' }).meta.some(m => /Verified/.test(m)));
   assert.ok(E.run.laplace('1/(s*(s+1)^2)', { op: 'inverse' }).meta.some(m => /Verified/.test(m)));
@@ -370,4 +370,39 @@ test('conservative fields: potential function, non-conservative detection and pa
   const V = (s, o) => E.run.vector(s, Object.assign({ op: 'potential' }, o)); const r = V('2*x*y ; x^2 + 3*y^2', { pa: '0,0', pb: '1,2' }); assert.match(r.main.text, /x \^ 2 \* y \+ y \^ 3 \+ C/); assert.match(txt(r), /= 10/); assert.ok(r.meta.some(m => /numerical line integral/.test(m)));
   assert.match(V('y*z ; x*z ; x*y', {}).main.text, /^[xyz] \* [xyz] \* [xyz] \+ C$/); assert.match(V('y ; -x', {}).main.label, /not conservative/); assert.match(V('x^2*y ; x^3', {}).main.label, /not conservative/); assert.match(V('y*cos(x*y) + 2*x ; x*cos(x*y) + 3*y^2', {}).main.text, /sin\(x \* y\)/);
   assert.throws(() => V('x ; y ; z ; w', {}), /two or three/); assert.throws(() => V('x ; t', {}), /variables must be/); assert.throws(() => V('2*x*y ; x^2', { pa: '0' }), /both end points/);
+});
+
+test('implicit differentiation: formula, slope and tangent at a point, numerical check', () => {
+  const r = E.run.derivative('x^2 + y^2 = 25', { point: '3, 4' });
+  assert.equal(r.main.label, 'dy/dx =');
+  const at = (s, x, y) => math.evaluate(s.replace(/\bx\b/g, `(${x})`).replace(/\by\b/g, `(${y})`));
+  assert.ok(Math.abs(at(r.main.text, 3, 4) + 0.75) < 1e-12);
+  assert.ok(r.items.some(i => /Slope at \(3, 4\)/.test(i.label) && /-3\/4/.test(i.text)));
+  assert.ok(r.meta.some(m => /^Verified: solving the equation numerically/.test(m)));
+  assert.ok(r.plot && r.plot.generic && r.plot.generic.traces[0].type === 'contour');
+  // only x given: every point of the curve with that x
+  const two = E.run.derivative('x^2 + y^2 = 25', { point: '3' });
+  assert.equal(two.items.filter(i => /^Slope at/.test(i.label)).length, 2);
+  // second derivative of the circle is -25/y^3 on the curve
+  const d2 = E.run.derivative('x^2 + y^2 = 25', { order: '2' });
+  assert.ok(Math.abs(at(d2.main.text, 3, 4) + 25 / 64) < 1e-12);
+  // "6xy" means 6·x·y in an equation
+  const f = E.run.derivative('x^3 + y^3 = 6xy', { point: '3, 3' });
+  assert.ok(f.items.some(i => /Slope at/.test(i.label) && /-1$/.test(i.text)));
+  // a point off the curve is flagged, not silently used
+  assert.ok(E.run.derivative('x*y = 1', { point: '2, 7' }).warnings.some(w => /not on the curve/.test(w)));
+  assert.throws(() => E.run.derivative('x^2 = 4', {}), /exactly two variables/);
+  assert.throws(() => E.run.derivative('x + y + z = 1', {}), /exactly two variables/);
+  assert.throws(() => E.run.derivative('x^2 + y^2 = 25', { order: '5' }), /order can be 1, 2 or 3/);
+  // f(x) = … is still an ordinary derivative
+  assert.equal(E.run.derivative('f(x) = x^3', {}).main.text, '3 * x ^ 2');
+});
+
+test('transforms and the complex plane refuse infinite constants; Laplace answers use plain brackets', () => {
+  for (const [tool, src, op] of [['laplace', 'Infinity', undefined], ['laplace', '1e5000', 'iztrans'], ['complex', 'Infinity', 'domain'], ['complex', '1e5000', undefined]]) {
+    assert.throws(() => E.run[tool](src, op ? { op } : {}), /infinite or too large/);
+  }
+  assert.equal(E.run.laplace('exp(-t)', {}).main.text, '1 / (s + 1)');
+  assert.equal(E.run.laplace('t^2', {}).main.text, '2 / s^3');
+  assert.equal(E.run.laplace('5', {}).main.text, '5 / s');
 });

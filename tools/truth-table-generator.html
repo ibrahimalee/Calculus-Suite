@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Truth Table Generator and Boolean Simplifier | Calculus Suite</title>
+    <meta name="description" content="Truth tables, tautology tests, canonical forms and Quine–McCluskey minimisation, plus shortest paths, spanning trees and Euler trails for graphs.">
+    <meta name="theme-color" content="#f8f7ef">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Calculus Suite">
+    <meta property="og:title" content="Truth Table Generator and Boolean Simplifier | Calculus Suite">
+    <meta property="og:description" content="Truth tables, tautology tests, canonical forms and Quine–McCluskey minimisation, plus shortest paths, spanning trees and Euler trails for graphs.">
+    <meta property="og:image" content="../og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="../manifest.webmanifest">
+    <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="../css/tokens.css">
+    <link rel="stylesheet" href="../css/home.css">
+    <script src="../js/theme-init.js"></script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Truth tables, Boolean algebra and graphs – Calculus Suite","description":"Truth tables, tautology tests, canonical forms and Quine–McCluskey minimisation, plus shortest paths, spanning trees and Euler trails for graphs.","applicationCategory":"EducationalApplication","operatingSystem":"Any (runs in a web browser)","browserRequirements":"Requires JavaScript","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How large an expression can it handle?","acceptedAnswer":{"@type":"Answer","text":"Up to a dozen or so variables comfortably; the truth table doubles in size with each variable."}}]}</script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="bar">
+        <a class="wordmark" href="../" aria-label="Calculus Suite, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span></a>
+        <nav class="bar-nav" aria-label="Sections"><a href="./">All tools</a><a href="../teacher.html">Teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">Source</a></nav>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
+        <a class="btn btn-solid bar-cta" href="../app.html">Open the app</a>
+    </header>
+    <main id="main" class="wrap tool-page">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <a href="./">Tools</a> <span aria-hidden="true">›</span> <span aria-current="page">Truth tables, Boolean algebra and graphs</span></nav>
+        <h1>Truth tables, Boolean algebra and graphs</h1>
+        <p class="lede">Generate a truth table, test for a tautology, find the canonical forms and a minimal expression; or run shortest-path and spanning-tree algorithms on a graph.</p>
+        <p class="cta-row"><a class="btn btn-solid btn-lg" href="../app.html?tool=discrete">Open the discrete maths tool</a><span class="fine">Free, no account. Runs in your browser and works offline.</span></p>
+
+        <section class="sec" aria-labelledby="h-eg">
+            <h2 id="h-eg">Worked examples</h2>
+            <p>Each answer below was computed by the tool itself. Open one to see the steps and the plot.</p>
+            <ol class="eg-table">
+                <li><div class="eg-q"><b>Minimise (A ∧ B) ∨ (¬A ∧ C)</b><code>(A and B) or (not A and C)</code></div><div class="eg-a"><code>Minimal sum of products: (¬A ∧ C) ∨ (A ∧ B)</code><small class="eg-check">✓ Checked: the minimised form was evaluated on all 8 input rows and matches the original expression on every one; 2 terms cover all 4 minterms with 3 prime implicants available.</small></div><a class="eg-open" href="../app.html#s=eyJtIjoiZGlzY3JldGUiLCJmIjoiKEEgYW5kIEIpIG9yIChub3QgQSBhbmQgQykiLCJvIjp7Im9wIjoidHJ1dGgiLCJnc3JjIjoiIiwiZ2RzdCI6IiJ9fQ">Open with steps</a></li>
+                <li><div class="eg-q"><b>Implication A → B</b><code>A -&gt; B</code></div><div class="eg-a"><code>Minimal sum of products: ¬A ∨ B</code><small class="eg-check">✓ Checked: the minimised form was evaluated on all 4 input rows and matches the original expression on every one; 2 terms cover all 3 minterms with 2 prime implicants available.</small></div><a class="eg-open" href="../app.html#s=eyJtIjoiZGlzY3JldGUiLCJmIjoiQSAtPiBCIiwibyI6eyJvcCI6InRydXRoIiwiZ3NyYyI6IiIsImdkc3QiOiIifX0">Open with steps</a></li>
+                <li><div class="eg-q"><b>Hypothetical syllogism is a tautology</b><code>(P -&gt; Q) and (Q -&gt; R) -&gt; (P -&gt; R)</code></div><div class="eg-a"><code>The expression is a tautology (always true)</code><small class="eg-check">✓ Verified by evaluating the expression on all 8 input rows.</small></div><a class="eg-open" href="../app.html#s=eyJtIjoiZGlzY3JldGUiLCJmIjoiKFAgLT4gUSkgYW5kIChRIC0-IFIpIC0-IChQIC0-IFIpIiwibyI6eyJvcCI6InRydXRoIiwiZ3NyYyI6IiIsImdkc3QiOiIifX0">Open with steps</a></li>
+                <li><div class="eg-q"><b>Minimise a four-variable function</b><code>(A xor B) or (C and D)</code></div><div class="eg-a"><code>Minimal sum of products: (C ∧ D) ∨ (¬A ∧ B) ∨ (A ∧ ¬B)</code><small class="eg-check">✓ Checked: the minimised form was evaluated on all 16 input rows and matches the original expression on every one; 3 terms cover all 10 minterms with 3 prime implicants available.</small></div><a class="eg-open" href="../app.html#s=eyJtIjoiZGlzY3JldGUiLCJmIjoiKEEgeG9yIEIpIG9yIChDIGFuZCBEKSIsIm8iOnsib3AiOiJ0cnV0aCIsImdzcmMiOiIiLCJnZHN0IjoiIn19">Open with steps</a></li>
+                <li><div class="eg-q"><b>Graph: shortest path A to E</b><code>A-B:4, A-C:2, B-C:1, B-D:5, C-D:8, D-E:3</code></div><div class="eg-a"><code>5 vertices, 6 edges, 1 connected component shortest A → E: A → C → B → D → E  (length 11)</code><small class="eg-check">✓ Checked: Dijkstra's distances equal Bellman–Ford's, Kruskal's tree and Prim's tree have the same total weight 11, union–find and depth-first search find the same 1 component, and the degrees add up to twice the number of edges.</small></div><a class="eg-open" href="../app.html#s=eyJtIjoiZGlzY3JldGUiLCJmIjoiQS1COjQsIEEtQzoyLCBCLUM6MSwgQi1EOjUsIEMtRDo4LCBELUU6MyIsIm8iOnsib3AiOiJncmFwaCIsImdzcmMiOiJBIiwiZ2RzdCI6IkUifX0">Open with steps</a></li>
+            </ol>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-how">
+            <h2 id="h-how">How it works</h2>
+            <p>Boolean expressions are minimised with the Quine–McCluskey method. Graphs are given as weighted edges, and Dijkstra, Kruskal and Prim are run on them.</p>
+            <h3>How the answer is checked</h3>
+            <p>The minimal expression is compared with the original on every row of the truth table; Dijkstra is checked against Bellman–Ford, and Kruskal against Prim.</p>
+            <h3>Typing your input</h3>
+            <ul class="plain">
+                <li>Use and, or, not, xor, -&gt; or the symbols ∧ ∨ ¬.</li>
+            </ul>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-faq">
+            <h2 id="h-faq">Questions</h2>
+            <h3>How large an expression can it handle?</h3>
+            <p>Up to a dozen or so variables comfortably; the truth table doubles in size with each variable.</p>
+        </section>
+
+        <section class="sec" aria-labelledby="h-rel">
+            <h2 id="h-rel">Related tools</h2>
+            <ul class="rel"><li><a href="number-theory-calculator.html">Number theory calculator</a></li><li><a href="scientific-calculator.html">Calculator with exact fractions</a></li><li><a href="./">All 31 tool pages</a></li></ul>
+        </section>
+    </main>
+    <footer class="foot">
+        <div class="wrap foot-in">
+            <span>Calculus Suite · MIT licence · free, no account, works offline</span>
+            <span class="foot-links"><a href="../">Home</a><a href="./">All tools</a><a href="../app.html">App</a><a href="../teacher.html">For teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">GitHub</a></span>
+        </div>
+    </footer>
+    <script src="../js/home.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Complex Number Calculator: Roots, Residues, Plots | Calculus Suite</title>
+    <meta name="description" content="Complex arithmetic, polar form, all roots of a polynomial, residues and contour integrals, domain colouring and conformal maps.">
+    <meta name="theme-color" content="#f8f7ef">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Calculus Suite">
+    <meta property="og:title" content="Complex Number Calculator: Roots, Residues, Plots | Calculus Suite">
+    <meta property="og:description" content="Complex arithmetic, polar form, all roots of a polynomial, residues and contour integrals, domain colouring and conformal maps.">
+    <meta property="og:image" content="../og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="../manifest.webmanifest">
+    <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="../css/tokens.css">
+    <link rel="stylesheet" href="../css/home.css">
+    <script src="../js/theme-init.js"></script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Complex number calculator – Calculus Suite","description":"Complex arithmetic, polar form, all roots of a polynomial, residues and contour integrals, domain colouring and conformal maps.","applicationCategory":"EducationalApplication","operatingSystem":"Any (runs in a web browser)","browserRequirements":"Requires JavaScript","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can it evaluate real integrals with residues?","acceptedAnswer":{"@type":"Answer","text":"Yes, integrals over the whole real line of rational functions, checked numerically."}}]}</script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="bar">
+        <a class="wordmark" href="../" aria-label="Calculus Suite, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span></a>
+        <nav class="bar-nav" aria-label="Sections"><a href="./">All tools</a><a href="../teacher.html">Teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">Source</a></nav>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
+        <a class="btn btn-solid bar-cta" href="../app.html">Open the app</a>
+    </header>
+    <main id="main" class="wrap tool-page">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <a href="./">Tools</a> <span aria-hidden="true">›</span> <span aria-current="page">Complex number calculator</span></nav>
+        <h1>Complex number calculator</h1>
+        <p class="lede">Arithmetic and polar form, all complex roots, residues and contour integrals, real integrals by residues, domain colouring plots, conformal maps and Möbius transformations.</p>
+        <p class="cta-row"><a class="btn btn-solid btn-lg" href="../app.html?tool=complex">Open the complex tool</a><span class="fine">Free, no account. Runs in your browser and works offline.</span></p>
+
+        <section class="sec" aria-labelledby="h-eg">
+            <h2 id="h-eg">Worked examples</h2>
+            <p>Each answer below was computed by the tool itself. Open one to see the steps and the plot.</p>
+            <ol class="eg-table">
+                <li><div class="eg-q"><b>(3+4i)(1−2i)/(2+i)</b><code>(3+4i)*(1-2i)/(2+i)</code></div><div class="eg-a"><span class="tex"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:0.4306em;"></span><span class="mord mathnormal" style="margin-right:0.044em;">z</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">4</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6595em;"></span><span class="mord">3</span><span class="mord mathnormal">i</span></span></span></span></span></div><a class="eg-open" href="../app.html#s=eyJtIjoiY29tcGxleCIsImYiOiIoMys0aSkqKDEtMmkpLygyK2kpIiwibyI6eyJvcCI6ImFyaXRoIiwiY2MiOiIwIiwicmFkIjoiMiIsInJlZ2lvbiI6ImdyaWQiLCJleHRlbnQiOiIxLjUiLCJyYW5nZSI6IjIiLCJudGgiOiIzIn19">Open with steps</a></li>
+                <li><div class="eg-q"><b>Roots of z⁴ − 1</b><code>z^4-1</code></div><div class="eg-a"><code>z = 1,  i,  -1,  -i</code><small class="eg-check">✓ Checked: max |p(root)| = 4.90e-16</small></div><a class="eg-open" href="../app.html#s=eyJtIjoiY29tcGxleCIsImYiOiJ6XjQtMSIsIm8iOnsib3AiOiJyb290cyIsImNjIjoiMCIsInJhZCI6IjIiLCJyZWdpb24iOiJncmlkIiwiZXh0ZW50IjoiMS41IiwicmFuZ2UiOiIyIiwibnRoIjoiMyJ9fQ">Open with steps</a></li>
+                <li><div class="eg-q"><b>Residues: 1/(z²(z−1))</b><code>1/(z^2*(z-1))</code></div><div class="eg-a"><code>Residues: Res at 1 = 1;   Res at 0 = -1</code><small class="eg-check">✓ Checked: each residue was computed two ways (a closed formula and a numerical contour integral on a small circle) and agree to 1.1e-16; the residues sum to 0, as the behaviour at infinity requires</small></div><a class="eg-open" href="../app.html#s=eyJtIjoiY29tcGxleCIsImYiOiIxLyh6XjIqKHotMSkpIiwibyI6eyJvcCI6InJlc2lkdWUiLCJjYyI6IjAiLCJyYWQiOiIyIiwicmVnaW9uIjoiZ3JpZCIsImV4dGVudCI6IjEuNSIsInJhbmdlIjoiMiIsIm50aCI6IjMifX0">Open with steps</a></li>
+                <li><div class="eg-q"><b>Real integral: ∫ 1/(x²+1)</b><code>1/(x^2+1)</code></div><div class="eg-a"><code>∫ f(x) dx from −∞ to ∞ = π  ≈ 3.1415926536</code><small class="eg-check">✓ Checked: direct numerical integration over the whole real line gives 3.1415926536 (relative difference 0.0e+0); also each residue was computed two ways (a closed formula and a numerical contour integral on a small circle) and agree to 2.2e-16; the residues sum to 0, as the behaviour at infinity requires</small></div><a class="eg-open" href="../app.html#s=eyJtIjoiY29tcGxleCIsImYiOiIxLyh4XjIrMSkiLCJvIjp7Im9wIjoicmVhbGludCIsImNjIjoiMCIsInJhZCI6IjIiLCJyZWdpb24iOiJncmlkIiwiZXh0ZW50IjoiMS41IiwicmFuZ2UiOiIyIiwibnRoIjoiMyJ9fQ">Open with steps</a></li>
+            </ol>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-how">
+            <h2 id="h-how">How it works</h2>
+            <p>Residues are computed at every pole of a rational function, and contour integrals follow from the residue theorem. Domain colouring shows zeros and poles of f(z) at a glance.</p>
+            <h3>How the answer is checked</h3>
+            <p>Contour and real integrals are compared with direct numerical integration.</p>
+            <h3>Typing your input</h3>
+            <ul class="plain">
+                <li>Use i for the imaginary unit and z as the variable.</li>
+            </ul>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-faq">
+            <h2 id="h-faq">Questions</h2>
+            <h3>Can it evaluate real integrals with residues?</h3>
+            <p>Yes, integrals over the whole real line of rational functions, checked numerically.</p>
+        </section>
+
+        <section class="sec" aria-labelledby="h-rel">
+            <h2 id="h-rel">Related tools</h2>
+            <ul class="rel"><li><a href="scientific-calculator.html">Calculator with exact fractions</a></li><li><a href="laplace-transform-calculator.html">Laplace transform calculator</a></li><li><a href="./">All 31 tool pages</a></li></ul>
+        </section>
+    </main>
+    <footer class="foot">
+        <div class="wrap foot-in">
+            <span>Calculus Suite · MIT licence · free, no account, works offline</span>
+            <span class="foot-links"><a href="../">Home</a><a href="./">All tools</a><a href="../app.html">App</a><a href="../teacher.html">For teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">GitHub</a></span>
+        </div>
+    </footer>
+    <script src="../js/home.js"></script>
+</body>
+</html>

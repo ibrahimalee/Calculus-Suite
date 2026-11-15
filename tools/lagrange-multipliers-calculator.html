@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Lagrange Multipliers Calculator | Calculus Suite</title>
+    <meta name="description" content="Constrained maxima and minima with Lagrange multipliers, every candidate checked against ∇f = λ∇g, with level curves and the constraint plotted.">
+    <meta name="theme-color" content="#f8f7ef">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Calculus Suite">
+    <meta property="og:title" content="Lagrange Multipliers Calculator | Calculus Suite">
+    <meta property="og:description" content="Constrained maxima and minima with Lagrange multipliers, every candidate checked against ∇f = λ∇g, with level curves and the constraint plotted.">
+    <meta property="og:image" content="../og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="../manifest.webmanifest">
+    <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="../css/tokens.css">
+    <link rel="stylesheet" href="../css/home.css">
+    <script src="../js/theme-init.js"></script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Lagrange multipliers calculator – Calculus Suite","description":"Constrained maxima and minima with Lagrange multipliers, every candidate checked against ∇f = λ∇g, with level curves and the constraint plotted.","applicationCategory":"EducationalApplication","operatingSystem":"Any (runs in a web browser)","browserRequirements":"Requires JavaScript","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does it handle three variables?","acceptedAnswer":{"@type":"Answer","text":"Yes, for example optimising x + 2y + 3z on the unit sphere."}}]}</script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="bar">
+        <a class="wordmark" href="../" aria-label="Calculus Suite, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span></a>
+        <nav class="bar-nav" aria-label="Sections"><a href="./">All tools</a><a href="../teacher.html">Teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">Source</a></nav>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
+        <a class="btn btn-solid bar-cta" href="../app.html">Open the app</a>
+    </header>
+    <main id="main" class="wrap tool-page">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <a href="./">Tools</a> <span aria-hidden="true">›</span> <span aria-current="page">Lagrange multipliers calculator</span></nav>
+        <h1>Lagrange multipliers calculator</h1>
+        <p class="lede">Find the maximum and minimum of f subject to a constraint g = c. Every candidate point is listed with its λ and the value of f.</p>
+        <p class="cta-row"><a class="btn btn-solid btn-lg" href="../app.html?tool=multivariable">Open the multivariable tool</a><span class="fine">Free, no account. Runs in your browser and works offline.</span></p>
+
+        <section class="sec" aria-labelledby="h-eg">
+            <h2 id="h-eg">Worked examples</h2>
+            <p>Each answer below was computed by the tool itself. Open one to see the steps and the plot.</p>
+            <ol class="eg-table">
+                <li><div class="eg-q"><b>Lagrange: maximise xy on the unit circle</b><code>x*y</code></div><div class="eg-a"><code>Constrained extrema: max 1/2 at (-0.7071068, -0.7071068);  min -1/2 at (0.7071068, -0.7071068)</code><small class="eg-check">✓ Checked: every candidate satisfies ∇f = λ∇g and the constraint (largest residual 1.78e-13)</small></div><a class="eg-open" href="../app.html#s=eyJtIjoibXVsdGl2YXJpYWJsZSIsImYiOiJ4KnkiLCJvIjp7Im9wIjoibGFncmFuZ2UiLCJ2YXJzIjoiIiwicG9pbnQiOiIiLCJtZXRob2QiOiJnZCIsInN0YXJ0IjoiLTEuMiwgMSIsImxyIjoiMC4xIiwiaXRlcnMiOiIzMCIsImNvbnN0cmFpbnQiOiJ4XjIgKyB5XjIgPSAxIiwiZGlyZWN0aW9uIjoiIiwieExvdyI6IjAiLCJ4SGlnaCI6IjEiLCJ5TG93IjoiMCIsInlIaWdoIjoieCIsInJhZGl1cyI6IjMifX0">Open with steps</a></li>
+                <li><div class="eg-q"><b>Lagrange: x + 2y + 3z on the unit sphere</b><code>x + 2*y + 3*z</code></div><div class="eg-a"><code>Constrained extrema: max 3.74165739 at (0.2672612, 0.5345225, 0.8017837);  min -3.74165739 at (-0.2672612, -0.5345225, -0.8017837)</code><small class="eg-check">✓ Checked: every candidate satisfies ∇f = λ∇g and the constraint (largest residual 3.37e-14)</small></div><a class="eg-open" href="../app.html#s=eyJtIjoibXVsdGl2YXJpYWJsZSIsImYiOiJ4ICsgMip5ICsgMyp6IiwibyI6eyJvcCI6ImxhZ3JhbmdlIiwidmFycyI6IiIsInBvaW50IjoiIiwibWV0aG9kIjoiZ2QiLCJzdGFydCI6Ii0xLjIsIDEiLCJsciI6IjAuMSIsIml0ZXJzIjoiMzAiLCJjb25zdHJhaW50IjoieF4yICsgeV4yICsgel4yID0gMSIsImRpcmVjdGlvbiI6IiIsInhMb3ciOiIwIiwieEhpZ2giOiIxIiwieUxvdyI6IjAiLCJ5SGlnaCI6IngiLCJyYWRpdXMiOiIyIn19">Open with steps</a></li>
+                <li><div class="eg-q"><b>Lagrange: closest point on a line</b><code>x^2 + y^2</code></div><div class="eg-a"><code>Constrained extrema: f = 2 at (1, 1)</code><small class="eg-check">✓ Checked: every candidate satisfies ∇f = λ∇g and the constraint (largest residual 0.00e+0)</small></div><a class="eg-open" href="../app.html#s=eyJtIjoibXVsdGl2YXJpYWJsZSIsImYiOiJ4XjIgKyB5XjIiLCJvIjp7Im9wIjoibGFncmFuZ2UiLCJ2YXJzIjoiIiwicG9pbnQiOiIiLCJtZXRob2QiOiJnZCIsInN0YXJ0IjoiLTEuMiwgMSIsImxyIjoiMC4xIiwiaXRlcnMiOiIzMCIsImNvbnN0cmFpbnQiOiJ4ICsgeSA9IDIiLCJkaXJlY3Rpb24iOiIiLCJ4TG93IjoiMCIsInhIaWdoIjoiMSIsInlMb3ciOiIwIiwieUhpZ2giOiJ4IiwicmFkaXVzIjoiNCJ9fQ">Open with steps</a></li>
+            </ol>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-how">
+            <h2 id="h-how">How it works</h2>
+            <p>The tool solves ∇f = λ∇g together with the constraint, then ranks the candidates by the value of f. For two variables the level curves and the constraint are drawn.</p>
+            <h3>How the answer is checked</h3>
+            <p>Each candidate is checked to satisfy ∇f = λ∇g and the constraint.</p>
+            <h3>Typing your input</h3>
+            <ul class="plain">
+                <li>Give the constraint as an equation in the Constraint option, for example x^2 + y^2 = 1.</li>
+            </ul>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-faq">
+            <h2 id="h-faq">Questions</h2>
+            <h3>Does it handle three variables?</h3>
+            <p>Yes, for example optimising x + 2y + 3z on the unit sphere.</p>
+        </section>
+
+        <section class="sec" aria-labelledby="h-rel">
+            <h2 id="h-rel">Related tools</h2>
+            <ul class="rel"><li><a href="partial-derivative-calculator.html">Partial derivatives and multivariable calculus</a></li><li><a href="critical-points-calculator.html">Function analysis: critical points, extrema and asymptotes</a></li><li><a href="./">All 31 tool pages</a></li></ul>
+        </section>
+    </main>
+    <footer class="foot">
+        <div class="wrap foot-in">
+            <span>Calculus Suite · MIT licence · free, no account, works offline</span>
+            <span class="foot-links"><a href="../">Home</a><a href="./">All tools</a><a href="../app.html">App</a><a href="../teacher.html">For teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">GitHub</a></span>
+        </div>
+    </footer>
+    <script src="../js/home.js"></script>
+</body>
+</html>
