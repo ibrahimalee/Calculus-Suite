@@ -5,3 +5,4 @@ scripts
 .vscode
 package-lock.json
 *.md
+translations-review.csv
