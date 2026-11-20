@@ -44,9 +44,18 @@
             <ul class="plain"><li>Next prime: 1000000009</li></ul>
             <p class="cta-row"><a class="btn btn-solid" href="../app.html#s=eyJtIjoibnVtYmVyIiwiZiI6IjEwMDAwMDAwMDciLCJvIjp7Im9wIjoiaXNwcmltZSJ9fQ">Open this in the calculator</a><a class="btn btn-line" href="../tools/number-theory-calculator.html">Number theory calculator</a></p>
         </section>
+        <section class="sec" aria-labelledby="h-steps">
+            <h2 id="h-steps">Step by step</h2>
+            <ol class="prob-steps">
+                <li><b>Trial division by small primes</b><p>None of 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37 divides 1000000007, so 1000000007 has no small factor.</p></li>
+                <li><b>Miller–Rabin set-up</b><p>Write 1000000007 − 1 = 1000000006 as 2^1 · 500000003, with 500000003 odd. For a base a, 1000000007 passes if a^500000003 ≡ 1, or a^(500000003·2^i) ≡ −1 for some i &lt; 1, (mod 1000000007).</p></li>
+                <li><b>Every base passes</b><p>The first twelve primes (2, 3, 5, …, 37) as bases all pass. This set is proven sufficient for every number below 3.3·10²⁴, so 1000000007 is prime.</p></li>
+            </ol>
+        </section>
         <section class="sec notes" aria-labelledby="h-how">
             <h2 id="h-how">About this kind of problem</h2>
             <p>Large integers are factored with trial division and Pollard’s rho, and primality is tested with Miller–Rabin. Every factorisation is multiplied back to confirm it.</p>
+            <p>For this problem the working uses: Trial division by small primes, Miller–Rabin set-up, Every base passes.</p>
         </section>
         <section class="sec" aria-labelledby="h-more">
             <h2 id="h-more">Similar problems</h2>

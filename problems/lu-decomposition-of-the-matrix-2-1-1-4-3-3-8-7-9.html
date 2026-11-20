@@ -53,13 +53,14 @@ M347 1759 V0 H263 V1759 v0 v1759 h84z"/></svg></span></span></span><span class="
         <section class="sec" aria-labelledby="h-steps">
             <h2 id="h-steps">Step by step</h2>
             <ol class="prob-steps">
+                <li><b>Eliminate below each pivot, recording the multipliers</b><p>swap R1 ↔ R3 (the larger pivot 8 is safer);   R2 → R2 − (1/2)·R1;   R3 → R3 − (1/4)·R1;   swap R2 ↔ R3 (the larger pivot 3/4 is safer);   R3 → R3 − (2/3)·R2.  The multipliers (the numbers in brackets) go into L below the diagonal, and the swaps are recorded in P so that PA = LU; the rows that are left form U = [[8, 7, 9], [0, -3/4, -5/4], [0, 0, -2/3]].</p></li>
                 <li><b>Eliminate below each pivot</b><p>Record every multiplier ℓᵢⱼ in L and keep the reduced rows in U; swap rows (tracked in P) when a larger pivot is available.</p></li>
             </ol>
         </section>
         <section class="sec notes" aria-labelledby="h-how">
             <h2 id="h-how">About this kind of problem</h2>
             <p>Every matrix operation is worked row by row, and the result is verified: a determinant against a second expansion, an inverse by multiplying it with the original, eigenvalues by substituting back.</p>
-            <p>For this problem the working uses: Eliminate below each pivot.</p>
+            <p>For this problem the working uses: Eliminate below each pivot, recording the multipliers, Eliminate below each pivot.</p>
         </section>
         <section class="sec" aria-labelledby="h-more">
             <h2 id="h-more">Similar problems</h2>

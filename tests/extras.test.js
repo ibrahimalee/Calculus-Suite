@@ -412,3 +412,30 @@ test('Riemann sums reject an unknown rule instead of silently using another', ()
   const mid = E.run.riemann('sin(x)', { lower: '0', upper: 'pi', n: '10', rule: 'mid' });
   assert.match(mid.main.text, /2\.0082/);
 });
+
+test('worked steps show the actual computation, not just the method', () => {
+  const stepText = r => r.steps.map(s => s.title + ' ' + s.text).join(' | ');
+  assert.match(stepText(E.run.number('360', { op: 'factor' })), /360 ÷ 2 = 180.*5 ÷ 5 = 1/);
+  assert.match(stepText(E.run.number('221', { op: 'isprime' })), /221 ÷ 13 = 17 with remainder 0/);
+  assert.match(stepText(E.run.number('1000000007', { op: 'isprime' })), /Miller–Rabin set-up.*2\^1 · 500000003/);
+  assert.match(stepText(E.run.geometry('a = 3, b = 4, c = 5', { op: 'triangle', unit: 'deg' })), /cos A = .*= 4\/5, so A = 36\.8698976°/);
+  assert.match(stepText(E.run.geometry('a = 8, b = 10, A = 30', { op: 'triangle', unit: 'deg' })), /sin B = .*= 5\/8, so B = 38\.68/);
+  assert.match(stepText(E.run.geometry('a = 3, b = 10, A = 30', { op: 'triangle', unit: 'deg' })), /1\.6666.*larger/);
+  assert.match(stepText(E.run.geometry('9x^2 + 4y^2 - 18x + 16y - 11 = 0', { op: 'conic' })), /9\(x − 1\)² \+ 4\(y \+ 2\)² = 36/);
+  assert.match(E.run.geometry('x^2 + 4xy + y^2 = 1', { op: 'conic' }).main.label, /Hyperbola/); // "4xy" means 4·x·y
+  assert.match(stepText(E.run.units('5 km/h to m/s', {})), /1 km\/h = 0\.27777.*= 1\.38888/);
+  assert.match(stepText(E.run.units('72 degF to degC', {})), /295\.37.*22\.2222/);
+  const lu = E.run.matrix('2 1 1 ; 4 3 3 ; 8 7 9', { op: 'lu' });
+  assert.match(lu.steps[0].text, /swap R1 ↔ R3.*R2 → R2 − \(1\/2\)·R1/); assert.match(lu.main.text, /U = \[ \[8, 7, 9\]/);
+  assert.match(stepText(E.run.matrix('1 2 ; 3 4 ; 5 6', { op: 'svd' })), /AᵀA = \[\[35, 44\], \[44, 56\]\]/);
+  assert.match(stepText(E.run.matrix('1 1 ; 1 2 ; 1 3', { op: 'leastsquares', b: '1 ; 2 ; 2' })), /AᵀA = \[\[3, 6\], \[6, 14\]\] and Aᵀb = \[\[5\], \[11\]\]/);
+});
+
+test('NaN and Infinity are rejected when misused, but inf still works as a limit and bound', () => {
+  assert.throws(() => E.run.calc('NaN', {}), /NaN is not a number/);
+  assert.throws(() => E.run.derivative('NaNx^2', {}), /Unknown symbol/);
+  assert.throws(() => E.run.series('exp(NaNx)', { task: 'pade', pm: '2', pn: '2' }), /Unknown symbol/);
+  assert.throws(() => E.run.complex('(z-1)/Infinity(z+1)', { op: 'domain' }), /not a number to multiply by/);
+  assert.equal(E.run.limit('x*e^(-x)', { point: 'inf', direction: 'both' }).main.text.replace(/.*=\s*/, ''), '0');
+  assert.match(E.run.integral('e^(-x)', { lower: '0', upper: 'inf' }).main.text, /1/);
+});

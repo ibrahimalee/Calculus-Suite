@@ -44,9 +44,18 @@
             <ul class="plain"><li>Next prime: 101</li></ul>
             <p class="cta-row"><a class="btn btn-solid" href="../app.html#s=eyJtIjoibnVtYmVyIiwiZiI6Ijk3IiwibyI6eyJvcCI6ImlzcHJpbWUifX0">Open this in the calculator</a><a class="btn btn-line" href="../tools/number-theory-calculator.html">Number theory calculator</a></p>
         </section>
+        <section class="sec" aria-labelledby="h-steps">
+            <h2 id="h-steps">Step by step</h2>
+            <ol class="prob-steps">
+                <li><b>Trial division by small primes</b><p>None of 2, 3, 5, 7 divides 97, so 97 has no small factor.</p></li>
+                <li><b>Miller–Rabin set-up</b><p>Write 97 − 1 = 96 as 2^5 · 3, with 3 odd. For a base a, 97 passes if a^3 ≡ 1, or a^(3·2^i) ≡ −1 for some i &lt; 5, (mod 97).</p></li>
+                <li><b>Every base passes</b><p>The first twelve primes (2, 3, 5, …, 37) as bases all pass. This set is proven sufficient for every number below 3.3·10²⁴, so 97 is prime.</p></li>
+            </ol>
+        </section>
         <section class="sec notes" aria-labelledby="h-how">
             <h2 id="h-how">About this kind of problem</h2>
             <p>Large integers are factored with trial division and Pollard’s rho, and primality is tested with Miller–Rabin. Every factorisation is multiplied back to confirm it.</p>
+            <p>For this problem the working uses: Trial division by small primes, Miller–Rabin set-up, Every base passes.</p>
         </section>
         <section class="sec" aria-labelledby="h-more">
             <h2 id="h-more">Similar problems</h2>

@@ -1212,12 +1212,27 @@
             show('Prime?', f.length === 1 && f[0][1] === 1 ? 'yes' : 'no');
             if (divCount <= 120n) { let ds = [1n]; f.forEach(([p, e]) => { const nx = []; ds.forEach(d => { let q = 1n; for (let i = 0; i <= e; i++) { nx.push(d * q); q *= p; } }); ds = nx; }); ds.sort((a, b) => (a < b ? -1 : 1)); show('Divisors:', ds.join(', ')); }
             r.meta.push(`Verified: the factors multiply back to ${n}.`); r.meta.push('Method: trial division by small primes, Miller–Rabin primality test and Pollard’s rho for the rest');
-            r.steps.push({ title: 'Divide out small primes', text: 'Repeatedly divide by 2, 3, 5, … while the remainder is 0.', tex: '' }); r.steps.push({ title: 'Primality test', text: 'Each remaining cofactor is tested with Miller–Rabin and split with Pollard’s rho if composite.', tex: '' });
+            { let rest = n; const lines = []; const big = f.slice().sort((x, y) => (x[0] < y[0] ? -1 : 1));
+                for (const [p, e] of big) { for (let i = 0; i < Number(e); i++) { lines.push(`${rest} ÷ ${p} = ${rest / p}`); rest /= p; } }
+                r.steps.push({ title: 'Divide out the primes one at a time', text: lines.slice(0, 40).join(';   ') + (lines.length > 40 ? ';   …' : '') + `.  The quotient reaches 1, so nothing is left.`, tex: '' });
+                r.steps.push({ title: 'Collect equal factors', text: `${n} = ${big.map(([p, e]) => (Number(e) > 1 ? `${p}${sup(e)}` : `${p}`)).join(' · ')}`, tex: `${n}=${facTex(f)}` });
+                r.steps.push({ title: 'Check by multiplying back', text: `${big.map(([p, e]) => (Number(e) > 1 ? `${p}${sup(e)} = ${p ** BigInt(e)}` : `${p}`)).join(',  ')}  →  product = ${big.reduce((a, [p, e]) => a * p ** BigInt(e), 1n)}`, tex: '' });
+                if (f.length > 1 || (f[0] && f[0][1] > 1)) r.steps.push({ title: 'What the factors tell you', text: `The number of divisors is the product of (exponent + 1) = ${divCount}; the sum of divisors is the product of (p^(e+1) − 1)/(p − 1) = ${divSum}.`, tex: '' }); }
         } else if (op === 'isprime') {
             const [n] = intList(src, 1); r.title = 'Primality test'; const pr = isPrimeB(n);
             r.main = { label: `${n} is`, text: pr ? 'prime' : (n < 2n ? 'not prime (less than 2)' : 'composite'), tex: '' };
             if (!pr && n > 1n && n.toString().length <= 30) { const f = factorB(n); show('Factorisation:', f.map(([p, e]) => (e > 1 ? `${p}${sup(e)}` : p)).join(' · ')); } else if (pr) { const nxt = (() => { let k = n + 1n; while (!isPrimeB(k)) k++; return k; })(); show('Next prime:', nxt); }
             r.meta.push('Method: deterministic Miller–Rabin (correct for all numbers below 3.3·10²⁴; probabilistically certain beyond)');
+            if (n >= 2n) {
+                const small = [2n, 3n, 5n, 7n, 11n, 13n, 17n, 19n, 23n, 29n, 31n, 37n].filter(q => q * q <= n || q === 2n);
+                const hit = small.find(q => n % q === 0n && n !== q);
+                if (hit) r.steps.push({ title: 'A small factor settles it', text: `${n} ÷ ${hit} = ${n / hit} with remainder 0, so ${hit} divides ${n} and ${n} is composite.`, tex: '' });
+                else {
+                    r.steps.push({ title: 'Trial division by small primes', text: small.length ? `None of ${small.join(', ')} divides ${n}, so ${n} has no small factor.` : `${n} is smaller than 4, and 2 and 3 are prime.`, tex: '' });
+                    if (n > 40n) { let d = n - 1n, sCount = 0; while (d % 2n === 0n) { d /= 2n; sCount++; }
+                        r.steps.push({ title: 'Miller–Rabin set-up', text: `Write ${n} − 1 = ${n - 1n} as 2^${sCount} · ${d}, with ${d} odd. For a base a, ${n} passes if a^${d} ≡ 1, or a^(${d}·2^i) ≡ −1 for some i < ${sCount}, (mod ${n}).`, tex: '' });
+                        r.steps.push({ title: pr ? 'Every base passes' : 'A base fails', text: pr ? `The first twelve primes (2, 3, 5, …, 37) as bases all pass. This set is proven sufficient for every number below 3.3·10²⁴, so ${n} is prime.` : `Some base fails the test, which proves ${n} is composite.`, tex: '' }); } }
+            }
         } else if (op === 'gcd' || op === 'lcm') {
             const a = intList(src, 0); if (a.length < 2) throw new CalcError('Enter at least two numbers.'); const g = a.reduce((x, y) => bgcd(x, y)); const l = a.reduce((x, y) => (x === 0n || y === 0n ? 0n : babs(x * y) / bgcd(x, y)));
             r.title = op === 'gcd' ? 'Greatest common divisor' : 'Least common multiple'; r.main = op === 'gcd' ? { label: `gcd(${a.join(', ')}) =`, text: String(g), tex: '' } : { label: `lcm(${a.join(', ')}) =`, text: String(l), tex: '' };
@@ -1276,6 +1291,20 @@
         } else { r.main = { label: 'Value:', text: typeof val === 'number' ? engine.fmt(val, 10) : String(val), tex: '' }; }
         r.items.unshift({ label: 'Input:', text: String(src).trim(), tex: '' });
         r.steps.push({ title: 'Convert through base units', text: 'Every unit is expressed in SI base units (m, kg, s, A, K, …); the target unit then divides the result back out.', tex: '' });
+        try {
+            const mm = /^\s*(-?[\d.]+(?:e[-+]?\d+)?)\s*([A-Za-z°][^\s]*(?:\s*[*/^][^\s]+)*)\s+to\s+(\S+)\s*$/i.exec(String(text));
+            if (mm) {
+                const v0 = parseFloat(mm[1]), from = mm[2], to = mm[3], offs = /^deg[CFK]$/.test(from) || /^deg[CFK]$/.test(to);
+                if (offs) {
+                    const toK = { degC: x => x + 273.15, degF: x => (x - 32) * 5 / 9 + 273.15, degK: x => x }, fromK = { degC: k => k - 273.15, degF: k => (k - 273.15) * 9 / 5 + 32, degK: k => k };
+                    if (toK[from] && fromK[to]) { const k = toK[from](v0), out = fromK[to](k);
+                        r.steps.push({ title: 'Temperatures also need an offset', text: `Scales with different zero points cannot be converted by a factor alone. ${from} → kelvin: ${engine.fmt(k, 10)} K; kelvin → ${to}: ${engine.fmt(out, 10)} ${to}.${from === 'degF' && to === 'degC' ? ' (Directly: °C = (°F − 32) × 5/9.)' : from === 'degC' && to === 'degF' ? ' (Directly: °F = °C × 9/5 + 32.)' : ''}`, tex: '' }); }
+                } else {
+                    const factor = math.unit(1, from).toNumber(to);
+                    if (Number.isFinite(factor)) r.steps.push({ title: 'The conversion factor', text: `1 ${from} = ${engine.fmt(factor, 10)} ${to}, so ${engine.fmt(v0, 10)} ${from} = ${engine.fmt(v0, 10)} × ${engine.fmt(factor, 10)} = ${engine.fmt(v0 * factor, 10)} ${to}.`, tex: '' });
+                }
+            }
+        } catch (e) { /* the generic step above still explains the method */ }
         return I.finalizeText(r);
     }
     register({ units: runUnits });
@@ -2313,7 +2342,32 @@
         return r;
     }
     { const oBase3 = engine.run.ode; engine.run.ode = (src, opt) => { opt = opt || {}; const r = oBase3(src, opt); if (opt.odeType === 'system') { try { return systemPlot3D(src, opt, r); } catch (e) { if (e instanceof CalcError) throw e; } } return r; }; }
-    { const mBase = engine.run.matrix; engine.run.matrix = (src, opt) => { opt = opt || {}; return LA_OPS.has(opt.op) ? runLinalg(src, opt) : mBase(src, opt); }; }
+    /** Numbers for the decomposition steps: the multipliers of an LU elimination, AᵀA for singular values, the normal equations, the reduced rows. */
+    function linalgNumbers(r, src, opt) {
+        try {
+            const M = I.parseMatrix(src), m = M.length, n = M[0].length, op = opt.op, T = (X) => X[0].map((_, j) => X.map(row => row[j])), mulM = (X, Y) => X.map(row => Y[0].map((_, j) => row.reduce((acc, v, k) => acc + v * Y[k][j], 0)));
+            const fmtM = X => '[' + X.map(row => '[' + row.map(v => nice(v, 6, 1e-9).text).join(', ') + ']').join(', ') + ']';
+            const add = (title, text, tex) => r.steps.splice(Math.max(0, r.steps.length - (r.steps.some(x => /^Check$|^Verified/.test(x.title)) ? 1 : 0)), 0, { title, text, tex: tex || '' });
+            if (op === 'lu' && m === n) {
+                const U = M.map(row => row.slice()), lines = []; let ok = true;
+                for (let k = 0; k < n && ok; k++) { let pv = k; for (let i = k + 1; i < n; i++) if (Math.abs(U[i][k]) > Math.abs(U[pv][k]) + 1e-12) pv = i; if (pv !== k) { [U[k], U[pv]] = [U[pv], U[k]]; lines.push(`swap R${k + 1} ↔ R${pv + 1} (the larger pivot ${nice(Math.abs(U[k][k]), 6, 1e-9).text} is safer)`); } if (Math.abs(U[k][k]) < 1e-12) { ok = false; break; } for (let i = k + 1; i < n; i++) { const f = U[i][k] / U[k][k]; if (f !== 0) lines.push(`R${i + 1} → R${i + 1} − (${nice(f, 6, 1e-9).text})·R${k + 1}`); for (let j = k; j < n; j++) U[i][j] -= f * U[k][j]; } }
+                if (ok && lines.length) { r.steps.unshift({ title: 'Eliminate below each pivot, recording the multipliers', text: `${lines.join(';   ')}.  The multipliers (the numbers in brackets) go into L below the diagonal, and the swaps are recorded in P so that PA = LU; the rows that are left form U = ${fmtM(U.map(row => row.map(v => (Math.abs(v) < 1e-12 ? 0 : v))))}.`, tex: '' }); }
+                else if (!ok) r.steps.unshift({ title: 'A zero pivot appears', text: 'A zero (or tiny) pivot means rows must be swapped first; the permutation matrix P records the swaps, and the elimination is then done on PA.', tex: '' });
+            } else if (op === 'svd' || op === 'pinv' || op === 'cond') {
+                const AtA = mulM(T(M), M), ev = math.eigs(AtA).values.map(Number).sort((x, y) => y - x);
+                r.steps.unshift({ title: 'Form AᵀA', text: `AᵀA = ${fmtM(AtA)}. It is symmetric, and its eigenvalues are the squares of the singular values.`, tex: '' });
+                r.steps.splice(1, 0, { title: 'Eigenvalues of AᵀA, then square roots', text: `λ = ${ev.map(v => nice(v, 6, 1e-9).text).join(', ')}, so σ = √λ = ${ev.map(v => nice(Math.sqrt(Math.max(v, 0)), 8, 1e-9).text).join(', ')}.`, tex: '' });
+            } else if (op === 'leastsquares') {
+                const AtA = mulM(T(M), M); let b = null; try { b = I.parseMatrix(opt.b || ''); } catch (e) { /* no b */ }
+                if (b) { const Atb = mulM(T(M), b); r.steps.unshift({ title: 'Normal equations AᵀA x = Aᵀb', text: `AᵀA = ${fmtM(AtA)} and Aᵀb = ${fmtM(Atb)}. Solving this square system gives the x with the smallest sum of squared errors, because the residual b − Ax is then perpendicular to every column of A.`, tex: 'A^{T}A\\,x=A^{T}b' }); }
+            } else if (op === 'nullspace' || op === 'colspace') {
+                const g = gaussSteps(M, 0); const last = g.steps[g.steps.length - 1];
+                r.steps.unshift({ title: 'Row-reduce A', text: `Gauss–Jordan elimination leaves ${g.pivots.length} pivot${g.pivots.length === 1 ? '' : 's'} (columns ${g.pivots.map(x => x + 1).join(', ') || 'none'}); the other ${n - g.pivots.length} column${n - g.pivots.length === 1 ? ' is' : 's are'} free.`, tex: last && last.tex ? last.tex : '' });
+            }
+        } catch (e) { /* the descriptive steps remain */ }
+        return r;
+    }
+    { const mBase = engine.run.matrix; engine.run.matrix = (src, opt) => { opt = opt || {}; return LA_OPS.has(opt.op) ? linalgNumbers(runLinalg(src, opt), src, opt) : mBase(src, opt); }; }
 
 
 
@@ -2989,7 +3043,7 @@
                 if (A[0] === opp) { kind = 'SAS (two sides and the angle between them)'; const T = { a: known.a, b: known.b, c: known.c }; const [s1, s2] = S; const ang = known[opp]; T[missing] = lc(T[s1], T[s2], ang); const Aa = acosl(T.a, T.b, T.c), Bb = acosl(T.b, T.a, T.c); push([T.a, T.b, T.c, Aa, Bb, Math.PI - Aa - Bb]); }
                 else { kind = 'SSA (two sides and an angle not between them: the ambiguous case)'; const aa = A[0], sideOf = aa.toLowerCase(); const other = S.find(k => k !== sideOf); if (!S.includes(sideOf)) throw new CalcError(`Angle ${aa} needs the side a opposite it (side ${sideOf}) among the known values for this case.`); const x = known[sideOf], y = known[other], X = known[aa]; const sinY = y * Math.sin(X) / x;
                     if (sinY > 1 + 1e-12) { /* none */ } else { const Y1 = Math.asin(Math.min(1, sinY)); [Y1, Math.PI - Y1].forEach((Y, idx) => { if (idx === 1 && Math.abs(Y - Y1) < 1e-9) return; const Z = Math.PI - X - Y; if (Z <= 1e-12) return; const z = x * Math.sin(Z) / Math.sin(X); const ang = { [aa]: X, [other.toUpperCase()]: Y }; const third = ['A', 'B', 'C'].find(k => ang[k] === undefined); ang[third] = Z; const side = { [sideOf]: x, [other]: y, [third.toLowerCase()]: z }; push([side.a, side.b, side.c, ang.A, ang.B, ang.C]); }); }
-                    if (!sols.length) { r.main = { label: 'No triangle', text: 'the side opposite the angle is too short to reach the other side', tex: '' }; r.items.push({ label: 'Why:', text: `the height from the far vertex is ${fm(y * Math.sin(X))}, which is longer than the given side ${fm(x)}`, tex: '' }); r.meta.push('Verified: sin(Y) = y·sin(X)/x came out larger than 1, so no angle Y exists.'); return I.finalizeText(r); } }
+                    if (!sols.length) { r.main = { label: 'No triangle', text: 'the side opposite the angle is too short to reach the other side', tex: '' }; r.items.push({ label: 'Why:', text: `the height from the far vertex is ${fm(y * Math.sin(X))}, which is longer than the given side ${fm(x)}`, tex: '' }); r.meta.push('Verified: sin(Y) = y·sin(X)/x came out larger than 1, so no angle Y exists.'); r.steps.push({ title: 'Sine rule for the unknown angle', text: `sin Y = y·sin X / x = ${fm(y)}·sin ${aa} / ${fm(x)} = ${fm(sinY)}`, tex: '' }); r.steps.push({ title: 'No angle has a sine above 1', text: `The sine of an angle is at most 1, but sin Y = ${fm(sinY)} is larger, so no triangle fits these three values.`, tex: '' }); return I.finalizeText(r); } }
             } else { kind = 'ASA / AAS (two angles and a side)'; const ang = {}; A.forEach(k => { ang[k] = known[k]; }); const third = ['A', 'B', 'C'].find(k => ang[k] === undefined); ang[third] = Math.PI - known[A[0]] - known[A[1]]; if (ang[third] <= 1e-12) throw new CalcError(`The two angles add up to ${deg ? '180° or more' : 'π or more'}, which leaves no room for a triangle.`); const sk = S[0], ratio = known[sk] / Math.sin(ang[sk.toUpperCase()]); push([ratio * Math.sin(ang.A), ratio * Math.sin(ang.B), ratio * Math.sin(ang.C), ang.A, ang.B, ang.C]); }
             r.title = 'Triangle solver'; r.main = { label: sols.length === 1 ? 'Solution:' : `${sols.length} triangles fit:`, text: sols.map(t => `a = ${G(t[0], 7)}, b = ${G(t[1], 7)}, c = ${G(t[2], 7)}, A = ${G(fromRad(t[3]), 7)}${deg ? '°' : ''}, B = ${G(fromRad(t[4]), 7)}${deg ? '°' : ''}, C = ${G(fromRad(t[5]), 7)}${deg ? '°' : ''}`).join('   or   '), tex: '' };
             r.items.push({ label: 'Case:', text: kind, tex: '' }); let worst = 0;
@@ -3000,11 +3054,32 @@
             if (worst > 1e-8) throw new CalcError('Internal check failed: the solved triangle does not satisfy the laws of sines and cosines.');
             r.meta.push(`Verified: for each solution the angles add up to ${deg ? '180°' : 'π'}, the law of sines and the law of cosines hold, and the area from Heron's formula equals ½·side·side·sin(angle) for all three vertices (largest gap ${worst.toExponential(1)}).`);
             if (S.length === 2 && A.length === 1 && kind.startsWith('SSA')) r.meta.push(sols.length === 2 ? 'Ambiguous case: both Y and 180° − Y give a valid triangle because the side opposite the given angle is shorter than the other side but longer than its height.' : 'Only one triangle fits.');
+            {   // the computation itself, case by case, with the numbers
+                const ang = v => `${G(fromRad(v), 7)}${deg ? '°' : ''}`, g7 = v => G(v, 7), half = deg ? '180°' : 'π';
+                sols.forEach((t, i) => { const [a, b, c, An, Bn, Cn] = t, tag = sols.length > 1 ? `Triangle ${i + 1}: ` : '';
+                    if (kind.startsWith('SSS')) {
+                        r.steps.push({ title: `${tag}Angle A from the cosine rule`, text: `cos A = (b² + c² − a²)/(2bc) = (${g7(b * b)} + ${g7(c * c)} − ${g7(a * a)})/(2·${g7(b)}·${g7(c)}) = ${g7(Math.cos(An))}, so A = ${ang(An)}.`, tex: '' });
+                        r.steps.push({ title: `${tag}Angle B the same way`, text: `cos B = (a² + c² − b²)/(2ac) = ${g7(Math.cos(Bn))}, so B = ${ang(Bn)}.`, tex: '' });
+                        r.steps.push({ title: `${tag}Angle C from the angle sum`, text: `C = ${half} − A − B = ${ang(Cn)}.`, tex: '' });
+                    } else if (kind.startsWith('SAS')) {
+                        const miss = ['a', 'b', 'c'].find(k => known[k] === undefined), o = { a: 'A', b: 'B', c: 'C' }[miss], sd = S.map(k => `${k} = ${g7(known[k])}`).join(', ');
+                        r.steps.push({ title: `${tag}Third side from the cosine rule`, text: `${miss}² = ${S.join('² + ')}² − 2·${S.join('·')}·cos ${o} with ${sd} and ${o} = ${ang(known[o])}, so ${miss} = ${g7(t[{ a: 0, b: 1, c: 2 }[miss]])}.`, tex: '' });
+                        r.steps.push({ title: `${tag}The other two angles`, text: `Cosine rule again gives A = ${ang(An)} and B = ${ang(Bn)}; then C = ${half} − A − B = ${ang(Cn)}.`, tex: '' });
+                    } else if (kind.startsWith('ASA')) {
+                        r.steps.push({ title: `${tag}Third angle`, text: `The angles add up to ${half}, so the missing angle is ${half} minus the two given ones: A = ${ang(An)}, B = ${ang(Bn)}, C = ${ang(Cn)}.`, tex: '' });
+                        r.steps.push({ title: `${tag}Sides from the sine rule`, text: `a/sin A = b/sin B = c/sin C = ${g7(a / Math.sin(An))}, so a = ${g7(a)}, b = ${g7(b)}, c = ${g7(c)}.`, tex: '' });
+                    } else {
+                        const aa = A[0], sd = S.map(k => `${k} = ${g7(known[k])}`).join(', ');
+                        { const sideOf = aa.toLowerCase(), xv = known[sideOf], otherK = S.find(k => k !== sideOf), yv = known[otherK], Yn = { A: An, B: Bn, C: Cn }[otherK.toUpperCase()]; r.steps.push({ title: `${tag}Angle from the sine rule`, text: `Given ${sd} and ${aa} = ${ang(known[aa])}: sin ${otherK.toUpperCase()} = ${otherK}·sin ${aa} / ${sideOf} = ${g7(yv)}·${g7(Math.sin(known[aa]))} / ${g7(xv)} = ${g7(Math.sin(Yn))}, so ${otherK.toUpperCase()} = ${ang(Yn)}${sols.length > 1 ? ` (its supplement ${ang(Math.PI - Yn)} is the other possibility, which is why two triangles fit)` : ''}. The third angle is ${half} − ${aa} − ${otherK.toUpperCase()}.`, tex: '' }); }
+                        r.steps.push({ title: `${tag}Remaining side`, text: `Sine rule: a = ${g7(a)}, b = ${g7(b)}, c = ${g7(c)}.`, tex: '' });
+                    } });
+                if (!sols.length) r.steps.push({ title: 'Why no triangle fits', text: 'The sine of the second angle would have to exceed 1, which no angle has, so the side opposite the given angle is too short.', tex: '' });
+            }
             r.steps.push({ title: 'Laws used', text: 'Sine rule: a/sin A = b/sin B = c/sin C. Cosine rule: c² = a² + b² − 2ab·cos C. The angles add up to 180°.', tex: '\\frac{a}{\\sin A}=\\frac{b}{\\sin B}=\\frac{c}{\\sin C},\\quad c^2=a^2+b^2-2ab\\cos C' });
             const traces = sols.map((t, i) => { const [, b, c, An] = t; const P = [[0, 0], [c, 0], [b * Math.cos(An), b * Math.sin(An)]]; return { x: [P[0][0], P[1][0], P[2][0], P[0][0]], y: [P[0][1], P[1][1], P[2][1], P[0][1]], mode: 'lines+markers+text', type: 'scatter', name: sols.length > 1 ? `triangle ${i + 1}` : 'triangle', text: ['A', 'B', 'C', ''], textposition: 'top center', fill: 'toself' }; });
             r.plot = { generic: { title: 'The triangle', xTitle: '', yTitle: '', equal: true, traces } };
         } else if (op === 'conic') {
-            const t = String(src).replace(/[−–]/g, '-'); const sides = t.split('='); if (sides.length > 2) throw new CalcError('Use one equals sign, e.g. 9x^2 + 4y^2 - 18x + 16y - 11 = 0.'); const node = engine.parse(sides.length === 2 ? `(${sides[0]})-(${sides[1]})` : t); const vs = engine.freeVars(node); if (vs.some(v => v !== 'x' && v !== 'y')) throw new CalcError('Use only the variables x and y.');
+            const t = String(src).replace(/[−–]/g, '-').replace(/(?<![A-Za-z_])([xy]{2,})(?![A-Za-z_\d])(?!\s*\()/g, w => w.split('').join('*')); const sides = t.split('='); if (sides.length > 2) throw new CalcError('Use one equals sign, e.g. 9x^2 + 4y^2 - 18x + 16y - 11 = 0.'); const node = engine.parse(sides.length === 2 ? `(${sides[0]})-(${sides[1]})` : t); const vs = engine.freeVars(node); if (vs.some(v => v !== 'x' && v !== 'y')) throw new CalcError('Use only the variables x and y.');
             const code = node.compile(); const P = (x, y) => { const v = code.evaluate({ x, y }); if (typeof v !== 'number' || !Number.isFinite(v)) throw new CalcError('The equation could not be evaluated.'); return v; };
             let F = P(0, 0), D = (P(1, 0) - P(-1, 0)) / 2, A = (P(1, 0) + P(-1, 0)) / 2 - F, E = (P(0, 1) - P(0, -1)) / 2, Cc = (P(0, 1) + P(0, -1)) / 2 - F, B = P(1, 1) - A - Cc - D - E - F; const scl = Math.max(1, ...[A, B, Cc, D, E, F].map(Math.abs)); if (![A, B, Cc, D, E, F].every(Number.isFinite) || scl > 1e100) throw new CalcError('The coefficients are too large or not finite.');
             [[0.37, -1.3], [2.1, 0.8], [-1.7, -2.2], [3.3, 1.9], [-0.6, 2.7]].forEach(([x, y]) => { if (Math.abs(P(x, y) - (A * x * x + B * x * y + Cc * y * y + D * x + E * y + F)) > 1e-8 * scl * (1 + x * x + y * y)) throw new CalcError('This is not a conic: it must be a polynomial of degree at most 2 in x and y.'); });
@@ -3045,7 +3120,21 @@
             }
             let res = 0, fres = 0; samples.forEach(pt => { res = Math.max(res, Math.abs(P(pt[0], pt[1])) / (scl * (1 + pt[0] * pt[0] + pt[1] * pt[1]))); if (fcheck) fres = Math.max(fres, fcheck(pt)); }); if (res > 1e-8 || fres > 1e-7) throw new CalcError('Internal check failed: the canonical form does not reproduce the original equation.');
             r.meta.push(`Verified: ${samples.length} points generated from the canonical form satisfy the original equation (relative residual ${res.toExponential(1)})${fcheck ? `, and the focus property holds at each of them (${kind === 'ellipse' ? 'distances to the two foci add to 2a' : kind === 'hyperbola' ? 'distances to the foci differ by 2a' : 'distance to the focus equals distance to the directrix'}; error ${fres.toExponential(1)})` : ''}.`);
-            r.meta.push(`Type from the discriminant B² − 4AC = ${G(B * B - 4 * A * Cc)}: ${disc > 0 ? 'negative → ellipse' : disc < 0 ? 'positive → hyperbola' : 'zero → parabola'}.`); r.steps.push({ title: 'Classify, then rotate and translate', text: 'The sign of B² − 4AC gives the type. Rotating by ½·atan2(B, A − C) removes the xy term; completing squares then moves the centre (or vertex) to the origin.', tex: 'B^2-4AC<0:\\ \\text{ellipse},\\ =0:\\ \\text{parabola},\\ >0:\\ \\text{hyperbola}' });
+            r.meta.push(`Type from the discriminant B² − 4AC = ${G(B * B - 4 * A * Cc)}: ${disc > 0 ? 'negative → ellipse' : disc < 0 ? 'positive → hyperbola' : 'zero → parabola'}.`); {   // the working: discriminant, rotation, and completing the square when there is no xy term
+                const dsc = B * B - 4 * A * Cc, nz = v => Math.abs(v) > 1e-12 * Math.max(1, Math.abs(A), Math.abs(Cc), Math.abs(F));
+                r.steps.push({ title: 'Read the coefficients', text: `Compare with A x² + B x y + C y² + D x + E y + F = 0: A = ${G(A)}, B = ${G(B)}, C = ${G(Cc)}, D = ${G(D)}, E = ${G(E)}, F = ${G(F)}.`, tex: '' });
+                r.steps.push({ title: 'Classify with the discriminant', text: `B² − 4AC = ${G(B)}² − 4·${G(A)}·${G(Cc)} = ${G(dsc)}. ${dsc < -1e-12 ? 'Negative, so the curve is an ellipse (a circle when A = C and B = 0).' : dsc > 1e-12 ? 'Positive, so the curve is a hyperbola.' : 'Zero, so the curve is a parabola.'}`, tex: '' });
+                if (nz(B)) r.steps.push({ title: 'Remove the xy term by rotating', text: `Rotate the axes by θ = ½·atan2(B, A − C) = ½·atan2(${G(B)}, ${G(A - Cc)}) = ${G(0.5 * Math.atan2(B, A - Cc) * 180 / Math.PI, 7)}°. In the rotated axes the xy term vanishes and the curve has the standard form.`, tex: '' });
+                else if (kind !== 'parabola' && nz(A) && nz(Cc)) {
+                    const h = -D / (2 * A), k = -E / (2 * Cc), Rr = -F + D * D / (4 * A) + E * E / (4 * Cc);
+                    const sg = v => (v < 0 ? `(${G(v)})` : G(v)), px = Rr / A, py = Rr / Cc;
+                    r.steps.push({ title: 'Complete the square in x and in y', text: `${G(A)}(x ${h <= 0 ? '+' : '−'} ${G(Math.abs(h))})² + ${sg(Cc)}(y ${k <= 0 ? '+' : '−'} ${G(Math.abs(k))})² = ${G(Rr)}. The right-hand side is −F + D²/(4A) + E²/(4C) = ${G(-F)} + ${G(D * D / (4 * A))} + ${G(E * E / (4 * Cc))}.`, tex: '' });
+                    const form = px > 0 && py > 0 ? `(x − h)²/${G(px)} + (y − k)²/${G(py)} = 1` : px > 0 && py < 0 ? `(x − h)²/${G(px)} − (y − k)²/${G(-py)} = 1` : px < 0 && py > 0 ? `(y − k)²/${G(py)} − (x − h)²/${G(-px)} = 1` : 'no real points';
+                    r.steps.push({ title: 'Read off the centre and the axes', text: `Centre (h, k) = (${G(h)}, ${G(k)}). Dividing by ${G(Rr)} gives ${form}; the denominators are the squares of the semi-axes.`, tex: '' });
+                }
+                else r.steps.push({ title: 'Complete the square', text: 'With only one squared term, complete the square in that variable; the other variable stays to the first power, which is the parabola form (y − k) = a(x − h)².', tex: '' });
+            }
+            r.steps.push({ title: 'Classify, then rotate and translate', text: 'The sign of B² − 4AC gives the type. Rotating by ½·atan2(B, A − C) removes the xy term; completing squares then moves the centre (or vertex) to the origin.', tex: 'B^2-4AC<0:\\ \\text{ellipse},\\ =0:\\ \\text{parabola},\\ >0:\\ \\text{hyperbola}' });
             r.plot = { generic: { title: 'The conic', xTitle: 'x', yTitle: 'y', equal: true, traces } };
         } else if (op === 'circle3') {
             const nums = String(src).replace(/[()\[\]]/g, ' ').split(/[\s,;]+/).filter(Boolean).map(t => I.parseLimit(t, 'A coordinate').value); if (nums.length !== 6 || nums.some(v => !Number.isFinite(v))) throw new CalcError('Give three points, e.g. (0,0), (4,0), (0,3).');

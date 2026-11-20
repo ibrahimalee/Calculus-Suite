@@ -47,13 +47,14 @@
         <section class="sec" aria-labelledby="h-steps">
             <h2 id="h-steps">Step by step</h2>
             <ol class="prob-steps">
+                <li><b>Eliminate below each pivot, recording the multipliers</b><p>swap R1 ↔ R2 (the larger pivot 6 is safer);   R2 → R2 − (2/3)·R1.  The multipliers (the numbers in brackets) go into L below the diagonal, and the swaps are recorded in P so that PA = LU; the rows that are left form U = [[6, 3], [0, 1]].</p></li>
                 <li><b>Eliminate below each pivot</b><p>Record every multiplier ℓᵢⱼ in L and keep the reduced rows in U; swap rows (tracked in P) when a larger pivot is available.</p></li>
             </ol>
         </section>
         <section class="sec notes" aria-labelledby="h-how">
             <h2 id="h-how">About this kind of problem</h2>
             <p>Every matrix operation is worked row by row, and the result is verified: a determinant against a second expansion, an inverse by multiplying it with the original, eigenvalues by substituting back.</p>
-            <p>For this problem the working uses: Eliminate below each pivot.</p>
+            <p>For this problem the working uses: Eliminate below each pivot, recording the multipliers, Eliminate below each pivot.</p>
         </section>
         <section class="sec" aria-labelledby="h-more">
             <h2 id="h-more">Similar problems</h2>

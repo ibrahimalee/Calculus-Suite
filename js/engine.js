@@ -116,8 +116,16 @@
         }
         // `x(x+1)` is parsed as a call of "x" – turn those back into multiplication
         node = node.transform(n => {
+            // NaN and Infinity are values, not names to build words from: "NaNx" or "Infinity(z+1)" are typing mistakes
+            if (n.type === 'OperatorNode' && n.implicit && n.args.some(q => q.type === 'ConstantNode' && typeof q.value === 'number' && !Number.isFinite(q.value))) throw new CalcError('Infinity is not a number to multiply by. Use inf only as a limit or bound, and write products with *.');
+            if (n.type === 'ConstantNode' && typeof n.value === 'number' && Number.isNaN(n.value)) throw new CalcError('NaN is not a number you can compute with.');
+            if (n.type === 'SymbolNode') {
+                if (n.name === 'NaN') throw new CalcError('NaN is not a number you can compute with.');
+                if (/^(NaN|Infinity)[A-Za-z_]/.test(n.name)) throw new CalcError(`Unknown symbol "${n.name}". Write products with * (for example 2*x) and use inf for infinity.`);
+            }
             if (n.type === 'FunctionNode') {
                 const name = n.fn && n.fn.type === 'SymbolNode' ? n.fn.name : null;
+                if (name === 'Infinity' || name === 'NaN') throw new CalcError(`${name} is a value, not a function. Use * for multiplication, for example 2*(z+1).`);
                 if (name && FUNCS.has(name)) return n;
                 if (name && name.length === 1 && n.args.length === 1) {
                     return OP('*', 'multiply', [S(name), n.args[0]], true);
