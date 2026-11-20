@@ -27,7 +27,7 @@ Questions can use random numbers per student (made from the student's name), par
 
 ## Running it
 
-Open `index.html` or `app.html` directly, or run `npm run serve` and visit http://localhost:8080. The libraries (math.js, Algebrite, Plotly, KaTeX) are in `vendor/`; there is no CDN fallback on purpose. Any static host will serve it as it is. On Vercel, `vercel.json` sets the caching and security headers, including a Content-Security-Policy that allows the inline scripts by hash. If you change an inline script in a page, run `npm run csp` to update those hashes; `npm test` fails when they are stale.
+Open `index.html` or `app.html` directly, or run `npm run serve` and visit http://localhost:8080 (it applies the headers from `vercel.json`). The libraries (math.js, Algebrite, Plotly, KaTeX) are in `vendor/`; there is no CDN fallback on purpose. Any static host will serve it as it is. On Vercel, `vercel.json` sets the caching and security headers, including a Content-Security-Policy that allows the inline scripts by hash. If you change an inline script in a page, run `npm run csp` to update those hashes; `npm test` fails when they are stale.
 
 ## Search engines
 
@@ -42,8 +42,8 @@ npm run seo -- --url https://your-domain.example
 ```
 npm install
 npm test                      # unit tests for the engine, parser, classroom code and CSP hashes
-npm run serve                 # then, in another shell:
-BASE=http://localhost:8080 npm run e2e    # browser tests (needs Playwright's Chromium)
+npm run serve                 # serves with the headers from vercel.json; then, in another shell:
+BASE=http://localhost:8080 npm run e2e    # browser tests under the real CSP, incl. an axe accessibility check
 ```
 
 ## Limits

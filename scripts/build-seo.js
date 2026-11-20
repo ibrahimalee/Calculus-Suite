@@ -58,7 +58,7 @@ function computeAnswer(mode, fn, opts) {
     if (preferred.length && !(mode === 'multivariable' && !/^Solve/.test((main && main.label) || ''))) answer = preferred.map(line).join('<br>');
     else if (main) {
         const html = main.tex ? tex(main.tex, false) : null;
-        answer = html ? `<span class="tex">${html}</span>` : line(main);
+        answer = html ? `<span class="tex" tabindex="0" role="group" aria-label="Answer">${html}</span>` : line(main);
         if (APPEND[mode]) answer += pick(APPEND[mode]).map(it => '<br>' + line(it)).join('');
     }
     const check = (r.meta || []).find(x => /^Verified/.test(x));
