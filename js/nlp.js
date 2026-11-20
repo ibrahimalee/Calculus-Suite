@@ -34,12 +34,12 @@
             t = t.replace(new RegExp(`\\b(${FN}|a?(?:sin|cos|tan)h?)(?: of)? (-?[\\w.]+(?:\\^-?[\\w.]+)?)(?![\\w(])`, 'g'), '$1($2)');
             if (t === before) break;
         }
-        t = t.replace(/\^\((\w+)\)/g, '^$1').replace(/\be ?\^ ?(\w+)/g, 'e^$1').replace(/\be to (\w+)/g, 'e^$1');
+        t = t.replace(/\^\((\d+|[a-z])\)/g, '^$1').replace(/\be ?\^ ?(\w+)/g, 'e^$1').replace(/\be to (\w+)/g, 'e^$1');
         t = t.replace(/\band\b/g, ' ');
         return t.replace(/\s*([+\-*/^=()])\s*/g, '$1').replace(/\s+/g, ' ').trim();
     }
 
-    const num = w => (w in NUM ? NUM[w] : w in ORD ? ORD[w] : (/^\d+$/.test(w) ? +w : null));
+    const num = w => (w in NUM ? NUM[w] : w in ORD ? ORD[w] : (/^\d+(?:st|nd|rd|th)?$/.test(w) ? parseInt(w, 10) : null));
     const limitWord = w => String(w).replace(/\binfinity\b|∞/g, 'inf').replace(/minus\s+inf/, '-inf').replace(/negative\s+inf/, '-inf').replace(/\s+/g, '');
 
     function matrixFrom(text) {
@@ -60,6 +60,20 @@
         const lower = t.toLowerCase().replace(/(\([^()]*\)|[a-z0-9]+)!/g, 'factorial($1)').replace(/[.?!]+$/g, '');
         const strip = s => s.replace(/^(please |hey |hi )?(can|could|would) you (please )?/, '').replace(/^(please )?(find|calculate|compute|evaluate|determine|work out|give me|tell me|show me|what is|what's|whats|what are|how (do|would) (i|you)|how to)\s+/, '').replace(/^(the )/, '');
         let s = strip(lower);
+        // common phrasings rewritten into the forms the rules below know
+        s = s.replace(/^(?:the )?(?:slope|rate of change|gradient) of (.+?) at (.+)$/, 'derivative of $1 at $2')
+            .replace(/^∫\s*(.+)$/, 'integrate $1')
+            .replace(/^lim(?:it)?\s+([a-z])\s*(?:->|→)\s*(\S+)\s+(?:of\s+)?(.+)$/, 'limit of $3 as $1 -> $2')
+            .replace(/^(?:the )?limit as ([a-z])\s*(?:->|→|approaches|tends to|goes to)\s*(.+?) of (.+)$/, 'limit of $3 as $1 -> $2')
+            .replace(/^expand (.+?) (around|about) (.+)$/, 'taylor series of $1 around $3')
+            .replace(/^(?:when|where) (?:is|are) (.+[<>].+)$/, 'solve $1')
+            .replace(/^how many (\w+) (?:are |is )?in (.+)$/, 'convert $2 to $1')
+            .replace(/^(?:the )?prime factori[sz]ation of (\d+)$/, 'factor $1')
+            .replace(/^is (\d+) a prime(?: number)?$/, 'is $1 prime')
+            .replace(/^(?:the )?area of (?:a |the )?triangle with sides? (.+)$/, 'triangle with sides $1')
+            .replace(/^(?:fourier series)(?: of| for) (.+)$/, 'fourier series of $1')
+            .replace(/^(?:newton'?s? method|(?:find )?a (?:root|zero))(?: for| of)? (.+)$/, 'newton root of $1')
+            .replace(/^triangle with sides? (\d+(?:\.\d+)?)[ ,]+(?:and )?(\d+(?:\.\d+)?)[ ,]+(?:and )?(\d+(?:\.\d+)?)$/, 'triangle with a=$1, b=$2, c=$3');
 
         // ---- matrices ------------------------------------------------------
         const M = matrixFrom(t);
@@ -170,9 +184,19 @@
             return { mode: 'series', fn: mathify(body), opts: { point, terms, variable: '' }, say: `${m[1]} series` };
         }
 
+        m = s.match(/^newton root of (.+)$/);
+        if (m) return { mode: 'root', fn: mathify(m[1]), opts: { method: 'newton' }, say: "Newton's method" };
+        m = s.match(/^fourier series of (.+)$/);
+        if (m) return { mode: 'fourier', fn: mathify(m[1]), opts: { lower: '-pi', upper: 'pi', terms: '8' }, say: 'Fourier series on [−π, π]' };
+        m = s.match(/^(?:the )?(left|right|midpoint|mid|trapezoid(?:al)?|simpson'?s?)? ?riemann sum (?:of |for )?(.+?)\s+from\s+(.+?)\s+to\s+(.+?)(?:\s+(?:with|using)\s+(\w+) (?:rectangles|subintervals|intervals|steps|strips|trapezoids))?$/);
+        if (m) { const r = m[1] || 'left'; return { mode: 'riemann', fn: mathify(m[2]), opts: { lower: mathify(m[3]), upper: mathify(m[4]), n: String(num(m[5]) || 8), rule: /mid/.test(r) ? 'mid' : /trap/.test(r) ? 'trap' : /simpson/.test(r) ? 'simpson' : /right/.test(r) ? 'right' : 'left' }, say: 'Riemann sum' }; }
+        m = s.match(/^(?:solve |find )?(?:the )?(?:ode |differential equation )?([a-z]'' ?[+-].+=\s*0)$/);
+        if (m && /y/.test(m[1])) return { mode: 'ode', fn: mathify(m[1].replace(/=\s*0$/, '')).replace(/^y''\+?/, '-(') + ')', opts: { odeType: 'second', x0: '0', xEnd: '10', y0: '1', v0: '0' }, say: 'Second-order ODE (y(0)=1, y′(0)=0 assumed)' };
         // ---- sums ----------------------------------------------------------
         m = s.match(/^(?:the )?sum of (.+?)\s+from\s+([a-z])\s*=\s*(\w+)\s+to\s+(\w+)$/);
         if (m) return { mode: 'sums', fn: mathify(m[1]), opts: { lower: m[3], upper: limitWord(m[4]), variable: m[2] }, say: 'Series sum' };
+        m = s.match(/^(?:the )?sum of (.+?)(?:\s+from\s+(\w+)\s+to\s+(\w+))?$/);
+        if (m && /\bk\b|\bn\b/.test(m[1])) { const v = /\bk\b/.test(m[1]) ? 'k' : 'n'; return { mode: 'sums', fn: mathify(m[1]).replace(/\bn\b/g, 'k'), opts: { lower: m[2] && /^\d+$/.test(m[2]) ? m[2] : '1', upper: m[3] ? limitWord(m[3]) : 'inf', variable: v }, say: 'Series sum' }; }
         m = s.match(/^(?:does|do) (?:the )?(?:series|sum) (?:of )?(.+?) converge$/);
         if (m) return { mode: 'sums', fn: mathify(m[1]), opts: { lower: '1', upper: 'inf', variable: 'k' }, say: 'Convergence test' };
 
