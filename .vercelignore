@@ -1,5 +1,6 @@
 node_modules
 tests
+scripts
 .github
 .vscode
 package-lock.json

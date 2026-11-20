@@ -1654,7 +1654,7 @@
         const clip = (t, n) => { t = String(t == null ? '' : t); return t.length > n ? t.slice(0, n) + '…' : t; };
         let share = ''; try { share = location.origin + location.pathname + '#s=' + encodeHash(snapshot()); } catch (e) { /* ignore */ }
         const body = ['**What is wrong?**', '', '(describe what you expected)', '', '---', `Tool: ${(MODES[state.mode] || {}).label || state.mode}`, 'Input:', '```', clip($('functionInput').value, 400), '```', `Options: \`${clip(JSON.stringify(state.opts[state.mode] || {}), 300)}\``, `Result: ${clip(r && r.main ? ((r.main.label || '') + ' ' + r.main.text) : (r && r.title) || '', 300)}`, share.length < 1200 ? `Link: ${share}` : ''].filter(x => x !== '').join('\n');
-        return 'https://github.com/ibrahimalee/calculus-suite/issues/new?labels=wrong-answer&title=' + encodeURIComponent(clip('Wrong or unexpected answer: ' + ((MODES[state.mode] || {}).label || state.mode), 90)) + '&body=' + encodeURIComponent(body);
+        return 'https://github.com/ibrahimalee/calculus-suite/issues/new?labels=bug%2Cmaths&title=' + encodeURIComponent(clip('Wrong or unexpected answer: ' + ((MODES[state.mode] || {}).label || state.mode), 90)) + '&body=' + encodeURIComponent(body);
     }
 
     function checkBox(r) {

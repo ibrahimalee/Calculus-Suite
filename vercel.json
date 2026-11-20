@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "echo \"static site – nothing to install\"",
-  "buildCommand": "echo \"static site – nothing to build\"",
+  "installCommand": "echo \"static site \u2013 nothing to install\"",
+  "buildCommand": "echo \"static site \u2013 nothing to build\"",
   "outputDirectory": ".",
   "cleanUrls": false,
   "trailingSlash": false,
@@ -27,7 +27,15 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "camera=(), microphone=(), geolocation=(), payment=()"
+          "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), accelerometer=(), gyroscope=(), magnetometer=(), interest-cohort=()"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "X-Permitted-Cross-Domain-Policies",
+          "value": "none"
         }
       ]
     },
@@ -36,7 +44,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8=' 'sha256-jBUD5aDs+qaPW69W7t7y1Jnn+TjsbJkYBR/9wutw9a8=' 'sha256-lJQnjEsyj1sUfXiWOdm7McCnRBq/AJ4smzgeFPGLxSY=' 'sha256-ljkj3rYdWerH3+Vg7GgFnT116bCPO8LffomvBv3/X64=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *"
+          "value": "default-src 'self'; script-src 'self' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8=' 'sha256-jBUD5aDs+qaPW69W7t7y1Jnn+TjsbJkYBR/9wutw9a8=' 'sha256-lJQnjEsyj1sUfXiWOdm7McCnRBq/AJ4smzgeFPGLxSY=' 'sha256-ljkj3rYdWerH3+Vg7GgFnT116bCPO8LffomvBv3/X64=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests"
         }
       ]
     },
@@ -45,7 +53,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8=' 'sha256-jBUD5aDs+qaPW69W7t7y1Jnn+TjsbJkYBR/9wutw9a8=' 'sha256-lJQnjEsyj1sUfXiWOdm7McCnRBq/AJ4smzgeFPGLxSY=' 'sha256-ljkj3rYdWerH3+Vg7GgFnT116bCPO8LffomvBv3/X64=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *"
+          "value": "default-src 'self'; script-src 'self' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8=' 'sha256-jBUD5aDs+qaPW69W7t7y1Jnn+TjsbJkYBR/9wutw9a8=' 'sha256-lJQnjEsyj1sUfXiWOdm7McCnRBq/AJ4smzgeFPGLxSY=' 'sha256-ljkj3rYdWerH3+Vg7GgFnT116bCPO8LffomvBv3/X64=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests"
         }
       ]
     },
@@ -54,7 +62,16 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8=' 'sha256-jBUD5aDs+qaPW69W7t7y1Jnn+TjsbJkYBR/9wutw9a8=' 'sha256-lJQnjEsyj1sUfXiWOdm7McCnRBq/AJ4smzgeFPGLxSY=' 'sha256-ljkj3rYdWerH3+Vg7GgFnT116bCPO8LffomvBv3/X64=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *"
+          "value": "default-src 'self'; script-src 'self' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8=' 'sha256-jBUD5aDs+qaPW69W7t7y1Jnn+TjsbJkYBR/9wutw9a8=' 'sha256-lJQnjEsyj1sUfXiWOdm7McCnRBq/AJ4smzgeFPGLxSY=' 'sha256-ljkj3rYdWerH3+Vg7GgFnT116bCPO8LffomvBv3/X64=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests"
+        }
+      ]
+    },
+    {
+      "source": "/404.html",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8=' 'sha256-jBUD5aDs+qaPW69W7t7y1Jnn+TjsbJkYBR/9wutw9a8=' 'sha256-lJQnjEsyj1sUfXiWOdm7McCnRBq/AJ4smzgeFPGLxSY=' 'sha256-ljkj3rYdWerH3+Vg7GgFnT116bCPO8LffomvBv3/X64=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests"
         }
       ]
     },
@@ -63,7 +80,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8=' 'sha256-jBUD5aDs+qaPW69W7t7y1Jnn+TjsbJkYBR/9wutw9a8=' 'sha256-lJQnjEsyj1sUfXiWOdm7McCnRBq/AJ4smzgeFPGLxSY=' 'sha256-ljkj3rYdWerH3+Vg7GgFnT116bCPO8LffomvBv3/X64=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8=' 'sha256-jBUD5aDs+qaPW69W7t7y1Jnn+TjsbJkYBR/9wutw9a8=' 'sha256-lJQnjEsyj1sUfXiWOdm7McCnRBq/AJ4smzgeFPGLxSY=' 'sha256-ljkj3rYdWerH3+Vg7GgFnT116bCPO8LffomvBv3/X64=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *; upgrade-insecure-requests"
         }
       ]
     },
@@ -72,7 +89,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8=' 'sha256-jBUD5aDs+qaPW69W7t7y1Jnn+TjsbJkYBR/9wutw9a8=' 'sha256-lJQnjEsyj1sUfXiWOdm7McCnRBq/AJ4smzgeFPGLxSY=' 'sha256-ljkj3rYdWerH3+Vg7GgFnT116bCPO8LffomvBv3/X64=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *"
+          "value": "default-src 'self'; script-src 'self' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8=' 'sha256-jBUD5aDs+qaPW69W7t7y1Jnn+TjsbJkYBR/9wutw9a8=' 'sha256-lJQnjEsyj1sUfXiWOdm7McCnRBq/AJ4smzgeFPGLxSY=' 'sha256-ljkj3rYdWerH3+Vg7GgFnT116bCPO8LffomvBv3/X64=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests"
         }
       ]
     },
@@ -81,7 +98,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8=' 'sha256-jBUD5aDs+qaPW69W7t7y1Jnn+TjsbJkYBR/9wutw9a8=' 'sha256-lJQnjEsyj1sUfXiWOdm7McCnRBq/AJ4smzgeFPGLxSY=' 'sha256-ljkj3rYdWerH3+Vg7GgFnT116bCPO8LffomvBv3/X64=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8=' 'sha256-jBUD5aDs+qaPW69W7t7y1Jnn+TjsbJkYBR/9wutw9a8=' 'sha256-lJQnjEsyj1sUfXiWOdm7McCnRBq/AJ4smzgeFPGLxSY=' 'sha256-ljkj3rYdWerH3+Vg7GgFnT116bCPO8LffomvBv3/X64=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests"
         }
       ]
     },
@@ -90,7 +107,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8=' 'sha256-jBUD5aDs+qaPW69W7t7y1Jnn+TjsbJkYBR/9wutw9a8=' 'sha256-lJQnjEsyj1sUfXiWOdm7McCnRBq/AJ4smzgeFPGLxSY=' 'sha256-ljkj3rYdWerH3+Vg7GgFnT116bCPO8LffomvBv3/X64=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'sha256-6Nml+em+YVYBwdkafemLtyyMr1/Bi0aDBSmfVed6YDI=' 'sha256-BEz9Yl69Cu2bnxgifAbTqcQtjAEKj0dwshpVqgAXFa8=' 'sha256-jBUD5aDs+qaPW69W7t7y1Jnn+TjsbJkYBR/9wutw9a8=' 'sha256-lJQnjEsyj1sUfXiWOdm7McCnRBq/AJ4smzgeFPGLxSY=' 'sha256-ljkj3rYdWerH3+Vg7GgFnT116bCPO8LffomvBv3/X64=' 'sha256-sVddfuOnpAoKErpZSYajwbTGDIxcLoh0WrYlUorYfts='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests"
         }
       ]
     },
@@ -171,6 +188,41 @@
         {
           "key": "Content-Type",
           "value": "application/manifest+json; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "/robots.txt",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/plain; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
+      ]
+    },
+    {
+      "source": "/sitemap.xml",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/xml; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
+      ]
+    },
+    {
+      "source": "/tools/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
         }
       ]
     }
