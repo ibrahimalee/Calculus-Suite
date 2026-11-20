@@ -188,3 +188,13 @@ test('practice topics for counting and geometry become worksheet questions; roun
   for (const topic of ['counting', 'geometry']) for (let level = 1; level <= 3; level++) { const qs = C.fromPractice(P, topic, level, 6, 11); assert.strictEqual(qs.length, 6); const w = C.normalise({ questions: qs }); w.questions.forEach(q => assert.ok(C.check(q, q.key).ok, `${topic}/${level}: ${q.prompt}`)); }
   const geo = C.normalise({ questions: C.fromPractice(P, 'geometry', 2, 5, 3) }).questions; geo.forEach(q => { const rounded = (Math.round(parseFloat(q.key) * 100) / 100).toFixed(2); assert.ok(C.check(q, rounded).ok, `rounded ${rounded} vs ${q.key}`); assert.ok(!C.check(q, String(parseFloat(q.key) + 0.5)).ok); });
 });
+
+test('gradebook exports: tab-separated for spreadsheets, and a two-column grade file for learning platforms', () => {
+  const w = ws(), ans = ['9', 'x^2*cos(x)+2*x*sin(x)', 'x^2+4', '1', 'MVT', '2,3', '1 0;0 .5', '2^3*3^2*5'];
+  const mk = (n, a) => C.parseSubmission(C.makeSubmission(w, n, a)).sub;
+  const res = C.gradeAll(w, [mk('Ada\tLove', ans), mk('Bo', ['0'])]);
+  const tsv = C.toTSV(w, res).split('\n'); assert.match(tsv[0], /^Name\tQ1 \(2\)/); assert.equal(tsv[0].split('\t').length, tsv[1].split('\t').length);
+  assert.ok(tsv.every(l => l.split('\t').length === tsv[0].split('\t').length), 'a tab inside a name must not add a column');
+  const g = C.toGradeFile(res).split('\r\n'); assert.equal(g[0], 'Student,Grade (%)'); assert.equal(g.length, 3);
+  assert.match(g.find(l => /^"?Ada/.test(l)), /,100$/); assert.match(g.find(l => /^Bo/.test(l)), /,0$/);
+});

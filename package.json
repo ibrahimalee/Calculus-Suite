@@ -9,7 +9,7 @@
     "serve": "python3 -m http.server 8080",
     "csp": "node scripts/sync-csp.js",
     "seo": "node scripts/build-seo.js",
-    "e2e": "node tests/e2e/ui-checks.js && node tests/e2e/plot-checks.js && node tests/e2e/new-tools.js && node tests/e2e/home.js && node tests/e2e/classroom.js && node tests/e2e/classroom2.js && node tests/e2e/hostile.js && node tests/e2e/print.js"
+    "e2e": "node tests/e2e/ui-checks.js && node tests/e2e/plot-checks.js && node tests/e2e/new-tools.js && node tests/e2e/home.js && node tests/e2e/classroom.js && node tests/e2e/classroom2.js && node tests/e2e/hostile.js && node tests/e2e/print.js && node tests/e2e/daily.js"
   },
   "devDependencies": {
     "playwright": "^1.49.0",

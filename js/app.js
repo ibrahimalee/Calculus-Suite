@@ -2304,14 +2304,28 @@
         const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* storage blocked */ } };
         $('pracTopic').innerHTML = P.TOPICS.map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join('');
         $('pracTopic').value = st.topic; $('pracLevel').value = String(st.level);
-        const stats = () => { $('pracStats').textContent = `Solved ${st.solved} of ${st.tried} · streak ${st.streak} · best streak ${st.best}`; };
+        // the problem of the day: the same one for everybody on a given date, with a streak of days solved
+        const DKEY = 'cs_daily';
+        const dload = () => { try { const d = JSON.parse(localStorage.getItem(DKEY) || '{}'); return { last: /^\d{4}-\d\d-\d\d$/.test(d.last) ? d.last : '', streak: +d.streak || 0, best: +d.best || 0, total: +d.total || 0 }; } catch (e) { return { last: '', streak: 0, best: 0, total: 0 }; } };
+        let dst = dload(), isDaily = false;
+        const pad2 = n => String(n).padStart(2, '0'), ymd = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+        const dayNumber = d => Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5);
+        const stats = () => { $('pracStats').textContent = `Solved ${st.solved} of ${st.tried} · streak ${st.streak} · best streak ${st.best}${dst.best ? ` · daily streak ${dst.streak} (best ${dst.best})` : ''}`; };
+        const markDaily = () => {
+            const now = new Date(), today = ymd(now), yest = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+            if (dst.last === today) return; dst.streak = dst.last === yest ? dst.streak + 1 : 1; dst.best = Math.max(dst.best, dst.streak); dst.total++; dst.last = today;
+            try { localStorage.setItem(DKEY, JSON.stringify(dst)); } catch (e) { /* storage blocked */ }
+        };
         const texLine = (t, display) => `<span class="${display ? 'tex-display ' : ''}tex" data-tex="${esc(t)}"></span>`;
         const draw = el => { renderTex(el); };
-        function next(sameSeed) {
-            st.topic = $('pracTopic').value; st.level = +$('pracLevel').value; if (!sameSeed) st.seed = (st.seed % 999999) + 1; save();
-            try { cur = P.generate(st.topic, st.level, st.seed); } catch (e) { $('pracProblem').textContent = 'Could not create a problem. Try another topic.'; return; }
+        function next(sameSeed, forced) {
+            isDaily = !!forced;
+            if (forced) { $('pracTopic').value = forced.topic; $('pracLevel').value = String(forced.level); }
+            else { st.topic = $('pracTopic').value; st.level = +$('pracLevel').value; if (!sameSeed) st.seed = (st.seed % 999999) + 1; save(); }
+            const pTopic = forced ? forced.topic : st.topic, pLevel = forced ? forced.level : st.level, pSeed = forced ? forced.seed : st.seed;
+            try { cur = P.generate(pTopic, pLevel, pSeed); } catch (e) { $('pracProblem').textContent = 'Could not create a problem. Try another topic.'; return; }
             hintsShown = 0; finished = false; $('pracHints').innerHTML = ''; $('pracFeedback').textContent = ''; $('pracFeedback').className = 'practice-feedback'; $('pracAnswer').value = ''; $('pracPreview').innerHTML = ''; $('pracAnswer').placeholder = cur.placeholder || 'Your answer'; $('pracAnswer').disabled = false;
-            $('pracProblem').innerHTML = `<div class="prob-id">Problem #${st.seed} · ${esc(P.TOPICS.find(t => t[0] === st.topic)[1])} · level ${st.level}</div><div class="prob-body">${texLine(cur.tex, true)}</div>${cur.prompt ? `<div class="prob-prompt">${esc(cur.prompt)}</div>` : (st.topic === 'derivative' ? '<div class="prob-prompt">Differentiate.</div>' : st.topic === 'integral' ? '<div class="prob-prompt">Find an antiderivative.</div>' : '')}`;
+            $('pracProblem').innerHTML = `<div class="prob-id">${isDaily ? `Problem of the day · ${esc(ymd(new Date()))}` : `Problem #${pSeed}`} · ${esc(P.TOPICS.find(t => t[0] === pTopic)[1])} · level ${pLevel}</div><div class="prob-body">${texLine(cur.tex, true)}</div>${cur.prompt ? `<div class="prob-prompt">${esc(cur.prompt)}</div>` : (pTopic === 'derivative' ? '<div class="prob-prompt">Differentiate.</div>' : pTopic === 'integral' ? '<div class="prob-prompt">Find an antiderivative.</div>' : '')}`;
             draw($('pracProblem')); stats(); $('pracAnswer').focus();
         }
         function showSteps(n) {
@@ -2323,6 +2337,7 @@
         $('practiceBtn').addEventListener('click', () => { if (!cur) next(true); if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); $('pracAnswer').focus(); });
         $('practiceClose').addEventListener('click', () => dlg.close());
         $('pracNew').addEventListener('click', () => next(false));
+        $('pracDaily').addEventListener('click', () => { const now = new Date(), n = dayNumber(now); next(true, { topic: P.TOPICS[n % P.TOPICS.length][0], level: 2, seed: n }); });
         $('pracTopic').addEventListener('change', () => next(true)); $('pracLevel').addEventListener('change', () => next(true));
         $('pracAnswer').addEventListener('input', () => {
             const v = $('pracAnswer').value, box = $('pracPreview');
@@ -2334,8 +2349,8 @@
             const fb = $('pracFeedback'); let r;
             try { r = cur.check($('pracAnswer').value); } catch (err) { r = { ok: false, msg: err.message }; }
             if (r.ok) {
-                finished = true; st.tried++; st.solved++; st.streak++; st.best = Math.max(st.best, st.streak); save(); stats();
-                fb.className = 'practice-feedback good'; fb.textContent = hintsShown ? `Correct! (with ${hintsShown} hint${hintsShown === 1 ? '' : 's'}) Press “New problem” for the next one.` : 'Correct! Press “New problem” for the next one.';
+                finished = true; st.tried++; st.solved++; st.streak++; st.best = Math.max(st.best, st.streak); save(); if (isDaily) markDaily(); stats();
+                fb.className = 'practice-feedback good'; fb.textContent = (hintsShown ? `Correct! (with ${hintsShown} hint${hintsShown === 1 ? '' : 's'}) ` : 'Correct! ') + (isDaily ? `That is today’s problem done. Daily streak: ${dst.streak} day${dst.streak === 1 ? '' : 's'}. Come back tomorrow for a new one.` : 'Press “New problem” for the next one.');
                 $('pracAnswer').disabled = true;
             } else { fb.className = 'practice-feedback bad'; fb.textContent = r.msg || 'Not quite – try again, or ask for a hint.'; st.streak = 0; save(); stats(); }
         });

@@ -240,6 +240,17 @@
         const rows = res.rows.map(r => [r.name].concat(r.per.map(p => p.pts), [r.score, r.max, r.max ? Math.round(1000 * r.score / r.max) / 10 : 0], timed ? [r.used === null ? '' : Math.round(r.used / 6) / 10, r.over ? 'yes' : 'no'] : []));
         return [head].concat(rows).map(r => r.map(csvCell).join(',')).join('\r\n');
     }
+    /** Tab-separated, ready to paste into a spreadsheet or a learning-platform gradebook (no quoting needed). */
+    function toTSV(ws, res) {
+        const cell = v => String(v === null || v === undefined ? '' : v).replace(/[\t\r\n]+/g, ' ');
+        const head = ['Name'].concat(ws.questions.map((_, i) => `Q${i + 1} (${ws.questions[i].points})`), ['Score', 'Out of', 'Percent']);
+        const rows = res.rows.map(r => [r.name].concat(r.per.map(p => p.pts), [r.score, r.max, r.max ? Math.round(1000 * r.score / r.max) / 10 : 0]));
+        return [head].concat(rows).map(r => r.map(cell).join('\t')).join('\n');
+    }
+    /** The two columns most learning platforms import: who, and the grade as a percentage. */
+    function toGradeFile(res) {
+        return [['Student', 'Grade (%)']].concat(res.rows.map(r => [r.name, r.max ? Math.round(1000 * r.score / r.max) / 10 : 0])).map(r => r.map(csvCell).join(',')).join('\r\n');
+    }
     /** Turn the practice generator's problems into worksheet questions. */
     function fromPractice(P, topic, level, count, seed) {
         const out = []; for (let i = 0; i < count; i++) {
@@ -252,5 +263,5 @@
         }
         return out;
     }
-    return { TYPES, TYPE_LABEL, LIMITS, uid, normalise, encodeStudent, decodeStudent, check, readable, makeSubmission, parseSubmission, parseMany, grade, gradeAll, toCSV, fromPractice, safeParse, parseVars, fill, instantiate, instantiateQuestion, isRandomised, variantSeed, normName, matchRoster, reviewQuestions, qKey, encodeQuestions, decodeQuestions, _fnv: fnv };
+    return { TYPES, TYPE_LABEL, LIMITS, uid, normalise, encodeStudent, decodeStudent, check, readable, makeSubmission, parseSubmission, parseMany, grade, gradeAll, toTSV, toGradeFile, toCSV, fromPractice, safeParse, parseVars, fill, instantiate, instantiateQuestion, isRandomised, variantSeed, normName, matchRoster, reviewQuestions, qKey, encodeQuestions, decodeQuestions, _fnv: fnv };
 });
