@@ -1191,7 +1191,7 @@
                 ${checkBox(r)}
                 ${metaRest(r).length ? `<div class="result-meta">${metaRest(r).map(m => esc(m)).join('<br>')}</div>` : ''}
                 ${r.warnings.map(w => `<div class="alert alert-warning"><span class="alert-icon">${icon('info', 18)}</span><span>${esc(w)}</span></div>`).join('')}
-                <div class="result-foot"><span>${r.ms != null ? `${r.ms} ms` : 'instant'}</span><span>${esc(r.engine || 'worker')}</span><span>${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span></div>
+                <div class="result-foot"><span>${r.ms != null ? `${r.ms} ms` : 'instant'}</span><span>${esc(r.engine || 'worker')}</span><span>${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span><span><a class="report-link" href="${esc(reportUrl(r))}" target="_blank" rel="noopener">Report a problem</a></span></div>
             </div>`;
         const container = $('results');
         container.innerHTML = html;
@@ -1649,6 +1649,14 @@
     // ------------------------------------------------------------------
     // "How was this checked?", embed code, read-aloud, plot descriptions
     // ------------------------------------------------------------------
+    /** A GitHub issue form prefilled with what the person was doing, so a wrong answer can be reported in one click. */
+    function reportUrl(r) {
+        const clip = (t, n) => { t = String(t == null ? '' : t); return t.length > n ? t.slice(0, n) + '…' : t; };
+        let share = ''; try { share = location.origin + location.pathname + '#s=' + encodeHash(snapshot()); } catch (e) { /* ignore */ }
+        const body = ['**What is wrong?**', '', '(describe what you expected)', '', '---', `Tool: ${(MODES[state.mode] || {}).label || state.mode}`, 'Input:', '```', clip($('functionInput').value, 400), '```', `Options: \`${clip(JSON.stringify(state.opts[state.mode] || {}), 300)}\``, `Result: ${clip(r && r.main ? ((r.main.label || '') + ' ' + r.main.text) : (r && r.title) || '', 300)}`, share.length < 1200 ? `Link: ${share}` : ''].filter(x => x !== '').join('\n');
+        return 'https://github.com/ibrahimalee/calculus-suite/issues/new?labels=wrong-answer&title=' + encodeURIComponent(clip('Wrong or unexpected answer: ' + ((MODES[state.mode] || {}).label || state.mode), 90)) + '&body=' + encodeURIComponent(body);
+    }
+
     function checkBox(r) {
         const lines = (r.meta || []).filter(m => /^Verified|^Method:|cross-?checked|agree|independent/i.test(m));
         if (!lines.length) return '';

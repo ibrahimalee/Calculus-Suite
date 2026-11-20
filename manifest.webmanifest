@@ -14,5 +14,93 @@
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
+  ],
+  "id": "./app.html",
+  "lang": "en",
+  "categories": [
+    "education",
+    "productivity",
+    "utilities"
+  ],
+  "orientation": "any",
+  "shortcuts": [
+    {
+      "name": "Derivative",
+      "short_name": "Derivative",
+      "description": "Differentiate with steps",
+      "url": "./app.html?tool=derivative",
+      "icons": [
+        {
+          "src": "icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Integral",
+      "short_name": "Integral",
+      "description": "Integrate with steps",
+      "url": "./app.html?tool=integral",
+      "icons": [
+        {
+          "src": "icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Graph with sliders",
+      "short_name": "Graph",
+      "description": "Plot functions",
+      "url": "./app.html?tool=graph",
+      "icons": [
+        {
+          "src": "icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Equation solver",
+      "short_name": "Solve",
+      "description": "Solve equations and inequalities",
+      "url": "./app.html?tool=solve",
+      "icons": [
+        {
+          "src": "icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Matrices",
+      "short_name": "Matrix",
+      "description": "Determinant, inverse, eigenvalues",
+      "url": "./app.html?tool=matrix",
+      "icons": [
+        {
+          "src": "icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Teacher tools",
+      "short_name": "Teachers",
+      "description": "Build a worksheet and grade it",
+      "url": "./teacher.html",
+      "icons": [
+        {
+          "src": "icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
   ]
 }

@@ -26,3 +26,16 @@ test('every tool page has a unique title and description, one h1, structured dat
         for (const ld of html.matchAll(/<script type="application\/ld\+json">([^<]+)<\/script>/g)) JSON.parse(ld[1]);
     }
 });
+
+test('the web app manifest has working shortcuts, and the 404 page is noindex with no inline script', () => {
+    const man = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.webmanifest'), 'utf8'));
+    assert.ok(man.shortcuts.length >= 4 && man.id && man.categories.length);
+    const { readModes } = require('../scripts/read-modes.js'); const modes = readModes().modes;
+    for (const s of man.shortcuts) {
+        assert.ok(s.name && s.url.startsWith('./'), s.name);
+        const t = /[?&]tool=(\w+)/.exec(s.url); if (t) assert.ok(modes[t[1]], 'unknown tool in shortcut ' + s.url); else assert.ok(fs.existsSync(path.join(ROOT, s.url.replace(/^\.\//, '').split('?')[0])), s.url);
+    }
+    const nf = fs.readFileSync(path.join(ROOT, '404.html'), 'utf8');
+    assert.match(nf, /<meta name="robots" content="noindex">/);
+    assert.ok(!/<script(?![^>]*\bsrc=)/.test(nf), '404.html must not contain inline scripts (they would be blocked by the CSP)');
+});

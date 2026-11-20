@@ -4,7 +4,7 @@
    - vendor/ (libraries, fonts): cache first, in a cache that survives app releases, because those files never change in place.
    - The 4.8 MB plotting library is not fetched at install time; the page asks for it once it is idle (see 'warm').
    Query strings are ignored for caching, so ?ask=… and ?tool=… links do not each add a copy. */
-const VERSION = 'cs-v29';
+const VERSION = 'cs-v30';
 const SHELL = VERSION + '-shell';
 const VENDOR = 'cs-vendor-v1';
 const NETWORK_WAIT_MS = 4000;
