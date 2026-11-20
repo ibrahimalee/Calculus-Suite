@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>How to Find Critical Points, Maxima and Minima | Calculus Suite</title>
+    <meta name="description" content="Use the first and second derivative to find local maxima, minima and inflection points, with a worked example you can open.">
+    <meta name="theme-color" content="#f8f7ef">
+    <link rel="canonical" href="https://calculus-suite.vercel.app/guides/how-to-find-critical-points.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Calculus Suite">
+    <meta property="og:title" content="How to Find Critical Points, Maxima and Minima | Calculus Suite">
+    <meta property="og:description" content="Use the first and second derivative to find local maxima, minima and inflection points, with a worked example you can open.">
+    <meta property="og:url" content="https://calculus-suite.vercel.app/guides/how-to-find-critical-points.html">
+    <meta property="og:image" content="https://calculus-suite.vercel.app/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="../manifest.webmanifest">
+    <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="../css/tokens.css">
+    <link rel="stylesheet" href="../css/home.css">
+    <script src="../js/theme-init.js"></script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"How to find critical points and extrema","description":"Use the first and second derivative to find local maxima, minima and inflection points, with a worked example you can open.","mainEntityOfPage":"https://calculus-suite.vercel.app/guides/how-to-find-critical-points.html","publisher":{"@type":"Organization","name":"Calculus Suite"}}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Is a critical point always an extremum?","acceptedAnswer":{"@type":"Answer","text":"No. f(x) = x³ has f′(0) = 0 but no maximum or minimum there."}}]}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://calculus-suite.vercel.app/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://calculus-suite.vercel.app/guides/"},{"@type":"ListItem","position":3,"name":"How to find critical points and extrema","item":"https://calculus-suite.vercel.app/guides/how-to-find-critical-points.html"}]}</script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="bar">
+        <a class="wordmark" href="../" aria-label="Calculus Suite, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span></a>
+        <nav class="bar-nav" aria-label="Sections"><a href="../tools/">Tools</a><a href="../problems/">Problems</a><a href="../guides/">Guides</a><a href="../teacher.html">Teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">Source</a></nav>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
+        <a class="btn btn-solid bar-cta" href="../app.html">Open the app</a>
+    </header>
+    <main id="main" class="wrap tool-page guide">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <a href="./">Guides</a> <span aria-hidden="true">›</span> <span aria-current="page">How to find critical points and extrema</span></nav>
+        <h1>How to find critical points and extrema</h1>
+        <p class="lede">Critical points are where a function stops rising or falling, so they are where maxima and minima hide. The derivative finds them, and the second derivative tells you which is which.</p>
+        <section class="sec notes">
+            <h2>Step 1: solve f′(x) = 0</h2>
+            <p>Critical points occur where the derivative is zero or does not exist. Solve f′(x) = 0 for x.</p>
+        </section>
+        <section class="sec notes">
+            <h2>Step 2: classify with the second derivative</h2>
+            <p>If f″ is positive at the point, the graph curves upward and it is a local minimum. If f″ is negative it is a local maximum. If f″ is zero the test is inconclusive and you look at the sign of f′ on both sides.</p>
+        </section>
+        <section class="sec notes">
+            <h2>Example</h2>
+            <p>For f(x) = x³ − 3x we get f′ = 3x² − 3, zero at x = ±1, and f″ = 6x, which is negative at −1 and positive at 1.</p>
+            <div class="guide-eg"><p class="guide-eg-cap"><b>Example.</b> Analysis of x³ − 3x</p><div class="prob-q"><span class="katex-display"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:0.9474em;vertical-align:-0.0833em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">x</span></span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8641em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">3</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">3</span><span class="mspace nobreak"> </span><span class="mord mathnormal">x</span></span></span></span></span></div><div class="prob-a"><code>Roots (f = 0): -1.732051,  0,  1.732051</code><br><code>Local maximum: (-1, 2)</code><br><code>Local minimum: (1, -2)</code></div><p class="eg-links"><a href="../app.html#s=eyJtIjoiYW5hbHlzaXMiLCJmIjoieF4zLTN4IiwibyI6eyJtaW4iOiItMTAiLCJtYXgiOiIxMCIsInZhcmlhYmxlIjoiIn19">Open with steps</a></p></div>
+        </section>
+        <section class="sec notes">
+            <h2>Inflection points</h2>
+            <p>Where f″ changes sign the concavity switches. These are inflection points, which can be found in the same analysis.</p>
+        </section>
+        <section class="sec notes">
+            <h2>Functions of two variables</h2>
+            <p>Set both partial derivatives to zero and classify with the Hessian: positive definite means a minimum, negative definite a maximum, and mixed signs a saddle.</p>
+            <div class="guide-eg"><p class="guide-eg-cap"><b>Example.</b> Critical points of x³ − 3x + y²</p><div class="prob-q"><span class="katex-display"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:0.9474em;vertical-align:-0.0833em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">x</span></span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8641em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">3</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">3</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">⋅</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6667em;vertical-align:-0.0833em;"></span><span class="mord mathnormal">x</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:1.0585em;vertical-align:-0.1944em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal" style="margin-right:0.0359em;">y</span></span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8641em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span></span></span></span></span></div><div class="prob-a"><code>Saddle point: (-1, 0),  f = 2</code><br><code>Local minimum: (1, 0),  f = -2</code></div><p class="eg-links"><a href="../app.html#s=eyJtIjoibXVsdGl2YXJpYWJsZSIsImYiOiJ4XjMtMyp4K3leMiIsIm8iOnsib3AiOiJjcml0aWNhbCIsInZhcnMiOiIiLCJwb2ludCI6IiIsIm1ldGhvZCI6ImdkIiwic3RhcnQiOiItMS4yLCAxIiwibHIiOiIwLjEiLCJpdGVycyI6IjMwIiwiY29uc3RyYWludCI6IiIsImRpcmVjdGlvbiI6IiIsInhMb3ciOiIwIiwieEhpZ2giOiIxIiwieUxvdyI6IjAiLCJ5SGlnaCI6IngiLCJyYWRpdXMiOiI1In19">Open with steps</a></p></div>
+        </section>
+        <section class="sec notes" aria-labelledby="h-faq">
+            <h2 id="h-faq">Questions</h2>
+            <h3>Is a critical point always an extremum?</h3>
+            <p>No. f(x) = x³ has f′(0) = 0 but no maximum or minimum there.</p>
+        </section>
+        <section class="sec" aria-labelledby="h-go">
+            <h2 id="h-go">Try it yourself</h2>
+            <p class="cta-row"><a class="btn btn-solid" href="../app.html?tool=analysis">Open the analysis tool</a><a class="btn btn-line" href="../tools/critical-points-calculator.html">Function analysis: critical points, extrema and asymptotes</a></p>
+            <ul class="rel"><li><a href="how-to-find-a-derivative.html">How to find a derivative</a></li><li><a href="what-is-a-limit.html">What is a limit?</a></li><li><a href="./">All guides</a></li></ul>
+        </section>
+    </main>
+    <footer class="foot">
+        <div class="wrap foot-in">
+            <span>Calculus Suite · MIT licence · free, no account, works offline</span>
+            <span class="foot-links"><a href="../">Home</a><a href="../tools/">All tools</a><a href="../problems/">Worked problems</a><a href="../guides/">Guides</a><a href="../app.html">App</a><a href="../teacher.html">For teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">GitHub</a></span>
+        </div>
+    </footer>
+    <script src="../js/home.js"></script>
+</body>
+</html>

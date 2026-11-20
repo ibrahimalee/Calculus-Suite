@@ -406,3 +406,9 @@ test('transforms and the complex plane refuse infinite constants; Laplace answer
   assert.equal(E.run.laplace('t^2', {}).main.text, '2 / s^3');
   assert.equal(E.run.laplace('5', {}).main.text, '5 / s');
 });
+
+test('Riemann sums reject an unknown rule instead of silently using another', () => {
+  assert.throws(() => E.run.riemann('x^2', { lower: '0', upper: '1', n: '4', rule: 'midpoint' }), /Unknown rule/);
+  const mid = E.run.riemann('sin(x)', { lower: '0', upper: 'pi', n: '10', rule: 'mid' });
+  assert.match(mid.main.text, /2\.0082/);
+});

@@ -43,29 +43,37 @@ const bySlug = Object.fromEntries(PAGES.map(p => [p.slug, p]));
 // where a tool's headline restates the problem, show these result lines instead (or as well)
 const PREFER = { ode: /^(Particular solution|General solution|Series solution|Solution)/, analysis: /^(Roots|Local maximum|Local minimum)/, fourier: /^k = [1-3]:/, multivariable: /^(Saddle|Local|Global|Minimum|Maximum|Degenerate)/, graph: /^Intersection/ };
 const APPEND = { solve: /^Complex/, calc: /^Integer facts/ };
+const PREFER_RENDER = null; // (kept for clarity: the preference tables are defined above)
+function optsFor(mode, extra) { const o = {}; ((MODES[mode] || {}).fields || []).forEach(f => { o[f.key] = f.def; }); return Object.assign(o, extra || {}); }
+function appLink(mode, fn, opts) { return `../app.html#s=${share({ m: mode, f: fn, o: opts })}`; }
+/** Run the engine; returns { r, answer, verified } or throws. `answer` is typeset HTML. */
+function computeAnswer(mode, fn, opts) {
+    const src = mode === 'graph' ? fn.replace(/(^|[;\n])\s*(y|f\(x\))\s*=/g, '$1') : fn;
+    const r = E.run[mode](src, Object.assign({}, opts));
+    const main = r.main || (r.items && r.items[0]);
+    const line = it => `<code>${esc(((it.label ? it.label + ' ' : '') + it.text).slice(0, 300))}</code>`;
+    const pick = re => (r.items || []).filter(it => re.test(it.label || '')).slice(0, 3);
+    const preferred = PREFER[mode] ? pick(PREFER[mode]) : [];
+    let answer = '';
+    if (preferred.length && !(mode === 'multivariable' && !/^Solve/.test((main && main.label) || ''))) answer = preferred.map(line).join('<br>');
+    else if (main) {
+        const html = main.tex ? tex(main.tex, false) : null;
+        answer = html ? `<span class="tex">${html}</span>` : line(main);
+        if (APPEND[mode]) answer += pick(APPEND[mode]).map(it => '<br>' + line(it)).join('');
+    }
+    const check = (r.meta || []).find(x => /^Verified/.test(x));
+    return { r, answer, check, main };
+}
 function runExample(mode, idx) {
     const m = MODES[mode], ex = m && m.examples && m.examples[idx];
     if (!ex) throw new Error(`No example ${mode}[${idx}]`);
-    const opts = {}; (m.fields || []).forEach(f => { opts[f.key] = f.def; }); Object.assign(opts, ex.opts || {});
-    const s = { m: mode, f: ex.fn, o: opts };
+    const opts = optsFor(mode, ex.opts);
     let answer = '', ok = true;
     try {
-        const src = mode === 'graph' ? ex.fn.replace(/(^|[;\n])\s*(y|f\(x\))\s*=/g, '$1') : ex.fn;
-        const r = E.run[mode](src, Object.assign({}, opts));
-        const main = r.main || (r.items && r.items[0]);
-        const line = it => `<code>${esc(((it.label ? it.label + ' ' : '') + it.text).slice(0, 300))}</code>`;
-        const pick = re => (r.items || []).filter(it => re.test(it.label || '')).slice(0, 3);
-        const preferred = PREFER[mode] ? pick(PREFER[mode]) : [];
-        if (preferred.length && !(mode === 'multivariable' && !/^Solve/.test((main && main.label) || ''))) answer = preferred.map(line).join('<br>');
-        else if (main) {
-            const html = main.tex ? tex(main.tex, false) : null;
-            answer = html ? `<span class="tex">${html}</span>` : line(main);
-            if (APPEND[mode]) answer += pick(APPEND[mode]).map(it => '<br>' + line(it)).join('');
-        }
-        const check = (r.meta || []).find(x => /^Verified/.test(x));
-        if (check) answer += `<small class="eg-check">✓ ${esc(check.replace(/^Verified:\s*/, 'Checked: '))}</small>`;
+        const c = computeAnswer(mode, ex.fn, opts); answer = c.answer;
+        if (c.check) answer += `<small class="eg-check">✓ ${esc(c.check.replace(/^Verified:\s*/, 'Checked: '))}</small>`;
     } catch (e) { ok = false; answer = `<span class="eg-note">${esc(e.message)}</span>`; }
-    return { label: ex.label, fn: ex.fn, link: `../app.html#s=${share(s)}`, answer, ok };
+    return { label: ex.label, fn: ex.fn, link: appLink(mode, ex.fn, opts), answer, ok };
 }
 
 function head({ title, description, canonical, extra }) {
@@ -97,14 +105,14 @@ ${extra || ''}</head>`;
 const bar = `    <a class="skip" href="#main">Skip to content</a>
     <header class="bar">
         <a class="wordmark" href="../" aria-label="${NAME}, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">${NAME}</span></a>
-        <nav class="bar-nav" aria-label="Sections"><a href="./">All tools</a><a href="../teacher.html">Teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">Source</a></nav>
+        <nav class="bar-nav" aria-label="Sections"><a href="../tools/">Tools</a><a href="../problems/">Problems</a><a href="../guides/">Guides</a><a href="../teacher.html">Teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">Source</a></nav>
         <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
         <a class="btn btn-solid bar-cta" href="../app.html">Open the app</a>
     </header>`;
 const foot = `    <footer class="foot">
         <div class="wrap foot-in">
             <span>${NAME} · MIT licence · free, no account, works offline</span>
-            <span class="foot-links"><a href="../">Home</a><a href="./">All tools</a><a href="../app.html">App</a><a href="../teacher.html">For teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">GitHub</a></span>
+            <span class="foot-links"><a href="../">Home</a><a href="../tools/">All tools</a><a href="../problems/">Worked problems</a><a href="../guides/">Guides</a><a href="../app.html">App</a><a href="../teacher.html">For teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">GitHub</a></span>
         </div>
     </footer>
     <script src="../js/home.js"></script>
@@ -157,7 +165,11 @@ ${[hint, ...(p.tips || [])].filter(Boolean).map(t => `                <li>${esc(
 ${p.faq.map(([q, a]) => `            <h3>${esc(q)}</h3>\n            <p>${esc(a)}</p>`).join('\n')}
         </section>
 
-        <section class="sec" aria-labelledby="h-rel">
+${(typeof PROBLEMS !== 'undefined' ? PROBLEMS.problems.filter(q => q.tool.slug === p.slug).slice(0, 8) : []).length ? `        <section class="sec" aria-labelledby="h-prob">
+            <h2 id="h-prob">Worked problems</h2>
+            <ul class="rel">${PROBLEMS.problems.filter(q => q.tool.slug === p.slug).slice(0, 8).map(q => `<li><a href="../problems/${q.slug}.html">${esc(q.h1)}</a></li>`).join('')}<li><a href="../problems/">All worked problems</a></li></ul>
+        </section>
+` : ''}        <section class="sec" aria-labelledby="h-rel">
             <h2 id="h-rel">Related tools</h2>
             <ul class="rel">${related}<li><a href="./">All ${PAGES.length} tool pages</a></li></ul>
         </section>
@@ -186,6 +198,152 @@ ${ids.flatMap(id => byMode[id] || []).map(p => `                <li><a href="${p
     </main>
 ${foot}`;
 }
+
+/* ---- problem pages: one per specific problem, computed by the engine ---- */
+const FAMILIES = require('./seo-problems.js');
+const slugify = t => String(t).toLowerCase().replace(/\^/g, '').replace(/\*/g, ' ').replace(/\//g, ' over ').replace(/\+/g, ' plus ').replace(/=/g, ' equals ').replace(/<=/g, ' at most ').replace(/>=/g, ' at least ').replace(/</g, ' less than ').replace(/>/g, ' greater than ').replace(/-/g, ' minus ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 90).replace(/-+$/, '');
+function texOfInput(src) {
+    const rel = /(<=|>=|<|>|=)/; const parts = String(src).split(rel);
+    const sym = { '<=': '\\le ', '>=': '\\ge ', '<': '<', '>': '>', '=': '=' };
+    return parts.map(p => (rel.test(p) ? sym[p] : E.inspect(p).tex)).join('');
+}
+const matTex = m => '\\begin{bmatrix}' + m.split(';').map(r => r.trim().split(/\s+/).join('&')).join('\\\\') + '\\end{bmatrix}';
+function buildProblems() {
+    const out = [], used = new Set(), skipped = [];
+    for (const fam of FAMILIES) {
+        const tool = bySlug[fam.tool];
+        const made = [];
+        for (const it of fam.items) {
+            const input = fam.input ? fam.input(it) : it, expr = fam.expr ? fam.expr(it) : input, h1 = fam.h1(it);
+            const opts = optsFor(fam.mode, fam.opts(it));
+            try {
+                const c = computeAnswer(fam.mode, input, opts);
+                const text = ((c.main && c.main.text) || '').replace(/\s+/g, ' ');
+                if (!c.answer || /NaN|undefined|Infinity(?!\))/.test(text) || (c.r.warnings || []).some(w => /did not converge|blows up|stopped there/.test(w))) throw new Error('no clean answer');
+                const qTex = fam.mode === 'matrix' ? fam.q(it, matTex(input)) : fam.id === 'numbers' ? fam.q(it, '') : fam.q(it, /[<>=]/.test(expr) ? texOfInput(expr) : E.inspect(String(expr)).tex);
+                let slug = slugify(h1), n = 2; while (used.has(slug)) slug = slugify(h1) + '-' + n++; used.add(slug);
+                made.push({ fam, slug, h1, input, opts, c, qTex, text });
+            } catch (e) { skipped.push(`${fam.id}: ${h1} (${e.message.slice(0, 60)})`); }
+        }
+        made.forEach((p, i) => { p.siblings = [1, 2, 3, 4, -1].map(d => made[(i + d + made.length) % made.length]).filter((q, j, a) => q !== p && a.indexOf(q) === j); p.tool = tool; });
+        out.push(...made);
+    }
+    return { problems: out, skipped };
+}
+function problemPage(p) {
+    const { fam, c } = p, r = c.r, canonical = abs(`problems/${p.slug}.html`);
+    const steps = (r.steps || []).slice(0, 12);
+    const rules = [...new Set(steps.map(st => st.title))].slice(0, 6);
+    const title = `${p.h1} – step by step`;
+    const fullTitle = (title.length + 17 <= 72) ? `${title} | ${NAME}` : title;
+    const ans = esc((p.text || '').slice(0, 70));
+    const description = `${p.h1}: ${ans ? 'the answer is ' + ans + '. ' : ''}See every step${c.check ? ', the independent check' : ''} and open it in the free calculator.`.slice(0, 165);
+    const q = tex(p.qTex, true);
+    const items = (r.items || []).filter(it => it.text && !/^f\(|^Equation|^Interval|^Integrand/.test(it.label || '')).slice(0, 5);
+    const jsonld = [{ '@context': 'https://schema.org', '@type': 'WebPage', name: p.h1, description, isPartOf: { '@type': 'WebSite', name: NAME, ...(SITE ? { url: abs('') } : {}) }, ...(canonical ? { url: canonical } : {}) }];
+    if (SITE) jsonld.push({ '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Home', item: abs('') }, { '@type': 'ListItem', position: 2, name: 'Problems', item: abs('problems/') }, { '@type': 'ListItem', position: 3, name: p.h1, item: canonical }] });
+    return `${head({ title: fullTitle, description, canonical, extra: jsonld.map(j => '    ' + ld(j) + '\n').join('') })}
+<body>
+${bar}
+    <main id="main" class="wrap tool-page">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <a href="./">Problems</a> <span aria-hidden="true">›</span> <span aria-current="page">${esc(fam.group)}</span></nav>
+        <h1>${esc(p.h1)}</h1>
+        ${q ? `<div class="prob-q" role="group" aria-label="The problem">${q}</div>` : ''}
+        <section class="sec" aria-labelledby="h-ans">
+            <h2 id="h-ans">Answer</h2>
+            <div class="prob-a">${c.answer}</div>
+            ${c.check ? `<p class="eg-check">✓ ${esc(c.check.replace(/^Verified:\s*/, 'Checked: '))}</p>` : ''}
+            ${items.length ? `<ul class="plain">${items.map(it => `<li>${esc(((it.label || '') + ' ' + it.text).trim().slice(0, 200))}</li>`).join('')}</ul>` : ''}
+            <p class="cta-row"><a class="btn btn-solid" href="${esc(appLink(fam.mode, p.input, p.opts))}">Open this in the calculator</a><a class="btn btn-line" href="../tools/${p.tool.slug}.html">${esc(p.tool.h1)}</a></p>
+        </section>
+${steps.length ? `        <section class="sec" aria-labelledby="h-steps">
+            <h2 id="h-steps">Step by step</h2>
+            <ol class="prob-steps">
+${steps.map(st => { const t = st.tex ? tex(st.tex, true) : null; return `                <li><b>${esc(st.title)}</b>${st.text ? `<p>${esc(st.text)}</p>` : ''}${t ? `<div class="step-tex">${t}</div>` : ''}</li>`; }).join('\n')}
+            </ol>
+        </section>
+` : ''}        <section class="sec notes" aria-labelledby="h-how">
+            <h2 id="h-how">About this kind of problem</h2>
+            <p>${esc(fam.intro)}</p>
+${rules.length ? `            <p>For this problem the working uses: ${esc(rules.join(', ').replace(/\.$/, ''))}.</p>\n` : ''}        </section>
+        <section class="sec" aria-labelledby="h-more">
+            <h2 id="h-more">Similar problems</h2>
+            <ul class="rel">${p.siblings.map(o => `<li><a href="${o.slug}.html">${esc(o.h1)}</a></li>`).join('')}<li><a href="./">All problems</a></li></ul>
+        </section>
+    </main>
+${foot}`;
+}
+function problemsHub(problems) {
+    const canonical = abs('problems/');
+    const groups = [...new Set(FAMILIES.map(f => f.group))];
+    return `${head({ title: `Worked calculus problems with answers and steps | ${NAME}`, description: `${problems.length} worked problems: derivatives, integrals, limits, series, Laplace transforms, equations and matrices, each with the answer, every step and an independent check.`, canonical })}
+<body>
+${bar}
+    <main id="main" class="wrap tool-page">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <span aria-current="page">Problems</span></nav>
+        <h1>Worked problems</h1>
+        <p class="lede">${problems.length} common problems, each worked step by step by the same engine as the calculator, with the answer checked a second way. Open any of them in the calculator to change the numbers.</p>
+${groups.map(g => { const ps = problems.filter(p => p.fam.group === g); return `        <section class="sec" aria-label="${esc(g)}">
+            <h2>${esc(g)} <small>(${ps.length})</small></h2>
+            <ul class="prob-list">${ps.map(p => `<li><a href="${p.slug}.html">${esc(p.h1)}</a></li>`).join('')}</ul>
+        </section>`; }).join('\n')}
+    </main>
+${foot}`;
+}
+const PROBLEMS = buildProblems();
+if (PROBLEMS.skipped.length) console.log(`Skipped ${PROBLEMS.skipped.length} problems that did not give a clean answer:\n  ` + PROBLEMS.skipped.join('\n  '));
+
+/* ---- guides ---- */
+const GUIDES = require('./seo-guides.js');
+function guideExample(ex) {
+    const [mode, fn, extra, caption] = ex, opts = optsFor(mode, extra);
+    const c = computeAnswer(mode, fn, opts);
+    const qt = (/[<>=]/.test(fn) && mode !== 'laplace') ? texOfInput(fn) : (mode === 'matrix' ? matTex(fn) : (mode === 'laplace' && opts.op === 'ode') ? '' : E.inspect(fn).tex);
+    const found = PROBLEMS.problems.find(p => p.fam.mode === mode && p.input === fn && JSON.stringify(Object.entries(p.opts).filter(([k, v]) => String(opts[k]) !== String(v))) === '[]');
+    return `<div class="guide-eg"><p class="guide-eg-cap"><b>Example.</b> ${esc(caption)}</p>${qt && tex(qt, true) ? `<div class="prob-q">${tex(qt, true)}</div>` : ''}<div class="prob-a">${c.answer}</div>${c.check ? `<p class="eg-check">✓ ${esc(c.check.replace(/^Verified:\s*/, 'Checked: '))}</p>` : ''}<p class="eg-links"><a href="${esc(appLink(mode, fn, opts))}">Open with steps</a>${found ? ` · <a href="../problems/${found.slug}.html">Full worked page</a>` : ''}</p></div>`;
+}
+function guidePage(g) {
+    const canonical = abs(`guides/${g.slug}.html`), tool = bySlug[g.tool];
+    const jsonld = [{ '@context': 'https://schema.org', '@type': 'Article', headline: g.h1, description: g.description, ...(canonical ? { mainEntityOfPage: canonical } : {}), publisher: { '@type': 'Organization', name: NAME } }, { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: g.faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) }];
+    if (SITE) jsonld.push({ '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Home', item: abs('') }, { '@type': 'ListItem', position: 2, name: 'Guides', item: abs('guides/') }, { '@type': 'ListItem', position: 3, name: g.h1, item: canonical }] });
+    const related = (g.related || []).filter(x => GUIDES.some(y => y.slug === x)).map(x => GUIDES.find(y => y.slug === x));
+    return `${head({ title: `${g.title} | ${NAME}`.replace(/^(.{0,100}) \| Calculus Suite$/, (m, t) => (m.length <= 78 ? m : t)), description: g.description, canonical, extra: jsonld.map(j => '    ' + ld(j) + '\n').join('') })}
+<body>
+${bar}
+    <main id="main" class="wrap tool-page guide">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <a href="./">Guides</a> <span aria-hidden="true">›</span> <span aria-current="page">${esc(g.h1)}</span></nav>
+        <h1>${esc(g.h1)}</h1>
+        <p class="lede">${esc(g.lede)}</p>
+${g.sections.map(sec => `        <section class="sec notes">
+            <h2>${esc(sec.h)}</h2>
+${(sec.p || []).map(t => `            <p>${esc(t)}</p>`).join('\n')}
+${sec.formula ? `            <div class="prob-q">${tex(sec.formula, true)}</div>\n` : ''}${sec.example ? '            ' + guideExample(sec.example) + '\n' : ''}        </section>`).join('\n')}
+        <section class="sec notes" aria-labelledby="h-faq">
+            <h2 id="h-faq">Questions</h2>
+${g.faq.map(([q, a]) => `            <h3>${esc(q)}</h3>\n            <p>${esc(a)}</p>`).join('\n')}
+        </section>
+        <section class="sec" aria-labelledby="h-go">
+            <h2 id="h-go">Try it yourself</h2>
+            <p class="cta-row"><a class="btn btn-solid" href="../app.html?tool=${tool.mode}">Open the ${esc(MODES[tool.mode].label.toLowerCase())} tool</a><a class="btn btn-line" href="../tools/${tool.slug}.html">${esc(tool.h1)}</a></p>
+            ${related.length ? `<ul class="rel">${related.map(r => `<li><a href="${r.slug}.html">${esc(r.h1)}</a></li>`).join('')}<li><a href="./">All guides</a></li></ul>` : ''}
+        </section>
+    </main>
+${foot}`;
+}
+function guidesHub() {
+    const canonical = abs('guides/');
+    return `${head({ title: `Calculus guides: derivatives, integrals, limits and more | ${NAME}`, description: `${GUIDES.length} short guides to the ideas behind calculus, each with worked examples computed and checked by the calculator.`, canonical })}
+<body>
+${bar}
+    <main id="main" class="wrap tool-page">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <span aria-current="page">Guides</span></nav>
+        <h1>Guides</h1>
+        <p class="lede">Short explanations of the main ideas, each with worked examples that were computed and checked by the calculator.</p>
+        <ul class="hub">${GUIDES.map(g => `<li><a href="${g.slug}.html"><b>${esc(g.h1)}</b><span>${esc(g.description)}</span></a></li>`).join('')}</ul>
+    </main>
+${foot}`;
+}
+
 
 /* ---- the main pages: SEO head blocks and the static home-page index ---- */
 function seoBlock(page, title, description, extraLd) {
@@ -230,8 +388,12 @@ outputs.push(patch('app.html', html => replaceBlock(ensureMarkers(html, 'app.htm
 outputs.push(patch('teacher.html', html => replaceBlock(ensureMarkers(html, 'teacher.html'), html.includes('<!-- seo:start (') ? '<!-- seo:start (generated by scripts/build-seo.js) -->' : '<!-- seo:start -->', '<!-- seo:end -->', seoBlock('teacher.html', titleOf(html), headMeta(html, 'description'), null))));
 
 PAGES.forEach(p => outputs.push([`tools/${p.slug}.html`, toolPage(p)]));
+PROBLEMS.problems.forEach(p => outputs.push([`problems/${p.slug}.html`, problemPage(p)]));
+GUIDES.forEach(g => outputs.push([`guides/${g.slug}.html`, guidePage(g)]));
+outputs.push(['guides/index.html', guidesHub()]);
+outputs.push(['problems/index.html', problemsHub(PROBLEMS.problems)]);
 outputs.push(['tools/index.html', hubPage()]);
-const urls = ['', 'app.html', 'teacher.html', 'tools/', ...PAGES.map(p => `tools/${p.slug}.html`)];
+const urls = ['', 'app.html', 'teacher.html', 'tools/', ...PAGES.map(p => `tools/${p.slug}.html`), 'problems/', ...PROBLEMS.problems.map(p => `problems/${p.slug}.html`), 'guides/', ...GUIDES.map(g => `guides/${g.slug}.html`)];
 outputs.push(['robots.txt', `User-agent: *\nAllow: /\nDisallow: /worksheet.html\n${SITE ? `\nSitemap: ${abs('sitemap.xml')}\n` : ''}`]);
 if (SITE) outputs.push(['sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(u => `  <url><loc>${esc(abs(u))}</loc></url>`).join('\n')}\n</urlset>\n`]);
 
@@ -243,12 +405,18 @@ for (const [file, content] of outputs) {
     if (CHECK) { stale.push(file); continue; }
     fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, content);
 }
+// pages that were generated before but no longer are (a problem dropped, a slug changed) must not linger
+const wanted = new Set(outputs.map(([f]) => f));
+for (const dir of ['tools', 'problems', 'guides']) {
+    const dp = path.join(ROOT, dir); if (!fs.existsSync(dp)) continue;
+    for (const f of fs.readdirSync(dp).filter(x => x.endsWith('.html'))) if (!wanted.has(`${dir}/${f}`)) { if (CHECK) stale.push(`${dir}/${f} (no longer generated)`); else fs.unlinkSync(path.join(dp, f)); }
+}
 if (!SITE && !CHECK && fs.existsSync(path.join(ROOT, 'sitemap.xml'))) fs.unlinkSync(path.join(ROOT, 'sitemap.xml'));
 if (CHECK) {
     if (stale.length) { console.error('Out of date (run npm run seo): ' + stale.join(', ')); process.exit(1); }
     console.log('SEO pages are current');
 } else {
     require('./sync-csp.js').sync(false);
-    console.log(`Built ${PAGES.length} tool pages${SITE ? ' and sitemap.xml for ' + SITE : ' (no public address set: canonical links and sitemap.xml are skipped; run with --url https://your-domain)'}.`);
+    console.log(`Built ${PAGES.length} tool pages, ${PROBLEMS.problems.length} problem pages, ${GUIDES.length} guides${SITE ? ' and sitemap.xml for ' + SITE : ' (no public address set: canonical links and sitemap.xml are skipped; run with --url https://your-domain)'}.`);
 }
 module.exports = { PAGES };

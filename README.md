@@ -31,7 +31,7 @@ Open `index.html` or `app.html` directly, or run `npm run serve` and visit http:
 
 ## Search engines
 
-`tools/` holds one page per tool (what it does, worked examples computed by the engine, FAQ and structured data), and `tools/index.html` lists them. They, `robots.txt`, the sitemap and the canonical/Open Graph tags in the main pages are generated from the app by `npm run seo`, so they always match it; `npm test` fails if they are stale. Once the site has its public address, run it once with the address so canonical links and `sitemap.xml` are written:
+`tools/` holds one page per tool, `problems/` has a worked page for several hundred specific problems (answer, steps and check computed by the engine), and `guides/` has short explainers with computed examples. The problem list is `scripts/seo-problems.js` and the guides are `scripts/seo-guides.js`; add a line and run the build. They, `robots.txt`, the sitemap and the canonical/Open Graph tags in the main pages are generated from the app by `npm run seo`, so they always match it; `npm test` fails if they are stale. Once the site has its public address, run it once with the address so canonical links and `sitemap.xml` are written:
 
 ```
 npm run seo -- --url https://your-domain.example

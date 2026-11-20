@@ -2338,7 +2338,7 @@
                 r.warnings.push('No closed form was found (supported analytic types: linear and separable). Showing the numerical solution.');
                 r.steps.push({ title: 'Numerical solution', text: `Integrate y′ = ${strOf(f)} from x = ${fmt(x0)} with y(${fmt(x0)}) = ${fmt(y0)} using adaptive RK45.`, tex: '' });
             }
-            r.steps.push({ title: 'Solution values', text: [0, 0.25, 0.5, 0.75, 1].map(p => { const x = x0 + (xEnd - x0) * p; return `y(${fmt(x, 4)}) ≈ ${fmt(yf(x), 6)}`; }).join('   '), tex: '' });
+            r.steps.push({ title: 'Solution values', text: [0, 0.25, 0.5, 0.75, 1].map(p => { const x = x0 + (xEnd - x0) * p; const yv = yf(x); return Number.isFinite(yv) ? `y(${fmt(x, 4)}) ≈ ${fmt(yv, 6)}` : `y(${fmt(x, 4)}) is not defined (the solution does not reach this x)`; }).join('   '), tex: '' });
             if (sol.status !== 'ok') r.warnings.push(sol.status === 'blowup' ? `The solution blows up near x ≈ ${fmt(sol.t[sol.t.length - 1], 4)}; integration stopped there.` : 'Step limit reached before the end of the interval.');
             curves.push(yCurve);
             r.plot = { variable: 'x', curves, slopeField: { expr: strOf(f), fn: F }, points: [{ x: x0, y: y0, name: 'initial condition' }], xRange: [Math.min(x0, xEnd), Math.max(x0, xEnd)], yLabel: 'y' };
@@ -2672,6 +2672,7 @@
         const b = parseLimit(opt.upper === undefined || opt.upper === '' ? '1' : opt.upper, 'Upper limit');
         if (!Number.isFinite(a.value) || !Number.isFinite(b.value) || a.value >= b.value) throw new CalcError('Use finite limits with lower < upper');
         const rule = opt.rule || 'left';
+        if (!['left', 'right', 'mid', 'trap', 'simpson'].includes(rule)) throw new CalcError(`Unknown rule “${String(rule).slice(0, 20)}”. Use left, right, mid, trap or simpson.`);
         let n = Math.max(1, Math.min(100000, parseInt(opt.n, 10) || 8));
         if (rule === 'simpson' && n % 2) n += 1;
         const f = compile(node, [v]);
