@@ -1183,6 +1183,7 @@
                         ${'speechSynthesis' in window ? `<button class="mini-btn" data-act="listen" title="Read the result aloud">Listen</button>` : ''}
                         <button class="mini-btn" data-act="braille" title="Braille (Nemeth Code) output">Braille</button>
                         <button class="mini-btn" data-act="export" title="Download a Markdown report">Export</button>
+                        <button class="mini-btn" data-act="print" title="Print, or save as a PDF from the print dialog">Print / PDF</button>
                     </div>
                 </div>
                 ${r.main ? `<div class="result-content">${r.main.tex ? '' : `<span class="row-label">${esc(r.main.label)}</span> `}${texSpan(r.main.tex, r.main.text, true)}</div>` : ''}
@@ -1201,6 +1202,7 @@
         container.querySelector('[data-act="share"]').addEventListener('click', shareLink);
         container.querySelector('[data-act="save"]').addEventListener('click', saveToNotebook);
         container.querySelector('[data-act="export"]').addEventListener('click', exportReport);
+        container.querySelector('[data-act="print"]').addEventListener('click', printResult);
         container.querySelector('[data-act="embed"]').addEventListener('click', embedCode);
         container.querySelector('[data-act="braille"]').addEventListener('click', () => openBraille(r));
         const lb = container.querySelector('[data-act="listen"]'); if (lb) lb.addEventListener('click', () => speakResult(r));
@@ -1904,6 +1906,26 @@
         setTimeout(() => URL.revokeObjectURL(a.href), 1000);
         toast('Report downloaded', 'ok');
     }
+    /** Print the current result (answer, steps and plot) or save it as a PDF from the browser's print dialog. */
+    async function printResult() {
+        if (!state.result) { toast('Nothing to print yet – run a calculation first', 'err'); return; }
+        const r = state.result, was = activeTab();
+        const when = new Date().toLocaleString();
+        let head = $('printHead');
+        if (!head) { head = document.createElement('div'); head.id = 'printHead'; head.className = 'print-head'; $('results').parentNode.insertBefore(head, $('results').parentNode.firstChild); }
+        head.textContent = '';
+        const t = document.createElement('div'); t.className = 'print-title'; t.textContent = `${(MODES[state.mode] || {}).label || ''}: ${r.title || ''}`;
+        const i = document.createElement('div'); i.className = 'print-input'; i.textContent = 'Input: ' + String($('functionInput').value).replace(/\s+/g, ' ').trim().slice(0, 300);
+        const m = document.createElement('div'); m.className = 'print-meta'; m.textContent = `Calculus Suite · ${location.origin}${location.pathname} · ${when}`;
+        head.append(t, i, m);
+        // the plot is only drawn while its tab is showing, so show it once to have it on the page
+        if (r.plot || state.liveSpec) { try { switchTab('plot'); await needPlotly(); await new Promise(res => requestAnimationFrame(() => setTimeout(res, 350))); } catch (e) { /* print without the plot */ } switchTab(was); }
+        const prevTitle = document.title; document.title = `Calculus Suite – ${r.title || 'result'}`.slice(0, 80);
+        const restore = () => { document.title = prevTitle; window.removeEventListener('afterprint', restore); };
+        window.addEventListener('afterprint', restore); setTimeout(restore, 60000);
+        window.print();
+    }
+
     function downloadPlot() {
         const t = activeTab();
         const div = t === 'plot3d' ? $('plot3dDiv') : $('plot2d');
@@ -1922,6 +1944,7 @@
             ['Actions', 'link', 'Copy share link', '', 'url link', shareLink],
             ['Actions', 'file', 'Export result as Markdown report', '', 'download save report', exportReport],
             ['Actions', 'camera', 'Save current plot as PNG', '', 'image picture download', downloadPlot],
+            ['Actions', 'file', 'Print or save as PDF', 'Ctrl P', 'print pdf export paper homework', printResult],
             ['Actions', 'copy', 'Copy result as text', '', 'clipboard', () => state.result && copyText(state.result.text, 'Result copied')],
             ['Actions', 'keyboard', 'Show / hide symbol keypad', '', 'symbols keyboard', toggleKeypad],
             ['Actions', 'clock', 'Clear history', '', 'delete', () => { try { localStorage.removeItem('cs_history'); } catch (e) { /* ignore */ } renderHistory(); }],
