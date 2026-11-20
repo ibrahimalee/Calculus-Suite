@@ -4,7 +4,7 @@ Calculus Suite itself is MIT licensed (see `LICENSE`). It bundles these componen
 
 | Component | Version | Licence | Where |
 |---|---|---|---|
-| [math.js](https://mathjs.org) | 11.11.0 | Apache-2.0 | `vendor/math.min.js` |
+| [math.js](https://mathjs.org) | 15.2.0 | Apache-2.0 | `vendor/math-15.2.0.min.js` |
 | [Algebrite](https://github.com/davidedc/Algebrite) | 1.4.0 | MIT | `vendor/algebrite.min.js` |
 | [Plotly.js](https://plotly.com/javascript/) | 4.2.0 | MIT | `vendor/plotly.min.js` |
 | [KaTeX](https://katex.org) | 0.19.1 | MIT | `vendor/katex/` |

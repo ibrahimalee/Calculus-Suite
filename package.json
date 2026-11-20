@@ -43,6 +43,6 @@
   ],
   "dependencies": {
     "algebrite": "1.4.0",
-    "mathjs": "11.11.0"
+    "mathjs": "15.2.0"
   }
 }

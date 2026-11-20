@@ -35,13 +35,15 @@
     // ======================================================================
     const base = Object.assign({}, engine.run);
     const F_ = math.fraction;
-    const frTxt = f => { const n = f.s * f.n; return f.d === 1 ? String(n) : `${n}/${f.d}`; };
-    const frTex = f => { const n = f.s * f.n; return f.d === 1 ? String(n) : `${n < 0 ? '-' : ''}\\frac{${Math.abs(n)}}{${f.d}}`; };
-    const isZero = f => f.n === 0;
+    // math.js 12+ keeps a fraction's sign, numerator and denominator as BigInt; the helpers below read them as numbers
+    const fS = f => Number(f.s), fN = f => Number(f.n), fD = f => Number(f.d);
+    const frTxt = f => { const n = fS(f) * fN(f); return fD(f) === 1 ? String(n) : `${n}/${fD(f)}`; };
+    const frTex = f => { const n = fS(f) * fN(f); return fD(f) === 1 ? String(n) : `${n < 0 ? '-' : ''}\\frac{${Math.abs(n)}}{${fD(f)}}`; };
+    const isZero = f => fN(f) === 0;
     const matTexF = (M, aug) => `\\left[\\begin{array}{${'c'.repeat(M[0].length - (aug || 0))}${aug ? '|' + 'c'.repeat(aug) : ''}}${M.map(r => r.map(frTex).join('&')).join('\\\\')}\\end{array}\\right]`;
     const toFr = M => M.map(r => r.map(x => { try { return F_(x); } catch (e) { return F_(Math.round(x * 1e6), 1e6); } }));
     const rowName = i => `R${i + 1}`;
-    const sgnTerm = (f, i) => { const neg = f.s < 0; const a = F_(f.n, f.d); const c = (a.n === 1 && a.d === 1) ? '' : frTxt(a) + '·'; return { neg, txt: `${c}${rowName(i)}` }; };
+    const sgnTerm = (f, i) => { const neg = fS(f) < 0; const a = F_(fN(f), fD(f)); const c = (fN(a) === 1 && fD(a) === 1) ? '' : frTxt(a) + '·'; return { neg, txt: `${c}${rowName(i)}` }; };
 
     /** Gauss–Jordan with every row operation recorded. `aug` = number of augmented columns (e.g. identity for an inverse). */
     function gaussSteps(M0, aug) {
@@ -54,7 +56,7 @@
             if (pr < 0) continue;
             if (pr !== row) { [M[pr], M[row]] = [M[row], M[pr]]; detFactor = math.multiply(detFactor, F_(-1)); snap(`Swap ${rowName(row)} ↔ ${rowName(pr)}`, `Column ${c + 1} needs a non-zero pivot in row ${row + 1}.`); }
             const pv = M[row][c];
-            if (!(pv.n === 1 && pv.d === 1 && pv.s === 1)) { const inv = math.divide(F_(1), pv); M[row] = M[row].map(x => math.multiply(x, inv)); detFactor = math.multiply(detFactor, pv); snap(`${rowName(row)} → ${frTxt(inv)}·${rowName(row)}`, `Scale so the pivot in column ${c + 1} becomes 1.`); }
+            if (!(fN(pv) === 1 && fD(pv) === 1 && fS(pv) === 1)) { const inv = math.divide(F_(1), pv); M[row] = M[row].map(x => math.multiply(x, inv)); detFactor = math.multiply(detFactor, pv); snap(`${rowName(row)} → ${frTxt(inv)}·${rowName(row)}`, `Scale so the pivot in column ${c + 1} becomes 1.`); }
             for (let r = 0; r < m; r++) {
                 if (r === row || isZero(M[r][c])) continue;
                 const k = M[r][c];

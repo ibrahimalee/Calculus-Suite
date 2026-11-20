@@ -3,7 +3,7 @@
 try {
     // The vendored browser bundles expect a `window`; a worker only has `self`.
     if (typeof window === 'undefined') self.window = self;
-    importScripts('../vendor/math.min.js', '../vendor/algebrite.min.js', 'engine.js', 'extras.js');
+    importScripts('../vendor/math-15.2.0.min.js', '../vendor/algebrite.min.js', 'engine.js', 'extras.js');
     const g = self;
     const Alg = g.Algebrite || (g.window && g.window.Algebrite);
     const engine = g.CalcEngine.create(g.math, Alg);

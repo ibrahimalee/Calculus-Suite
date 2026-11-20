@@ -11,7 +11,7 @@
     'use strict';
 
     const LIBS = [
-        { name: 'math.js', global: 'math', urls: ['vendor/math.min.js'] },
+        { name: 'math.js', global: 'math', urls: ['vendor/math-15.2.0.min.js'] },
         { name: 'Algebrite', global: 'Algebrite', urls: ['vendor/algebrite.min.js'] },
         { name: 'KaTeX', global: 'katex', optional: true, urls: ['vendor/katex/katex.min.js'] }
     ];
