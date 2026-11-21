@@ -737,6 +737,9 @@
         ]
     };
 
+    // tool names arrive from links and saved files: with no prototype, names like "constructor" simply aren't tools
+    Object.setPrototypeOf(MODES, null);
+
     const MODE_GROUPS = [
         ['Core calculus', ['derivative', 'integral', 'limit', 'series', 'analysis']],
         ['Explore & visualise', ['graph', 'riemann', 'applications', 'root', 'fourier', 'geometry']],

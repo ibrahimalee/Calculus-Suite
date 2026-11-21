@@ -102,6 +102,21 @@ ${canonical ? `    <meta property="og:url" content="${esc(canonical)}">\n` : ''}
 ${extra || ''}</head>`;
 }
 
+
+/** Typed maths in a visible heading or link, written the way it is printed: x^5 → x⁵, e^(2x) → e²ˣ, sqrt(x) → √x.
+ *  Only exponents that have Unicode superscripts are rewritten; anything else (fractions, nested powers) is left as typed.
+ *  <title> and descriptions keep the typed form, which is what people search for. */
+const SUP = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹', '-': '⁻', '+': '⁺', n: 'ⁿ', x: 'ˣ', y: 'ʸ', t: 'ᵗ', k: 'ᵏ', i: 'ⁱ' };
+const sup = s => ([...s].every(c => SUP[c]) ? [...s].map(c => SUP[c]).join('') : null);
+function prettyMath(t) {
+    return String(t)
+        .replace(/\^\(([-+]?[0-9a-z]{1,4})\)/g, (m, e) => sup(e) || m)
+        .replace(/\^(-?\d{1,3}|[a-z])(?![\w(^])/g, (m, e) => sup(e) || m)
+        .replace(/\bsqrt\(([a-z0-9]{1,3})\)/g, '√$1')
+        .replace(/(\d)\*(?=[a-z(])/g, '$1')
+        .replace(/\*/g, '·')
+        .replace(/\binf\b/g, '∞').replace(/\bpi\b/g, 'π');
+}
 const bar = `    <a class="skip" href="#main">Skip to content</a>
     <header class="bar">
         <a class="wordmark" href="../" aria-label="${NAME}, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">${NAME}</span></a>
@@ -247,7 +262,7 @@ function problemPage(p) {
 ${bar}
     <main id="main" class="wrap tool-page">
         <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <a href="./">Problems</a> <span aria-hidden="true">›</span> <span aria-current="page">${esc(fam.group)}</span></nav>
-        <h1>${esc(p.h1)}</h1>
+        <h1>${esc(prettyMath(p.h1))}</h1>
         ${q ? `<div class="prob-q" role="group" aria-label="The problem">${q}</div>` : ''}
         <section class="sec" aria-labelledby="h-ans">
             <h2 id="h-ans">Answer</h2>
@@ -268,7 +283,7 @@ ${steps.map(st => { const t = st.tex ? tex(st.tex, true) : null; return `       
 ${rules.length ? `            <p>For this problem the working uses: ${esc(rules.join(', ').replace(/\.$/, ''))}.</p>\n` : ''}        </section>
         <section class="sec" aria-labelledby="h-more">
             <h2 id="h-more">Similar problems</h2>
-            <ul class="rel">${p.siblings.map(o => `<li><a href="${o.slug}.html">${esc(o.h1)}</a></li>`).join('')}<li><a href="./">All problems</a></li></ul>
+            <ul class="rel">${p.siblings.map(o => `<li><a href="${o.slug}.html">${esc(prettyMath(o.h1))}</a></li>`).join('')}<li><a href="./">All problems</a></li></ul>
         </section>
     </main>
 ${foot}`;
@@ -285,7 +300,7 @@ ${bar}
         <p class="lede">${problems.length} common problems, each worked step by step by the same engine as the calculator, with the answer checked a second way. Open any of them in the calculator to change the numbers.</p>
 ${groups.map(g => { const ps = problems.filter(p => p.fam.group === g); return `        <section class="sec" aria-label="${esc(g)}">
             <h2>${esc(g)} <small>(${ps.length})</small></h2>
-            <ul class="prob-list">${ps.map(p => `<li><a href="${p.slug}.html">${esc(p.h1)}</a></li>`).join('')}</ul>
+            <ul class="prob-list">${ps.map(p => `<li><a href="${p.slug}.html">${esc(prettyMath(p.h1))}</a></li>`).join('')}</ul>
         </section>`; }).join('\n')}
     </main>
 ${foot}`;

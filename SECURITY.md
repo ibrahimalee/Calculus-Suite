@@ -6,7 +6,7 @@ If you find a vulnerability (script injection through an input, a shared link, a
 
 What is in place:
 
-- A Content-Security-Policy in `vercel.json`: scripts only from this origin plus pinned hashes for the inline ones, no external connections, no plugins. `'unsafe-eval'` is needed because the maths library compiles expressions with `new Function`, which is why input is parsed through the whitelist first.
+- A Content-Security-Policy in `vercel.json`: scripts only from this origin plus pinned hashes for the inline ones, no external connections, no plugins. No page allows `eval` or `new Function`; only the calculator allows WebAssembly (`'wasm-unsafe-eval'`), which the photo scanner needs. `tests/e2e/csp-violations.js` runs the main features under this policy and fails on any violation.
 - The home page, tool pages and 404 page run with no `eval` at all and cannot be framed; only the calculator can be embedded, by design. Responses also carry `Cross-Origin-Opener-Policy`, a restrictive `Permissions-Policy` and `nosniff`, and the policy upgrades insecure requests.
 - Tests, scripts and dev files are excluded from the deployment (`.vercelignore`), and `/.well-known/security.txt` says where to report problems.
 - Every library is vendored, with no CDN fallback; the pinned versions have no known advisories (checked with `npm audit` and the npm advisory database).

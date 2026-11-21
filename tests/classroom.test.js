@@ -198,3 +198,15 @@ test('gradebook exports: tab-separated for spreadsheets, and a two-column grade 
   const g = C.toGradeFile(res).split('\r\n'); assert.equal(g[0], 'Student,Grade (%)'); assert.equal(g.length, 3);
   assert.match(g.find(l => /^"?Ada/.test(l)), /,100$/); assert.match(g.find(l => /^Bo/.test(l)), /,0$/);
 });
+test('spreadsheet exports never hand a spreadsheet a formula from a student', async () => {
+  const w = ws(); const mk = (n, a) => C.parseSubmission(C.makeSubmission(w, n, a)).sub;
+  const res = C.gradeAll(w, [mk('=HYPERLINK("http://x","hi")', ['@SUM(1)', '+cmd|x', '-2+3']), mk('Bo', ['-3'])]);
+  const tsv = C.toTSV(w, res), csv = C.toCSV(w, res), gf = C.toGradeFile(res);
+  for (const out of [tsv, csv, gf]) for (const line of out.split(/\r?\n/).slice(1)) for (const cell of line.split(/\t|,(?=(?:[^"]*"[^"]*")*[^"]*$)/)) assert.ok(!/^"?[=+@]/.test(cell), 'formula cell: ' + cell);
+  assert.match(tsv, /'=HYPERLINK/);
+});
+test('a worksheet link that inflates to megabytes (a decompression bomb) is refused, not read into memory', async () => {
+  const zlib = require('zlib'); const z = zlib.deflateRawSync(Buffer.alloc(50 * 1024 * 1024, 32));
+  const link = 'z' + z.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  await assert.rejects(() => C.decodeStudent(link), /far larger than any real worksheet/);
+});

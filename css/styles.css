@@ -364,7 +364,8 @@ body.embed .container { padding: 8px; } body.embed .main-grid { display: block; 
     .appbar { gap: 4px; }
     .cmd-btn { min-width: 44px; width: 44px; height: 44px; padding: 0; justify-content: center; margin-left: auto; } .cmd-btn kbd, .cmd-btn > span:not([data-icon]) { display: none; }
     .appbar-spacer { display: none; }
-    .brand-name { display: none; }
+    .brand-name { font-size: 16px; white-space: nowrap; }
+    #themeToggle { display: none; }   /* the theme is also in Settings; on a phone the room goes to the name */
     .icon-btn .lbl { display: none; } .icon-btn .lbl + [data-icon] { display: inline-grid; }
     .workspace { padding: 8px 10px 12px; }
     .tabs { overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; }
@@ -438,3 +439,4 @@ body.rtl .mode-toggle-label, body.rtl .field-label, body.rtl .option-label { tex
 html[dir="rtl"] :is(p, li, td, th, dd, dt, summary, label, .hint, .badge, .alert, .result-meta, .result-foot, .statusbar span, .density-note, .row-label, .field-hint, h1, h2, h3, h4, .result-title > span, .history-empty) { unicode-bidi: plaintext; }
 .help-body td code { white-space: nowrap; display: inline-block; margin: 1px 0; }
 @media (max-width: 640px) { .more-list { left: 0; right: auto; } }
+@media (max-width: 359px) { .brand-name { display: none; } }

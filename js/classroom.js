@@ -24,7 +24,22 @@
     const clip = (v, n) => String(v === undefined || v === null ? '' : v).slice(0, n);
 
     async function deflate(bytes) { if (typeof CompressionStream === 'undefined') return null; try { return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer()); } catch (e) { return null; } }
-    async function inflate(bytes) { if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot open compressed worksheet links. Please update your browser.'); try { return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer()); } catch (e) { throw new Error('This worksheet link is damaged or incomplete.'); } }
+    // a worksheet is a few KB of JSON; a link that inflates past this is broken or a decompression bomb, so stop reading
+    const MAX_INFLATED = 4 * 1024 * 1024;
+    async function inflate(bytes) {
+        if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot open compressed worksheet links. Please update your browser.');
+        const damaged = () => new Error('This worksheet link is damaged or incomplete. If it was long, it may have been cut off when it was sent; ask for it again.');
+        let reader;
+        try { reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader(); } catch (e) { throw damaged(); }
+        const parts = []; let total = 0;
+        for (;;) {
+            let r; try { r = await reader.read(); } catch (e) { throw damaged(); }
+            if (r.done) break;
+            total += r.value.length; if (total > MAX_INFLATED) { try { reader.cancel(); } catch (e) { /* ignore */ } throw new Error('This worksheet link is far larger than any real worksheet, so it was not opened.'); }
+            parts.push(r.value);
+        }
+        const out = new Uint8Array(total); let o = 0; parts.forEach(p => { out.set(p, o); o += p.length; }); return out;
+    }
     async function pack(obj) { const raw = utf8(JSON.stringify(obj)); const z = await deflate(raw); return z && z.length < raw.length ? 'z' + b64u(z) : 'r' + b64u(raw); }
     async function unpack(str) { str = String(str || '').trim(); if (!str) throw new Error('Empty link.'); const kind = str[0], body = str.slice(1); let bytes = unb64u(body); if (kind === 'z') bytes = await inflate(bytes); else if (kind !== 'r') throw new Error('This link is not a worksheet.'); return JSON.parse(unutf8(bytes)); }
 
@@ -101,6 +116,12 @@
             const out = inMath && Math.abs(v) === 1 ? (v < 0 ? '-' : (signed ? '+' : '')) : s;
             return signed ? (v >= 0 && out[0] !== '+' ? '+' + out : out) : (asKey && v < 0 ? '(' + s + ')' : out);
         });
+    }
+    /** An answer key as people write it: 15*x^2 + (-2)*x → 15*x^2 - 2*x, (-3)*x^2 → -3*x^2, 1*x → x. Display only; checking uses the key itself. */
+    function showKey(k) {
+        return String(k == null ? '' : k)
+            .replace(/\+\s*\((-[\d.]+)\)/g, (m, n) => '- ' + n.slice(1)).replace(/-\s*\((-[\d.]+)\)/g, (m, n) => '+ ' + n.slice(1))
+            .replace(/(^|,)(\s*)\((-[\d.]+)\)/g, '$1$2$3').replace(/(^|[^\d.])1\*(?=[a-z(])/g, '$1');
     }
     function drawScope(vars, seed, i) { const rnd = mulberry(parseInt(fnv(seed + '|' + i), 16)); const sc = {}; vars.forEach(v => { sc[v.name] = v.values[Math.floor(rnd() * v.values.length)]; }); return sc; }
     function instantiateQuestion(q, seed, i) {
@@ -237,7 +258,9 @@
     const qKey = q => fnv([q.type, q.prompt, q.key, q.rand || ''].join('|'));
     async function encodeQuestions(questions) { const clean = normalise({ questions }).questions; return pack({ v: 1, k: 'q', q: clean }); }
     async function decodeQuestions(str) { const o = await unpack(str); if (!o || o.k !== 'q' || !Array.isArray(o.q)) throw new Error('This link does not contain shared questions.'); return normalise({ questions: o.q.slice(0, LIMITS.questions) }).questions; }
-    const csvCell = v => { let s = String(v === undefined || v === null ? '' : v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    // A cell a spreadsheet would run as a formula (=, +, -, @ first) gets a leading apostrophe; plain numbers like -3 stay numbers.
+    const defuse = s => (/^[=+\-@\t\r]/.test(s) && !/^[-+]?\d+(\.\d+)?$/.test(s) ? "'" + s : s);
+    const csvCell = v => { const s = defuse(String(v === undefined || v === null ? '' : v)); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     function toCSV(ws, res) {
         const timed = ws.timeLimit > 0; const head = ['Name'].concat(ws.questions.map((_, i) => `Q${i + 1} (${ws.questions[i].points})`), ['Score', 'Out of', 'Percent'], timed ? ['Minutes used', 'Ran out of time'] : []);
         const rows = res.rows.map(r => [r.name].concat(r.per.map(p => p.pts), [r.score, r.max, r.max ? Math.round(1000 * r.score / r.max) / 10 : 0], timed ? [r.used === null ? '' : Math.round(r.used / 6) / 10, r.over ? 'yes' : 'no'] : []));
@@ -245,7 +268,7 @@
     }
     /** Tab-separated, ready to paste into a spreadsheet or a learning-platform gradebook (no quoting needed). */
     function toTSV(ws, res) {
-        const cell = v => String(v === null || v === undefined ? '' : v).replace(/[\t\r\n]+/g, ' ');
+        const cell = v => defuse(String(v === null || v === undefined ? '' : v).replace(/[\t\r\n]+/g, ' ').trim());
         const head = ['Name'].concat(ws.questions.map((_, i) => `Q${i + 1} (${ws.questions[i].points})`), ['Score', 'Out of', 'Percent']);
         const rows = res.rows.map(r => [r.name].concat(r.per.map(p => p.pts), [r.score, r.max, r.max ? Math.round(1000 * r.score / r.max) / 10 : 0]));
         return [head].concat(rows).map(r => r.map(cell).join('\t')).join('\n');
@@ -266,5 +289,5 @@
         }
         return out;
     }
-    return { TYPES, TYPE_LABEL, LIMITS, uid, normalise, encodeStudent, decodeStudent, check, readable, makeSubmission, parseSubmission, parseMany, grade, gradeAll, toTSV, toGradeFile, toCSV, fromPractice, safeParse, parseVars, fill, instantiate, instantiateQuestion, isRandomised, variantSeed, normName, matchRoster, reviewQuestions, qKey, encodeQuestions, decodeQuestions, _fnv: fnv };
+    return { TYPES, TYPE_LABEL, LIMITS, showKey, uid, normalise, encodeStudent, decodeStudent, check, readable, makeSubmission, parseSubmission, parseMany, grade, gradeAll, toTSV, toGradeFile, toCSV, fromPractice, safeParse, parseVars, fill, instantiate, instantiateQuestion, isRandomised, variantSeed, normName, matchRoster, reviewQuestions, qKey, encodeQuestions, decodeQuestions, _fnv: fnv };
 });

@@ -26,11 +26,12 @@ test('no page loads a script or stylesheet from another origin', () => {
     }
 });
 
-test('headers: only the app may be framed or use eval; every HTML page has a policy; hardening headers are set', () => {
+test('headers: only the app may be framed; no page may use eval; every HTML page has a policy; hardening headers are set', () => {
     const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'vercel.json'), 'utf8'));
     const csp = src => { const r = cfg.headers.find(h => h.source === src && h.headers.some(x => x.key === 'Content-Security-Policy')); return r && r.headers.find(x => x.key === 'Content-Security-Policy').value; };
     for (const src of ['/', '/index.html', '/tools/:path*', '/problems/:path*', '/guides/:path*', '/404.html', '/CalculusSuite.html', '/teacher.html', '/worksheet.html', '/app.html']) assert.ok(csp(src), 'no CSP for ' + src);
-    for (const src of ['/', '/index.html', '/tools/:path*', '/problems/:path*', '/guides/:path*', '/404.html']) assert.ok(!/unsafe-eval/.test(csp(src)), src + ' needs no eval');
+    for (const src of ['/', '/index.html', '/tools/:path*', '/problems/:path*', '/guides/:path*', '/404.html', '/app.html', '/teacher.html', '/worksheet.html']) assert.ok(!/'unsafe-eval'/.test(csp(src)), src + ' needs no eval');
+    for (const src of ['/teacher.html', '/worksheet.html']) assert.ok(!/wasm-unsafe-eval/.test(csp(src)), src + ' runs no WebAssembly');
     for (const src of ['/', '/index.html', '/tools/:path*', '/problems/:path*', '/guides/:path*', '/404.html', '/teacher.html', '/worksheet.html']) assert.match(csp(src), /frame-ancestors 'self'/, src);
     assert.match(csp('/app.html'), /frame-ancestors \*/, 'the calculator is embeddable on purpose');
     for (const src of ['/app.html', '/']) assert.match(csp(src), /upgrade-insecure-requests/);

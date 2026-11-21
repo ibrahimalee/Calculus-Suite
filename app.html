@@ -70,7 +70,7 @@
                     <form id="askForm" autocomplete="off">
                         <label class="field-label" for="askInput">Ask in plain English</label>
                         <div class="ask-row">
-                            <input id="askInput" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" enterkeyhint="go" aria-describedby="askNote" placeholder="e.g. integrate x squared from 0 to 3">
+                            <input id="askInput" type="text" maxlength="500" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" enterkeyhint="go" aria-describedby="askNote" placeholder="e.g. integrate x squared from 0 to 3">
                             <button class="btn btn-primary ask-go" type="submit" aria-label="Run this question">Ask</button>
                         </div>
                         <div class="ask-note" id="askNote" aria-live="polite">Try: “derivative of sin x times e to the x”, “limit of sin x over x as x goes to 0”, “5 km/h to m/s”.</div>

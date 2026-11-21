@@ -76,7 +76,7 @@
 
     function selfCheck() {
         let got = 0, max = 0;
-        view.questions.forEach((q, i) => { max += q.points; const r = C.check(q, answers[i]), v = $(`v${i}`); v.className = 'verdict ' + (r.ok ? 'good' : 'miss'); if (r.ok) { got += q.points; v.textContent = '✓ Correct'; } else { v.textContent = r.note === 'blank' ? '✗ No answer yet' : `✗ Not quite. The expected answer is: ${q.type === 'choice' ? q.options[+q.key] : q.key}`; } });
+        view.questions.forEach((q, i) => { max += q.points; const r = C.check(q, answers[i]), v = $(`v${i}`); v.className = 'verdict ' + (r.ok ? 'good' : 'miss'); if (r.ok) { got += q.points; v.textContent = '✓ Correct'; } else { v.textContent = r.note === 'blank' ? '✗ No answer yet' : `✗ Not quite. The expected answer is: ${q.type === 'choice' ? q.options[+q.key] : C.showKey(q.key)}`; } });
         const b = $('scoreBox'); b.hidden = false; b.textContent = ''; const big = document.createElement('div'); big.className = 'score-big'; big.textContent = `${got} / ${max}`; b.appendChild(big);
         return { got, max };
     }
