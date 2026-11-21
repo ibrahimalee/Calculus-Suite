@@ -60,8 +60,10 @@
     let lang = 'en';
     const tr = (en, l) => { const row = D[en]; return row && COL[l] != null ? row[COL[l]] : en; };
     const SKIP = 'script,style,textarea,.katex,.tex,.result-content,.result-rows,.step-card,.preview-box,.history-list,.nb-list,.practice-problem,.practice-hints,#plotDesc,.js-plotly-plot';
+    let ver = 0;   // grows when more strings are added, so text that had no translation is looked up again
     function applyText(n, l) {
-        if (n.__en === undefined) { const t = n.nodeValue.trim(); if (t && D[t]) { n.__en = t; n.__lead = n.nodeValue.match(/^\s*/)[0]; n.__trail = n.nodeValue.match(/\s*$/)[0]; } else n.__en = null; }
+        if (n.__en === null && n.__ver !== ver) n.__en = undefined;
+        if (n.__en === undefined) { const t = n.nodeValue.trim(); if (t && D[t]) { n.__en = t; n.__lead = n.nodeValue.match(/^\s*/)[0]; n.__trail = n.nodeValue.match(/\s*$/)[0]; } else { n.__en = null; n.__ver = ver; } }
         if (n.__en === null) return;
         n.nodeValue = n.__lead + (l === 'en' ? n.__en : tr(n.__en, l)) + n.__trail;
     }
@@ -70,13 +72,22 @@
         const walk = node => {
             if (node.nodeType === 3) { if (node.parentElement && node.parentElement.closest(SKIP)) return; const t = node.nodeValue.trim(); if (t && (D[t] || node.__en)) applyText(node, l); return; }
             if (node.nodeType !== 1 || node.matches(SKIP)) return;
-            for (const a of ['placeholder', 'title', 'aria-label']) { const k = 'data-i18n-en-' + a; const v = node.getAttribute(a); if (v == null) continue; if (!node.hasAttribute(k)) node.setAttribute(k, D[v] ? v : ''); const en = node.getAttribute(k); if (en) node.setAttribute(a, l === 'en' ? en : tr(en, l)); }
+            for (const a of ['placeholder', 'title', 'aria-label']) { const k = 'data-i18n-en-' + a; const v = node.getAttribute(a); if (v == null) continue; if (!node.hasAttribute(k) || (node.getAttribute(k) === '' && D[v])) node.setAttribute(k, D[v] ? v : ''); const en = node.getAttribute(k); if (en) node.setAttribute(a, l === 'en' ? en : tr(en, l)); }
             node.childNodes.forEach(walk);
         };
         walk(root);
     }
+    /** Adds strings (js/i18n-tools.js calls this) and re-translates the page. */
+    function add(dict) { Object.assign(D, dict); ver++; if (lang !== 'en' && typeof document !== 'undefined' && document.body) apply(document.body, lang); }
+    // the tools' labels, choices and hints are a second, larger dictionary that only non-English pages download
+    let toolsLoading = false;
+    function loadTools() {
+        if (toolsLoading || typeof document === 'undefined') return; toolsLoading = true;
+        const el = document.createElement('script'); el.src = 'js/i18n-tools.js'; el.async = true; el.onerror = () => { toolsLoading = false; el.remove(); };
+        document.head.appendChild(el);
+    }
     function set(l) {
-        if (!LANGS.some(x => x[0] === l)) l = 'en'; lang = l; const meta = LANGS.find(x => x[0] === l);
+        if (!LANGS.some(x => x[0] === l)) l = 'en'; lang = l; if (l !== 'en') loadTools(); const meta = LANGS.find(x => x[0] === l);
         document.documentElement.lang = l; document.documentElement.dir = meta[2]; document.body.classList.toggle('rtl', meta[2] === 'rtl'); store.set(l); apply(document.body, l);
     }
     function init() {
@@ -87,5 +98,5 @@
         obs.observe(document.body, { childList: true, subtree: true });
         if (l !== 'en') set(l); else { document.documentElement.lang = 'en'; document.documentElement.dir = 'ltr'; }
     }
-    return { LANGS, D, apply, set, init, tr, get lang() { return lang; } };
+    return { LANGS, D, add, apply, set, init, tr, get lang() { return lang; } };
 });

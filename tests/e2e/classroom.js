@@ -1,6 +1,6 @@
 // Classroom flow: build a worksheet, open the student link, answer, get a code, grade it in the gradebook.
 const { chromium } = require('playwright');
-const BASE = process.env.BASE_ROOT || 'http://localhost:8099';
+const BASE = process.env.BASE_ROOT || process.env.BASE || 'http://localhost:8099';
 (async () => {
   const b = await chromium.launch(); let bad = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; };
   const ctx = await b.newContext({ viewport: { width: 1200, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });

@@ -2351,7 +2351,7 @@
             draw($('pracHints'));
             return steps.length;
         }
-        $('practiceBtn').addEventListener('click', () => { if (!cur) next(true); if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); $('pracAnswer').focus(); });
+        $('practiceBtn').addEventListener('click', async () => { try { await Runner.ensureFull(); } catch (e) { toast('Practice needs the full engine, which did not load. Check your connection and try again.', 'err'); return; } if (!cur) next(true); if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); $('pracAnswer').focus(); });
         $('practiceClose').addEventListener('click', () => dlg.close());
         $('pracNew').addEventListener('click', () => next(false));
         $('pracDaily').addEventListener('click', () => { const now = new Date(), n = dayNumber(now); next(true, { topic: P.TOPICS[n % P.TOPICS.length][0], level: 2, seed: n }); });
@@ -2443,6 +2443,8 @@
         document.addEventListener('click', e => document.querySelectorAll('.more-menu[open]').forEach(m => { if (!m.contains(e.target)) m.open = false; }));
         // re-fit display maths when the width changes (phone rotated, window resized)
         { let w = innerWidth, t = 0; window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => { if (Math.abs(innerWidth - w) < 40) return; w = innerWidth; document.querySelectorAll('.tex-display[data-tex]').forEach(el => renderTex(el.parentNode)); }, 250); }); }
+        // the computer algebra system is only needed on this page for practice and as a fallback: fetch it once the app is idle
+        (window.requestIdleCallback || (f => setTimeout(f, 1200)))(() => { Runner.ensureFull().catch(() => { /* a banner explains */ }); });
         Runner.warmUp().then(ok => {
             $('engineDot').classList.add('on');
             $('engineStatus').textContent = ok ? 'Engine ready · background worker' : 'Engine ready · main thread';

@@ -1,7 +1,7 @@
 // Hostile input regression: crafted share links, query strings and a booby-trapped notebook file must never
 // break startup, pollute prototypes or run script.
 const { chromium } = require('playwright');
-const BASE = process.env.BASE_ROOT || 'http://localhost:8099';
+const BASE = process.env.BASE_ROOT || process.env.BASE || 'http://localhost:8099';
 const enc = o => Buffer.from(JSON.stringify(o)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 (async () => {
   const b = await chromium.launch(); let bad = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; };

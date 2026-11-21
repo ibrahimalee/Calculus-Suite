@@ -1,6 +1,6 @@
 // Phone layout: long answers wrap instead of being cut off, the More menu stays on screen, the home question box keeps its height.
 const { chromium } = require('playwright');
-const BASE = process.env.BASE_ROOT || 'http://localhost:8099';
+const BASE = process.env.BASE_ROOT || process.env.BASE || 'http://localhost:8099';
 (async () => {
     const b = await chromium.launch(); let bad = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; };
     const p = await (await b.newContext({ viewport: { width: 375, height: 740 }, serviceWorkers: 'block' })).newPage(); const errs = [];

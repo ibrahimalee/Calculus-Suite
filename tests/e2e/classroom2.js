@@ -1,7 +1,7 @@
 // Classroom batch 3 in a real browser: random numbers per student, shuffled choices, partial credit, point overrides,
 // class list, question analysis, review sheet, question bank, sharing questions, and printing a worksheet with its key.
 const { chromium } = require('playwright');
-const BASE = process.env.BASE_ROOT || 'http://localhost:8099';
+const BASE = process.env.BASE_ROOT || process.env.BASE || 'http://localhost:8099';
 (async () => {
   const b = await chromium.launch(); let bad = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; };
   const ctx = await b.newContext({ viewport: { width: 1200, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'] });

@@ -36,6 +36,8 @@ test('headers: only the app may be framed or use eval; every HTML page has a pol
     for (const src of ['/app.html', '/']) assert.match(csp(src), /upgrade-insecure-requests/);
     const g = cfg.headers.find(h => h.source === '/:path*').headers.map(x => x.key);
     for (const k of ['X-Content-Type-Options', 'Referrer-Policy', 'Permissions-Policy', 'Cross-Origin-Opener-Policy']) assert.ok(g.includes(k), k);
-    const ign = fs.readFileSync(path.join(__dirname, '..', '.vercelignore'), 'utf8');
-    for (const k of ['node_modules', 'tests', 'scripts']) assert.ok(ign.split('\n').includes(k), k + ' must not be deployed');
+    // the site is served from dist/, which the build fills; tooling, tests and dependencies must never be copied there
+    assert.equal(cfg.outputDirectory, 'dist'); assert.equal(cfg.buildCommand, 'npm run build');
+    const build = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'build-dist.js'), 'utf8');
+    for (const k of ['node_modules', 'tests', 'scripts', '.git', 'package.json', 'package-lock.json']) assert.ok(build.includes(`'${k}'`), k + ' must not be deployed');
 });

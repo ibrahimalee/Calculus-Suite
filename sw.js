@@ -11,7 +11,7 @@ const NETWORK_WAIT_MS = 4000;
 
 const CORE = ['./', 'index.html', 'app.html', 'teacher.html', 'worksheet.html',
     'css/tokens.css', 'css/home.css', 'css/classroom.css', 'css/styles.css',
-    'js/theme-init.js', 'js/dialog.js', 'js/home.js', 'js/classroom.js', 'js/teacher.js', 'js/worksheet.js', 'js/lib-guard.js', 'js/engine.js', 'js/extras.js', 'js/nlp.js', 'js/practice.js', 'js/i18n.js', 'js/braille.js', 'js/runner.js', 'js/worker.js', 'js/app.js',
+    'js/theme-init.js', 'js/dialog.js', 'js/home.js', 'js/classroom.js', 'js/teacher.js', 'js/worksheet.js', 'js/lib-guard.js', 'js/engine.js', 'js/extras.js', 'js/nlp.js', 'js/practice.js', 'js/i18n.js', 'js/i18n-tools.js', 'js/braille.js', 'js/runner.js', 'js/worker.js', 'js/app.js',
     'icon.svg', 'manifest.webmanifest'];
 const VENDOR_CORE = ['vendor/math-15.2.0.min.js', 'vendor/algebrite.min.js', 'vendor/katex/katex.min.js', 'vendor/katex/katex.min.css', 'vendor/qrcode/qrcode.js',
     'vendor/fonts/atkinson-hyperlegible-latin-400-normal.woff2', 'vendor/fonts/atkinson-hyperlegible-latin-400-italic.woff2', 'vendor/fonts/atkinson-hyperlegible-latin-700-normal.woff2',

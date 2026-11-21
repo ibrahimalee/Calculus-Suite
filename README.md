@@ -27,7 +27,7 @@ Questions can use random numbers per student (made from the student's name), par
 
 ## Running it
 
-Open `index.html` or `app.html` directly, or run `npm run serve` and visit http://localhost:8080 (it applies the headers from `vercel.json`). The libraries (math.js, Algebrite, Plotly, KaTeX) are in `vendor/`; there is no CDN fallback on purpose. Any static host will serve it as it is. On Vercel, `vercel.json` sets the caching and security headers, including a Content-Security-Policy that allows the inline scripts by hash. If you change an inline script in a page, run `npm run csp` to update those hashes; `npm test` fails when they are stale.
+Open `index.html` or `app.html` directly, or run `npm run serve` and visit http://localhost:8080 (it applies the headers from `vercel.json`). The libraries (math.js, Algebrite, Plotly, KaTeX) are in `vendor/`; there is no CDN fallback on purpose. Any static host will serve it as it is. On Vercel, `npm run build` copies the site into `dist/` and minifies the app's own scripts; the repository copy stays readable and runs without that step. On Vercel, `vercel.json` sets the caching and security headers, including a Content-Security-Policy that allows the inline scripts by hash. If you change an inline script in a page, run `npm run csp` to update those hashes; `npm test` fails when they are stale.
 
 ## Search engines
 

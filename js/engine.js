@@ -3469,6 +3469,8 @@
     }
 
     return {
+        /** Lets a page start with the light engine and add the computer algebra system once it has loaded. */
+        attachAlgebrite(a) { Algebrite = a || null; },
         CalcError, parse, inspect, clean, freeVars, compile, diff, fmt, nice, strOf, texOf,
         serialize, hydrate, intersections, antiderivative, integrateNumeric, integrateRobust, tanhSinhFinite, rk45, checkAntiderivative,
         internals: { taylorCoeffs, gl, runAlgebrite, toAlgebrite, fromAlgebrite, dependsOn, toRational, polyDivMod, polyMul, polyAdd, polyTrim, makeResult, finalizeText, wrapRuns, matTex, matTxt, parseMatrix, rref, polyRoots, polyRootsMult, polyGcd, charPolyCoeffs, nullSpace, parseLimit, curveOf, rangeFor, recogniseConst, validate, simplifyNode, foldConstants },

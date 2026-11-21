@@ -3,7 +3,7 @@
  *   npm run serve &   (serves http://localhost:8080)   then   BASE=http://localhost:8080 node tests/e2e/ui-checks.js
  */
 const { chromium } = require('playwright');
-const BASE = process.env.BASE || 'http://localhost:8099';
+const BASE = process.env.BASE_ROOT || process.env.BASE || 'http://localhost:8099';
 let failed = 0;
 const check = (name, ok, extra) => { if (!ok) failed++; console.log((ok ? 'ok   ' : 'FAIL ') + name + (ok ? '' : '  → ' + (extra === undefined ? '' : JSON.stringify(extra)))); };
 

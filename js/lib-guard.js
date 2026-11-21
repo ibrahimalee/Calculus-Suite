@@ -4,7 +4,7 @@
  * Every dependency ships in /vendor so the app works offline and from file://.
  * There is deliberately no CDN fallback: unpinned third-party scripts are a supply-chain risk,
  * and the Content-Security-Policy would block them. All scripts are requested together and run in order: the libraries,
- * then js/engine.js … js/app.js, which start the application. Plotly is 4.8 MB, so it is not loaded here: window.loadPlotly() fetches it the first
+ * then js/engine.js … js/app.js, which start the application. Algebrite and js/extras.js follow once the app is up (see FULL_SCRIPTS). Plotly is 4.8 MB, so it is not loaded here: window.loadPlotly() fetches it the first
  * time a plot is drawn.
  */
 (function () {
@@ -12,10 +12,12 @@
 
     const LIBS = [
         { name: 'math.js', global: 'math', urls: ['vendor/math-15.2.0.min.js'] },
-        { name: 'Algebrite', global: 'Algebrite', urls: ['vendor/algebrite.min.js'] },
         { name: 'KaTeX', global: 'katex', optional: true, urls: ['vendor/katex/katex.min.js'] }
     ];
-    const APP_SCRIPTS = ['js/engine.js', 'js/extras.js', 'js/nlp.js', 'js/dialog.js', 'js/practice.js', 'js/i18n.js', 'js/braille.js', 'js/runner.js', 'js/app.js'];
+    const APP_SCRIPTS = ['js/engine.js', 'js/nlp.js', 'js/dialog.js', 'js/practice.js', 'js/i18n.js', 'js/braille.js', 'js/runner.js', 'js/app.js'];
+    // The computer algebra system and the larger half of the engine run in the background worker. The page itself only
+    // needs them for practice problems and when no worker is available, so they load after the app is usable.
+    const FULL_SCRIPTS = ['vendor/algebrite.min.js', 'js/extras.js'];
 
     function loadScript(url) {
         return new Promise((resolve, reject) => {
@@ -47,6 +49,16 @@
             }).catch(err => { plotlyLoading = null; showBanner(['Plotly (the plotting library)']); throw err; });
         }
         return plotlyLoading;
+    };
+
+    let fullLoading = null;
+    window.loadFullEngine = function () {
+        if (!fullLoading) {
+            fullLoading = Promise.all(FULL_SCRIPTS.map(loadScript)).then(() => {
+                if (typeof window.Algebrite === 'undefined' || typeof window.CalcExtras === 'undefined') throw new Error('The full engine did not initialise');
+            }).catch(err => { fullLoading = null; showBanner(['the computer algebra system']); throw err; });
+        }
+        return fullLoading;
     };
 
     window.libsReady = (async function () {

@@ -11,13 +11,27 @@
     let nextId = 1;
     const pending = new Map();
 
+    let full = false, fullPromise = null;
     function getEngine() {
         if (!engine) {
             const alg = typeof Algebrite !== 'undefined' ? Algebrite : null;
             engine = CalcEngine.create(math, alg);
-            if (typeof CalcExtras !== 'undefined') CalcExtras.install(engine, math, alg);
+            if (alg && typeof CalcExtras !== 'undefined') { CalcExtras.install(engine, math, alg); full = true; }
         }
         return engine;
+    }
+    /** Resolves once the page's own engine has the computer algebra system and every tool (practice, no-worker fallback). */
+    function ensureFull() {
+        if (full) return Promise.resolve(getEngine());
+        if (!fullPromise) {
+            const load = typeof window.loadFullEngine === 'function' ? window.loadFullEngine() : Promise.resolve();
+            fullPromise = load.then(() => {
+                const e = getEngine();
+                if (!full) { e.attachAlgebrite(window.Algebrite); window.CalcExtras.install(e, math, window.Algebrite); full = true; }
+                return e;
+            }).catch(err => { fullPromise = null; throw err; });
+        }
+        return fullPromise;
     }
 
     function startWorker() {
@@ -62,7 +76,7 @@
         if (!ok) {
             // inline fallback – let the browser paint the spinner first
             await new Promise(r => setTimeout(r, 20));
-            return getEngine().run[mode](src, opts);
+            return (await ensureFull()).run[mode](src, opts);
         }
         return new Promise((resolve, reject) => {
             const id = nextId++;
@@ -78,5 +92,5 @@
         });
     }
 
-    window.Runner = { run, getEngine, warmUp: startWorker, cancel: restartWorker, isBusy: () => pending.size > 0, mode: () => (workerState === 'ready' ? 'background worker' : 'main thread') };
+    window.Runner = { run, getEngine, ensureFull, warmUp: startWorker, cancel: restartWorker, isBusy: () => pending.size > 0, mode: () => (workerState === 'ready' ? 'background worker' : 'main thread') };
 })();

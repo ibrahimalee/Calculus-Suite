@@ -20,7 +20,9 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Serve the app
         run: |
-          # serves the files with the headers from vercel.json, so the browser tests run under the real Content-Security-Policy
-          node scripts/serve.js 8099 > /dev/null 2>&1 &
+          # builds what Vercel deploys (dist/, minified) and serves it with the headers from vercel.json,
+          # so the browser tests run on the real files under the real Content-Security-Policy
+          npm run build
+          node scripts/serve.js 8099 dist > /dev/null 2>&1 &
           for i in $(seq 1 20); do curl -sf http://localhost:8099/app.html > /dev/null && break; sleep 1; done
       - run: npm run e2e
