@@ -7,7 +7,7 @@ const lim = (a, b) => `from ${plain(a)} to ${plain(b)}`;
 module.exports = [
     {
         id: 'derivatives', group: 'Derivatives', mode: 'derivative', tool: 'derivative-calculator',
-        intro: 'The derivative measures how fast a function changes. The working below names every rule used (sum, product, quotient, chain and the standard derivatives) and the answer is compared with a numerical derivative before it is shown.',
+        intro: 'The derivative measures how fast a function changes. The working above names every rule used (sum, product, quotient, chain and the standard derivatives) and the answer is compared with a numerical derivative before it is shown.',
         h1: f => `Derivative of ${plain(f)}`, q: (f, tex) => `\\frac{d}{dx}\\left[${tex}\\right]`,
         opts: () => ({ order: '1' }),
         items: ['x^5', 'sqrt(x)', '1/x', 'x^(1/3)', '1/sqrt(x)', 'e^x', 'e^(2x)', 'e^(-x)', 'e^(-x^2)', '2^x', 'ln(x)', 'ln(2x)', 'ln(x^2+1)', 'log10(x)', 'sin(x)', 'cos(x)', 'tan(x)', 'sec(x)', 'cot(x)', 'sin(2x)', 'cos(3x)', 'sin(x^2)', 'sin(x)^2', 'cos(x)^2', 'x*sin(x)', 'x*e^x', 'x*ln(x)', 'x^2*e^x', 'x^2*sin(x)', 'x^2*cos(x)', 'e^x*sin(x)', 'e^x*cos(x)', 'e^(-x)*sin(x)', 'sin(x)*cos(x)', 'ln(x)/x', 'x/(x+1)', '(x+1)/(x-1)', '1/(x^2+1)', 'x/(x^2+1)', 'sin(x)/x', 'e^x/x', '(x^2+1)/(x^2-1)', 'sqrt(x^2+1)', 'sqrt(1-x^2)', 'x*sqrt(x+1)', 'atan(x)', 'asin(x)', 'acos(x)', 'atan(2x)', 'x*atan(x)', 'sinh(x)', 'cosh(x)', 'tanh(x)', 'x^x', 'x^sin(x)', 'ln(sin(x))', 'e^(sin(x))', 'sin(e^x)', '(2x+1)^5', '(x^2+3)^4', 'cos(x)/sin(x)', 'tan(x)*sec(x)']

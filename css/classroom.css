@@ -138,3 +138,4 @@ details#analysis > summary { cursor: pointer; font: 700 15px var(--font); paddin
 .page select, .page .in, .page textarea { max-width: 100%; }
 .row > .field { min-width: 0; max-width: 100%; }
 .row > .field select { width: 100%; text-overflow: ellipsis; }
+.err:empty { min-height: 0; margin: 0; }

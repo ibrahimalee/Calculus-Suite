@@ -438,11 +438,26 @@
     }
 
     function texOf(node) {
-        try { return node.toTex({ parenthesis: 'auto', implicit: 'hide' }); } catch (e) { return String(node); }
+        try { return negFrac(node.toTex({ parenthesis: 'auto', implicit: 'hide' })); } catch (e) { return String(node); }
+    }
+    /** \frac{-1}{x^2} → -\frac{1}{x^2} when the numerator is a single negative term (and +- / -- before it are merged). */
+    function negFrac(tex) {
+        let out = '', i = 0;
+        while (i < tex.length) {
+            const k = tex.indexOf('\\frac{-', i);
+            if (k < 0) { out += tex.slice(i); break; }
+            let d = 1, j = k + 7, top = true;
+            for (; j < tex.length && d > 0; j++) { const c = tex[j]; if (c === '{') d++; else if (c === '}') d--; else if (d === 1 && (c === '+' || c === '-')) top = false; }
+            if (!top || d !== 0) { out += tex.slice(i, k + 7); i = k + 7; continue; }
+            let pre = out + tex.slice(i, k); const m = /([+-])\s*$/.exec(pre);
+            if (m) pre = pre.slice(0, m.index) + (m[1] === '+' ? '-' : '+'); else pre += '-';
+            out = pre + '\\frac{' + tex.slice(k + 7, j - 1) + '}'; i = j;
+        }
+        return out;
     }
     function strOf(node) {
         const handler = n => (n.type === 'ConstantNode' && typeof n.value === 'number' && Number.isInteger(n.value) && Math.abs(n.value) < 1e15 ? String(n.value) : undefined);
-        try { return node.toString({ parenthesis: 'auto', implicit: 'hide', handler }); } catch (e) { return String(node); }
+        try { return node.toString({ parenthesis: 'auto', implicit: 'hide', handler }).replace(/ \^ /g, '^'); } catch (e) { return String(node); }
     }
 
     // ------------------------------------------------------------------

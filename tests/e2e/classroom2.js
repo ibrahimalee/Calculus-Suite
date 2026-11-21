@@ -35,8 +35,8 @@ const BASE = process.env.BASE_ROOT || 'http://localhost:8099';
     ok(await s.$eval('#stuName', e => e.readOnly), name + ': the name is fixed once started');
     const tex = await s.$$eval('#p0 annotation, #p1 annotation, #p2 annotation', els => els.map(e => e.textContent)); const prompts = await s.$$eval('.q-prompt', els => els.map(e => e.textContent));
     ok(prompts.length === 3 && !prompts.some(p => /@\{/.test(p)), name + ': numbers were filled in');
-    const calc = tex.find(x => /x\^3/.test(x)); const m = /(-?\d+)x\^3\s*([+-]\s*\d+)x/.exec(calc || ''); ok(!!m, name + ': the derivative question shows real numbers (' + calc + ')');
-    const a = +m[1], bb = +m[2].replace(/\s/g, ''); const ids = await s.$$eval('.q-prompt', els => els.map(e => e.id));
+    const calc = tex.find(x => /x\^3/.test(x)); const m = /(-?\d*)x\^3\s*([+-]\s*\d*)x/.exec(calc || ''); ok(!!m && !/(^|[^\d])1x/.test(calc), name + ': the derivative question shows real numbers, no 1x (' + calc + ')');
+    const coef = t => { t = t.replace(/\s/g, ''); return t === '' || t === '+' ? 1 : t === '-' ? -1 : +t; }; const a = coef(m[1]), bb = coef(m[2]); const ids = await s.$$eval('.q-prompt', els => els.map(e => e.id));
     for (const el of await s.$$('#qs .q')) {
       const id = await el.$eval('.q-prompt', e => e.id);
       const txt = await el.$eval('.q-prompt', e => e.textContent);

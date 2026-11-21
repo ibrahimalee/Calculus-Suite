@@ -91,12 +91,15 @@
     /** Replace @{expr} with its value. Text that does not use the random names is left alone. */
     function fill(text, scope, asKey) {
         const names = new Set(Object.keys(scope));
-        return String(text === undefined || text === null ? '' : text).replace(/@\{([^{}]{1,80})\}/g, (all, inner) => {
+        return String(text === undefined || text === null ? '' : text).replace(/@\{([^{}]{1,80})\}/g, (all, inner, at, whole) => {
             let e = inner.trim(), signed = false; if (e[0] === '+') { signed = true; e = e.slice(1); }
             let p; try { p = safeParse(e); } catch (er) { return all; }
             if (!p.vars.length || p.vars.some(v => !names.has(v))) return all;
             const v = evalAt(p, scope); if (!Number.isFinite(v)) return all; const s = fmtNum(round10(v));
-            return signed ? (v >= 0 ? '+' + s : s) : (asKey && v < 0 ? '(' + s + ')' : s);
+            // inside $…$ maths, a coefficient of ±1 in front of a letter or bracket is written the usual way: x, −x (not 1x, −1x)
+            const inMath = !asKey && (whole.slice(0, at).split('$').length % 2 === 0) && /^[A-Za-z(\\]/.test(whole.slice(at + all.length));
+            const out = inMath && Math.abs(v) === 1 ? (v < 0 ? '-' : (signed ? '+' : '')) : s;
+            return signed ? (v >= 0 && out[0] !== '+' ? '+' + out : out) : (asKey && v < 0 ? '(' + s + ')' : out);
         });
     }
     function drawScope(vars, seed, i) { const rnd = mulberry(parseInt(fnv(seed + '|' + i), 16)); const sc = {}; vars.forEach(v => { sc[v.name] = v.values[Math.floor(rnd() * v.values.length)]; }); return sc; }

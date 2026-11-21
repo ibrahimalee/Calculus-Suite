@@ -68,3 +68,6 @@ dialog.cs-dialog::backdrop { background: rgba(15, 22, 35, .5); }
 .btn-danger { border-color: var(--err); }
 .btn.btn-danger.btn-solid, .btn.btn-danger.btn-primary { background: var(--err); border-color: var(--err); color: #fff; }
 :root[data-theme="dark"] .btn.btn-danger.btn-solid, :root[data-theme="dark"] .btn.btn-danger.btn-primary { color: #0f1621; }
+
+/* The hidden attribute always wins over a component's display rule (.btn, .finish, .timer-bar…). */
+[hidden] { display: none !important; }

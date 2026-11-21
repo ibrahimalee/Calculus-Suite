@@ -59,7 +59,7 @@ test('higher-order derivative and tangent line', () => {
 
 test('derivative with respect to another variable', () => {
     const r = E.run.derivative('x^2*y', { variable: 'y' });
-    assert.match(r.main.text, /x \^ 2/);
+    assert.match(r.main.text, /x\^2/);
 });
 
 test('indefinite integrals are verified antiderivatives', () => {
@@ -487,10 +487,10 @@ test('Taylor series: many orders, removable singularities, exact rationals', () 
     const coef = (src, n, a) => E.run.series(src, { terms: String(n), point: a || '0' });
     const atan = coef('atan(x)', 11);
     close(resultFn(atan, 1)(0.3), Math.atan(0.3), 1e-6);
-    assert.match(atan.main.text, /1 \/ 11 \* x \^ 11/);
-    assert.match(coef('tan(x)', 9).main.text, /62 \/ 2835 \* x \^ 9/);
-    assert.match(coef('asin(x)', 7).main.text, /5 \/ 112 \* x \^ 7/);
-    assert.match(coef('sin(x)/x', 6).main.text, /1 \/ 5040 \* x \^ 6/);
+    assert.match(atan.main.text, /1 \/ 11 \* x\^11/);
+    assert.match(coef('tan(x)', 9).main.text, /62 \/ 2835 \* x\^9/);
+    assert.match(coef('asin(x)', 7).main.text, /5 \/ 112 \* x\^7/);
+    assert.match(coef('sin(x)/x', 6).main.text, /1 \/ 5040 \* x\^6/);
     close(resultFn(coef('sin(x)/x', 8), 1)(0.5), Math.sin(0.5) / 0.5, 1e-9);
     close(resultFn(coef('(1-cos(x))/x^2', 6), 1)(0.4), (1 - Math.cos(0.4)) / 0.16, 1e-8);
     close(resultFn(coef('x^x', 6, '1'), 1)(1.1), Math.pow(1.1, 1.1), 1e-6);

@@ -73,7 +73,7 @@ test('regression: Laplace of a three-pole-group sum keeps its leading numerator 
 test('complex arithmetic rejects unknown symbols cleanly', () => { assert.throws(() => E.run.complex('s+1', { op: 'arith' }), /Unknown symbol/); });
 test('symbolic sums give verified closed forms', () => {
   const r = E.run.sums('k^2', { lower: '1', upper: 'n' }); assert.ok(r.meta.some(m => /Verified/.test(m)));
-  assert.equal(E.run.sums('2^k', { lower: '0', upper: 'n' }).main.text, '2 ^ (n + 1) - 1');
+  assert.equal(E.run.sums('2^k', { lower: '0', upper: 'n' }).main.text, '2^(n + 1) - 1');
   assert.throws(() => E.run.sums('sin(k)/k', { lower: '1', upper: 'n' }), /closed form/);
 });
 test('Laplace with steps and impulses; ODE by Laplace verifies by substitution', () => {
@@ -367,7 +367,7 @@ test('graphs: Dijkstra cross-checked with Bellman–Ford, spanning tree, Euler t
   assert.throws(() => DS('A-B:-1', { op: 'graph' }), /Negative/); assert.throws(() => DS('A-B, B->C', { op: 'graph' }), /either all directed/); assert.throws(() => DS('A-B:4', { op: 'graph', gsrc: 'Z' }), /not a vertex/); assert.throws(() => DS('hello', { op: 'graph' }), /Could not read the edge/);
 });
 test('conservative fields: potential function, non-conservative detection and path independence', () => {
-  const V = (s, o) => E.run.vector(s, Object.assign({ op: 'potential' }, o)); const r = V('2*x*y ; x^2 + 3*y^2', { pa: '0,0', pb: '1,2' }); assert.match(r.main.text, /x \^ 2 \* y \+ y \^ 3 \+ C/); assert.match(txt(r), /= 10/); assert.ok(r.meta.some(m => /numerical line integral/.test(m)));
+  const V = (s, o) => E.run.vector(s, Object.assign({ op: 'potential' }, o)); const r = V('2*x*y ; x^2 + 3*y^2', { pa: '0,0', pb: '1,2' }); assert.match(r.main.text, /x\^2 \* y \+ y\^3 \+ C/); assert.match(txt(r), /= 10/); assert.ok(r.meta.some(m => /numerical line integral/.test(m)));
   assert.match(V('y*z ; x*z ; x*y', {}).main.text, /^[xyz] \* [xyz] \* [xyz] \+ C$/); assert.match(V('y ; -x', {}).main.label, /not conservative/); assert.match(V('x^2*y ; x^3', {}).main.label, /not conservative/); assert.match(V('y*cos(x*y) + 2*x ; x*cos(x*y) + 3*y^2', {}).main.text, /sin\(x \* y\)/);
   assert.throws(() => V('x ; y ; z ; w', {}), /two or three/); assert.throws(() => V('x ; t', {}), /variables must be/); assert.throws(() => V('2*x*y ; x^2', { pa: '0' }), /both end points/);
 });
@@ -395,7 +395,7 @@ test('implicit differentiation: formula, slope and tangent at a point, numerical
   assert.throws(() => E.run.derivative('x + y + z = 1', {}), /exactly two variables/);
   assert.throws(() => E.run.derivative('x^2 + y^2 = 25', { order: '5' }), /order can be 1, 2 or 3/);
   // f(x) = … is still an ordinary derivative
-  assert.equal(E.run.derivative('f(x) = x^3', {}).main.text, '3 * x ^ 2');
+  assert.equal(E.run.derivative('f(x) = x^3', {}).main.text, '3 * x^2');
 });
 
 test('transforms and the complex plane refuse infinite constants; Laplace answers use plain brackets', () => {
