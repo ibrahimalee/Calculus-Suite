@@ -397,6 +397,8 @@ const urls = ['', 'app.html', 'teacher.html', 'tools/', ...PAGES.map(p => `tools
 outputs.push(['robots.txt', `User-agent: *\nAllow: /\nDisallow: /worksheet.html\n${SITE ? `\nSitemap: ${abs('sitemap.xml')}\n` : ''}`]);
 if (SITE) outputs.push(['sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(u => `  <url><loc>${esc(abs(u))}</loc></url>`).join('\n')}\n</urlset>\n`]);
 
+// mark the section a page belongs to in the header nav
+for (const o of outputs) { const sec = /^(tools|problems|guides)\//.exec(o[0]); if (sec && o[1].includes('<a href="../' + sec[1] + '/">')) o[1] = o[1].replace('<a href="../' + sec[1] + '/">', '<a href="../' + sec[1] + '/" aria-current="page">'); }
 let stale = [];
 for (const [file, content] of outputs) {
     const p = path.join(ROOT, file);

@@ -158,5 +158,5 @@
         if (visible && !doc.hidden) { t += Math.min(ts - last, 60) / 1000; draw(0.4 + (XM - 0.8) * (0.5 - 0.5 * Math.cos(t * 0.5 + 1.5))); }
         last = ts; requestAnimationFrame(tick);
     }
-    if (auto) { var hint = $('figHint'); if (hint) hint.textContent = 'Move your pointer over the graph to take control.'; requestAnimationFrame(function (ts) { last = ts; tick(ts); }); }
+    if (auto) { var hint = $('figHint'); if (hint) hint.textContent = (window.matchMedia && matchMedia('(hover: none)').matches) ? 'Touch and drag along the graph to take control.' : 'Move your pointer over the graph to take control.'; requestAnimationFrame(function (ts) { last = ts; tick(ts); }); }
 })();

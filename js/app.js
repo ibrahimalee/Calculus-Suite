@@ -886,8 +886,16 @@
             const tex = el.getAttribute('data-tex');
             if (!tex || typeof katex === 'undefined') return;
             try {
-                katex.render(tex, el, { throwOnError: true, displayMode: el.classList.contains('tex-display'), output: 'html' });
+                const display = el.classList.contains('tex-display');
+                el.classList.remove('tex-wrap');
+                katex.render(tex, el, { throwOnError: true, displayMode: display, output: 'html' });
                 el.classList.add('rendered');
+                // display maths never wraps; when it is wider than the screen, render it inline-style so it can break after = + −
+                const box = el.querySelector('.katex-display') || el;
+                if (display && box.clientWidth && box.scrollWidth > box.clientWidth + 1) {
+                    katex.render('\\displaystyle ' + tex, el, { throwOnError: true, displayMode: false, output: 'html' });
+                    el.classList.add('tex-wrap');
+                }
             } catch (e) { /* keep plain-text fallback */ }
         });
     }
@@ -1176,14 +1184,16 @@
                     <span>${esc(r.title)}</span>
                     <div class="result-actions">
                         <button class="mini-btn" data-act="copy" title="Copy result as text">Copy</button>
-                        <button class="mini-btn" data-act="copytex" title="Copy LaTeX">LaTeX</button>
-                        <button class="mini-btn" data-act="save" title="Save to your notebook">Save</button>
                         <button class="mini-btn" data-act="share" title="Copy a link to this calculation">Share</button>
-                        <button class="mini-btn" data-act="embed" title="Copy an embed code for a web page or LMS">Embed</button>
-                        ${'speechSynthesis' in window ? `<button class="mini-btn" data-act="listen" title="Read the result aloud">Listen</button>` : ''}
-                        <button class="mini-btn" data-act="braille" title="Braille (Nemeth Code) output">Braille</button>
-                        <button class="mini-btn" data-act="export" title="Download a Markdown report">Export</button>
+                        <button class="mini-btn" data-act="save" title="Save to your notebook">Save</button>
                         <button class="mini-btn" data-act="print" title="Print, or save as a PDF from the print dialog">Print / PDF</button>
+                        <details class="more-menu"><summary class="mini-btn" title="More ways to use this result">More</summary><div class="more-list">
+                            <button class="mini-btn" data-act="copytex" title="Copy LaTeX">Copy LaTeX</button>
+                            <button class="mini-btn" data-act="embed" title="Copy an embed code for a web page or LMS">Embed code</button>
+                            ${'speechSynthesis' in window ? `<button class="mini-btn" data-act="listen" title="Read the result aloud">Read aloud</button>` : ''}
+                            <button class="mini-btn" data-act="braille" title="Braille (Nemeth Code) output">Braille</button>
+                            <button class="mini-btn" data-act="export" title="Download a Markdown report">Download Markdown</button>
+                        </div></details>
                     </div>
                 </div>
                 ${r.main ? `<div class="result-content">${r.main.tex ? '' : `<span class="row-label">${esc(r.main.label)}</span> `}${texSpan(r.main.tex, r.main.text, true)}</div>` : ''}
@@ -1192,7 +1202,7 @@
                 ${checkBox(r)}
                 ${metaRest(r).length ? `<div class="result-meta">${metaRest(r).map(m => esc(m)).join('<br>')}</div>` : ''}
                 ${r.warnings.map(w => `<div class="alert alert-warning"><span class="alert-icon">${icon('info', 18)}</span><span>${esc(w)}</span></div>`).join('')}
-                <div class="result-foot"><span>${r.ms != null ? `${r.ms} ms` : 'instant'}</span><span>${esc(r.engine || 'worker')}</span><span>${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span><span><a class="report-link" href="${esc(reportUrl(r))}" target="_blank" rel="noopener">Report a problem</a></span></div>
+                <div class="result-foot"><span>${r.ms != null ? `${r.ms} ms` : 'instant'}</span><span>${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span><span><a class="report-link" href="${esc(reportUrl(r))}" target="_blank" rel="noopener">Report a problem</a></span></div>
             </div>`;
         const container = $('results');
         container.innerHTML = html;
@@ -1206,6 +1216,13 @@
         container.querySelector('[data-act="embed"]').addEventListener('click', embedCode);
         container.querySelector('[data-act="braille"]').addEventListener('click', () => openBraille(r));
         const lb = container.querySelector('[data-act="listen"]'); if (lb) lb.addEventListener('click', () => speakResult(r));
+        const more = container.querySelector('.more-menu');
+        if (more) {
+            more.querySelectorAll('.more-list button').forEach(b => b.addEventListener('click', () => { more.open = false; }));
+            // open the list towards whichever side has room, so it never runs off the screen
+            more.addEventListener('toggle', () => { if (!more.open) return; const list = more.querySelector('.more-list'); list.style.left = ''; list.style.right = ''; const r = list.getBoundingClientRect(); if (r.left < 8) { list.style.left = '0'; list.style.right = 'auto'; } else if (r.right > innerWidth - 8) { list.style.right = '0'; list.style.left = 'auto'; } });
+            more.addEventListener('keydown', e => { if (e.key === 'Escape' && more.open) { more.open = false; more.querySelector('summary').focus(); } });
+        }
         applyPlotDescription(r);
         state.stepsShown = 1;
         applyTeachingToResult(container);
@@ -1292,7 +1309,7 @@
         copyText(url, 'Link copied – anyone opening it sees this calculation');
     }
 
-    function getHistory() { try { return JSON.parse(localStorage.getItem('cs_history') || '[]'); } catch (e) { return []; } }
+    function getHistory() { try { const h = JSON.parse(localStorage.getItem('cs_history') || '[]'); return Array.isArray(h) ? h.filter(x => x && typeof x === 'object') : []; } catch (e) { return []; } }
     function pushHistory(result) {
         const entry = { s: snapshot(), t: result.main ? `${result.main.label} ${result.main.text}` : result.title, ts: Date.now() };
         const list = getHistory().filter(h => !(h.s.m === entry.s.m && h.s.f === entry.s.f && JSON.stringify(h.s.o) === JSON.stringify(entry.s.o)));
@@ -2423,6 +2440,9 @@
         moveIndicator();
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(moveIndicator);
         window.addEventListener('resize', moveIndicator);
+        document.addEventListener('click', e => document.querySelectorAll('.more-menu[open]').forEach(m => { if (!m.contains(e.target)) m.open = false; }));
+        // re-fit display maths when the width changes (phone rotated, window resized)
+        { let w = innerWidth, t = 0; window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => { if (Math.abs(innerWidth - w) < 40) return; w = innerWidth; document.querySelectorAll('.tex-display[data-tex]').forEach(el => renderTex(el.parentNode)); }, 250); }); }
         Runner.warmUp().then(ok => {
             $('engineDot').classList.add('on');
             $('engineStatus').textContent = ok ? 'Engine ready · background worker' : 'Engine ready · main thread';

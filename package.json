@@ -10,7 +10,7 @@
     "csp": "node scripts/sync-csp.js",
     "seo": "node scripts/build-seo.js",
     "i18n:export": "node scripts/export-translations.js",
-    "e2e": "node tests/e2e/ui-checks.js && node tests/e2e/plot-checks.js && node tests/e2e/new-tools.js && node tests/e2e/home.js && node tests/e2e/classroom.js && node tests/e2e/classroom2.js && node tests/e2e/hostile.js && node tests/e2e/print.js && node tests/e2e/daily.js && node tests/e2e/a11y.js"
+    "e2e": "node tests/e2e/ui-checks.js && node tests/e2e/plot-checks.js && node tests/e2e/new-tools.js && node tests/e2e/home.js && node tests/e2e/classroom.js && node tests/e2e/classroom2.js && node tests/e2e/hostile.js && node tests/e2e/print.js && node tests/e2e/daily.js && node tests/e2e/phone.js && node tests/e2e/a11y.js"
   },
   "devDependencies": {
     "axe-core": "4.10.2",

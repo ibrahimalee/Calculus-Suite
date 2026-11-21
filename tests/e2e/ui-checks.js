@@ -82,7 +82,7 @@ const check = (name, ok, extra) => { if (!ok) failed++; console.log((ok ? 'ok   
     check('cancel stops a running computation', /cancelled/i.test(await page.textContent('#results')), (await page.textContent('#results')).slice(0, 80));
     await mode('integral'); await page.fill('#functionInput', 'x^2'); await page.fill('#opt_lower', ''); await page.fill('#opt_upper', ''); await page.click('#computeBtn'); await idle();
     check('worker recovers after a cancel', /x\s*3|x3|\/3/.test((await page.textContent('#results .result-content')).replace(/\s/g, '')), (await page.textContent('#results .result-content')).slice(0, 80));
-    check('results report the worker as the engine', (await page.textContent('.result-foot')).includes('background worker'));
+    check('the status bar reports the worker as the engine', (await page.textContent('#engineStatus')).includes('background worker'));
 
     // 8. no horizontal overflow at phone width in any mode
     const m = await browser.newPage({ viewport: { width: 375, height: 800 } }); await m.goto(BASE + '/app.html'); await m.waitForFunction(() => window.__calc); await m.waitForTimeout(500);

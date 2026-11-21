@@ -49,6 +49,8 @@
     const nz = (r, a, b) => { let v = 0; while (!v) v = ri(r, a, b); return v; };
     const sgn = (v, first) => (v < 0 ? '-' : (first ? '' : '+')) + (Math.abs(v) === 1 ? '' : Math.abs(v));
     const polyStr = (r, terms) => terms.map(([c, n], i) => { const cs = (c < 0 ? (i ? ' - ' : '-') : (i ? ' + ' : '')) + (Math.abs(c) === 1 && n !== 0 ? '' : Math.abs(c)); return n === 0 ? cs : cs + (Math.abs(c) === 1 ? '' : '*') + (n === 1 ? 'x' : `x^${n}`); }).join('');
+    // drop a coefficient of 1 that a random draw can produce (1*x^6 → x^6); the maths is unchanged
+    const tidy = s => String(s).replace(/(^|[^\d.])1\*/g, '$1').replace(/\^1(?![\d.])/g, '').replace(/ [+-] 0\*?x(?![\d^])/g, '').replace(/ [+-] 0 =/g, ' =').replace(/- -/g, '+ ').replace(/\+ -/g, '- ');
     const tex = src => { try { return engine.texOf(engine.parse(src)); } catch (e) { return src; } };
     const stepsOf = (mode, src, opts) => () => { try { return engine.run[mode](src, opts || {}).steps.map(s => ({ title: s.title, text: s.text, tex: s.tex })); } catch (e) { return []; } };
 
@@ -57,7 +59,7 @@
         const L1 = [() => polyStr(r, [[a, n], [c, m], [ri(r, 1, 9), 0]]), () => `${Math.abs(a)}*x^${n} ${c < 0 ? '-' : '+'} ${Math.abs(c)}*x^${m + 1}`, () => `sqrt(x) + ${Math.abs(a)}*x`];
         const L2 = [() => `${Math.abs(a)}*sin(${b}*x)`, () => `e^(${a}*x)`, () => `x^${n}*sin(x)`, () => `ln(${b}*x + ${Math.abs(c)})`, () => `(${b}*x + ${Math.abs(c)})^${ri(r, 3, 5)}`, () => `x*e^x`, () => `${Math.abs(a)}*cos(x)*x^2`];
         const L3 = [() => `sin(x^2)*e^x`, () => `x/(x^2 + ${b})`, () => `atan(${b}*x)`, () => `sqrt(x^2 + ${b})`, () => `ln(sin(x))`, () => `e^(x^2)*cos(x)`, () => `(x^2 + 1)/(x - ${Math.abs(c)})`, () => `x^2*ln(x)`];
-        const src = (level === 1 ? L1 : level === 2 ? L2 : L3)[ri(r, 0, (level === 1 ? L1 : level === 2 ? L2 : L3).length - 1)]();
+        const src = tidy((level === 1 ? L1 : level === 2 ? L2 : L3)[ri(r, 0, (level === 1 ? L1 : level === 2 ? L2 : L3).length - 1)]());
         const node = engine.parse(src), truth = engine.diff(node, 'x');
         return {
             tex: `\\dfrac{d}{dx}\\left[${engine.texOf(node)}\\right]`, text: `d/dx [ ${src} ]`, input: 'expression', placeholder: 'f′(x) = …',
@@ -71,7 +73,7 @@
         const L1 = [() => polyStr(r, [[a, n], [nz(r, -4, 4), 1], [ri(r, 1, 7), 0]]), () => `${Math.abs(a)}*x^${n} + ${c}`, () => `sqrt(x) + ${b}*x^2`];
         const L2 = [() => `${Math.abs(a)}*cos(${b}*x)`, () => `e^(${a}*x)`, () => `1/(${b}*x + ${c})`, () => `sin(${b}*x) + ${c}`, () => `${b}/(x + ${c})`, () => `e^(-x) + x`];
         const L3 = [() => `x*e^x`, () => `x*cos(x)`, () => `2*x*cos(x^2)`, () => `x*ln(x)`, () => `1/(x^2 + ${b * b})`, () => `x*e^(x^2)`, () => `x*sin(${b}*x)`, () => `3*x^2*e^(x^3)`];
-        const pool = level === 1 ? L1 : level === 2 ? L2 : L3; const src = pool[ri(r, 0, pool.length - 1)]();
+        const pool = level === 1 ? L1 : level === 2 ? L2 : L3; const src = tidy(pool[ri(r, 0, pool.length - 1)]());
         const node = engine.parse(src); const f = engine.compile(node, ['x']);
         const res = engine.antiderivative(node, 'x', 'auto');
         return {
@@ -92,7 +94,7 @@
         const pool = level === 1 ? [() => [`x^${k + 1}`, '0', String(a)], () => [`${k}*x + ${a}`, '0', '2'], () => [`x^2 + ${a}`, '0', '3']]
             : level === 2 ? [() => [`sin(x)`, '0', 'pi'], () => [`e^(${k}*x)`, '0', '1'], () => [`1/x`, '1', String(a + 1)], () => [`cos(${k}*x)`, '0', `pi/${2 * k}`]]
                 : [() => [`x*e^x`, '0', '1'], () => [`x*cos(x)`, '0', 'pi/2'], () => [`1/(1 + x^2)`, '0', '1'], () => [`x*ln(x)`, '1', 'e'], () => [`e^(-x)`, '0', 'inf']];
-        const [src, lo, hi] = pool[ri(r, 0, pool.length - 1)]();
+        const [src0, lo, hi] = pool[ri(r, 0, pool.length - 1)](), src = tidy(src0);
         const res = engine.run.integral(src, { lower: lo, upper: hi });
         const num = parseFloat(String(res.main.text).replace(/[^\d.eE+-].*$/, '')) ;
         const truth = engine.compile(engine.parse(res.main.text.includes('≈') ? res.main.text.split('≈').pop().trim() : res.main.text.replace(/^.*=\s*/, '')), [])();
@@ -105,7 +107,7 @@
         const pool = level === 1 ? [() => [`(x^2 - ${a * a})/(x - ${a})`, String(a)], () => [`(x^2 + ${b}*x)/x`, '0'], () => [`(${c}*x + ${d})/(x + 1)`, '2']]
             : level === 2 ? [() => [`sin(${b}*x)/x`, '0'], () => [`(1 - cos(x))/x^2`, '0'], () => [`(e^(${c}*x) - 1)/x`, '0'], () => [`ln(1 + ${b}*x)/x`, '0'], () => [`tan(${c}*x)/(${d}*x)`, '0']]
                 : [() => [`(${b}*x^2 + ${c}*x)/(${d}*x^2 + 3)`, 'inf'], () => [`(1 + ${b}/x)^x`, 'inf'], () => [`sqrt(x^2 + ${b}*x) - x`, 'inf'], () => [`x*sin(${b}/x)`, 'inf'], () => [`(x - sin(x))/x^3`, '0']];
-        const [src, pt] = pool[ri(r, 0, pool.length - 1)]();
+        const [src0, pt] = pool[ri(r, 0, pool.length - 1)](), src = tidy(src0);
         const res = engine.run.limit(src, { point: pt, direction: 'both' });
         const text = res.main.text.replace(/^.*=\s*/, '').trim();
         let value; try { value = engine.compile(engine.parse(text), [])(); } catch (e) { value = NaN; }
@@ -114,10 +116,10 @@
     }
     function genEquation(level, r) {
         let src, roots;
-        if (level === 1) { const a = nz(r, -6, 6), x = ri(r, -8, 8), b = ri(r, -9, 9); src = `${sgn(a, true)}*x ${b < 0 ? '-' : '+'} ${Math.abs(b)} = ${a * x + b}`.replace('1*x', 'x').replace('-1*x', '-x'); roots = [x]; }
+        if (level === 1) { const a = nz(r, -6, 6), x = ri(r, -8, 8), b = ri(r, -9, 9); src = `${a === 1 ? '' : a === -1 ? '-' : a + '*'}x ${b < 0 ? '-' : '+'} ${Math.abs(b)} = ${a * x + b}`.replace(/ \+ 0 =/, ' ='); roots = [x]; }
         else if (level === 2) { const p = ri(r, -6, 6), q = ri(r, -6, 6); const s = -(p + q), t = p * q; src = `x^2 ${s < 0 ? '-' : '+'} ${Math.abs(s) === 1 ? '' : Math.abs(s)}x ${t < 0 ? '-' : '+'} ${Math.abs(t)} = 0`.replace(/\+ 0x/g, '').replace(/\+ 0 =/, '='); roots = Array.from(new Set([p, q])); }
         else { const p = ri(r, -4, 4), q = nz(r, 1, 3), s = ri(r, -4, 4), u = nz(r, 1, 3); const A = q * u, B = -(p * u + s * q), C = p * s; src = `${A === 1 ? '' : A}x^2 ${B < 0 ? '-' : '+'} ${Math.abs(B) === 1 ? '' : Math.abs(B)}x ${C < 0 ? '-' : '+'} ${Math.abs(C)} = 0`; roots = Array.from(new Set([p / q, s / u])); }
-        const clean = src.replace(/\s+/g, ' ');
+        const clean = tidy(src.replace(/\s+/g, ' '));
         return {
             tex: `${tex(clean.split('=')[0])}=${tex(clean.split('=')[1])}`, text: `Solve ${clean}`, input: 'list', placeholder: level === 1 ? 'x = …' : 'solutions, separated by commas',
             answerText: roots.map(x => engine.fmt(x, 8)).join(', '), answerTex: roots.map(x => engine.fmt(x, 8)).join(',\\;'),

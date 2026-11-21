@@ -177,7 +177,7 @@ module.exports = [
         title: 'Laplace Transform and Inverse Laplace Calculator',
         description: 'Laplace transforms, inverse transforms by partial fractions, step and delta functions, piecewise inputs and ODEs solved by Laplace. Every result is checked numerically.',
         h1: 'Laplace transform calculator',
-        lede: 'Transform f(t) to F(s) and back. Step functions, delta impulses and piecewise functions are supported, and initial-value problems can be solved with the Laplace method.',
+        lede: 'Laplace and inverse Laplace transforms, plus Fourier and Z-transforms, with the working shown. Step functions, delta impulses and piecewise functions are supported, and initial-value problems can be solved with the Laplace method.',
         how: [
             'Forward transforms use linearity and the standard table, with shifts for e^(at) and u(t − a). Inverse transforms split F(s) into partial fractions, including repeated and complex poles, and read each term off the table.',
             'The same tool does Fourier transforms with standard-pair recognition and Z-transforms for sequences.'
