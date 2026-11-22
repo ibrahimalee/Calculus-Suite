@@ -1,30 +1,41 @@
-/* Shared by every page: typefaces, colours and the squared-paper background.
-   Light is a school exercise book (pale blue squares, blue-black ink, a red pen for marks);
-   dark is the same page under a lamp. The home, classroom and app stylesheets build on this. */
+/* Shared by every page: typefaces, colours, depth and the page background.
+   A precise, modern instrument: cool paper with a faint dot grid, ink-dark text, one electric-blue accent and a
+   coral for "hot" marks (the tangent, a wrong answer). Dark is the same instrument at night.
+   The home, classroom and app stylesheets build on this. */
 
+@font-face { font-family: "CS Math"; src: url(../vendor/katex/fonts/KaTeX_Main-Regular.woff2) format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Geist"; src: url(../vendor/fonts/geist-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
 @font-face { font-family: "Atkinson Hyperlegible"; src: url(../vendor/fonts/atkinson-hyperlegible-latin-400-normal.woff2) format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: "Atkinson Hyperlegible"; src: url(../vendor/fonts/atkinson-hyperlegible-latin-400-italic.woff2) format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
 @font-face { font-family: "Atkinson Hyperlegible"; src: url(../vendor/fonts/atkinson-hyperlegible-latin-700-normal.woff2) format("woff2"); font-weight: 600 800; font-style: normal; font-display: swap; }
 @font-face { font-family: "Atkinson Hyperlegible Mono"; src: url(../vendor/fonts/atkinson-hyperlegible-mono-latin-400-normal.woff2) format("woff2"); font-weight: 400 500; font-style: normal; font-display: swap; }
 @font-face { font-family: "Atkinson Hyperlegible Mono"; src: url(../vendor/fonts/atkinson-hyperlegible-mono-latin-600-normal.woff2) format("woff2"); font-weight: 600 800; font-style: normal; font-display: swap; }
-@font-face { font-family: "Source Serif 4"; src: url(../vendor/fonts/source-serif-4-latin-wght-normal.woff2) format("woff2"); font-weight: 200 900; font-style: normal; font-display: swap; }
 
 :root {
     --font: "Atkinson Hyperlegible", "Noto Sans", "Noto Sans Arabic", "Noto Naskh Arabic", "Noto Nastaliq Urdu", "Noto Sans Devanagari", "Segoe UI", system-ui, -apple-system, sans-serif;
-    --serif: "Source Serif 4", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --display: "Geist", "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --glyph: "CS Math", "KaTeX_Main", "Cambria Math", "STIX Two Math", "Latin Modern Math", Georgia, serif;
     --mono: "Atkinson Hyperlegible Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-    --bg: #f8f7ef;
-    --surface: #fffefa; --surface-solid: #fffefa; --surface-2: #f1efe3; --surface-3: #e6e3d2;
-    --border: rgba(21, 32, 59, .17); --border-strong: rgba(21, 32, 59, .4);
-    --text: #15203b; --text-2: #39445f; --text-3: #55607a;
-    --ink: #15203b; --on-ink: #fbfaf4;
-    --accent: #b3261e; --accent-soft: rgba(179, 38, 30, .09); --accent-ink: #ffffff;
-    --link: #1d4aa0;
-    --ok: #1d6b3a; --warn: #865400; --err: #a01818;
-    --grid: rgba(55, 95, 165, .13); --margin: rgba(190, 62, 62, .42);
+    --bg: #f5f6fa;
+    --surface: #ffffff; --surface-solid: #ffffff; --surface-2: #f2f3f8; --surface-3: #e7e9f1;
+    --border: rgba(16, 24, 48, .09); --border-strong: rgba(16, 24, 48, .19);
+    --text: #0b1020; --text-2: #3a4157; --text-3: #5b6277;
+    --ink: #0b1020; --on-ink: #ffffff;
+    --accent: #3352f5; --accent-2: #6a4cff; --accent-soft: rgba(51, 82, 245, .09); --accent-ink: #ffffff;
+    --hot: #e0453a;
+    --link: #2b48e0;
+    --ok: #0f7a55; --warn: #8f5600; --err: #c8281c;
+    --grid: rgba(16, 24, 48, .13); --glow: rgba(51, 82, 245, .13);
+    --glass: rgba(245, 246, 250, .78);
 
-    --r-sm: 2px; --r-md: 3px; --r-lg: 4px; --r-xl: 4px;
+    --shadow-sm: 0 1px 2px rgba(16, 24, 48, .05), 0 1px 1px rgba(16, 24, 48, .03);
+    --shadow-md: 0 1px 2px rgba(16, 24, 48, .05), 0 8px 24px -12px rgba(16, 24, 48, .14);
+    --shadow-lg: 0 2px 4px rgba(16, 24, 48, .04), 0 24px 48px -20px rgba(16, 24, 48, .24);
+    --shadow-accent: 0 1px 1px rgba(16, 24, 48, .1), 0 8px 20px -8px rgba(51, 82, 245, .55);
+    --ring: 0 0 0 4px rgba(51, 82, 245, .16);
+
+    --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-xl: 20px; --r-pill: 999px;
     --ease: cubic-bezier(.2, .8, .2, 1);
 
     /* names used by the home and classroom pages */
@@ -33,41 +44,57 @@
 }
 
 :root[data-theme="dark"], body.dark {
-    --bg: #0f1621;
-    --surface: #162030; --surface-solid: #162030; --surface-2: #1c2839; --surface-3: #263349;
-    --border: rgba(214, 224, 242, .15); --border-strong: rgba(214, 224, 242, .4);
-    --text: #e8ecf4; --text-2: #bac3d4; --text-3: #9ba6bb;
-    --ink: #e8ecf4; --on-ink: #0f1621;
-    --accent: #ff8d82; --accent-soft: rgba(255, 141, 130, .13); --accent-ink: #0f1621;
-    --link: #93b6ff;
-    --ok: #7fd09b; --warn: #e3b552; --err: #ff8d82;
-    --grid: rgba(150, 178, 230, .075); --margin: rgba(255, 141, 130, .35);
+    --bg: #080b13;
+    --surface: #0f1320; --surface-solid: #0f1320; --surface-2: #151a29; --surface-3: #1d2335;
+    --border: rgba(222, 230, 255, .08); --border-strong: rgba(222, 230, 255, .17);
+    --text: #eceff8; --text-2: #b3bacd; --text-3: #8e96ac;
+    --ink: #eceff8; --on-ink: #080b13;
+    --accent: #8d9dff; --accent-2: #b39bff; --accent-soft: rgba(141, 157, 255, .13); --accent-ink: #080b13;
+    --hot: #ff7d74;
+    --link: #a3b1ff;
+    --ok: #4fd6a3; --warn: #f3c15a; --err: #ff8a80;
+    --grid: rgba(222, 230, 255, .09); --glow: rgba(110, 130, 255, .16);
+    --glass: rgba(8, 11, 19, .72);
+
+    --shadow-sm: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow-md: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 10px 30px -14px rgba(0, 0, 0, .7);
+    --shadow-lg: 0 1px 0 rgba(255, 255, 255, .05) inset, 0 30px 60px -24px rgba(0, 0, 0, .8);
+    --shadow-accent: 0 1px 1px rgba(0, 0, 0, .3), 0 10px 26px -10px rgba(97, 117, 255, .7);
+    --ring: 0 0 0 4px rgba(141, 157, 255, .22);
     color-scheme: dark;
 }
 
-/* the page: squared paper with a margin rule on wide screens */
-body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 24px 24px; background-position: -1px -1px; }
-body::after { content: ""; position: fixed; top: 0; bottom: 0; left: var(--margin-x, 56px); width: 1px; z-index: -1; pointer-events: none; background: var(--margin); }
-@media (max-width: 760px) { body::after { display: none; } }
+/* the main action colour: a solid blue that keeps white text readable in both themes */
+:root { --btn: #3352f5; --btn-hover: #2643e3; --btn-ink: #ffffff; }
+:root[data-theme="dark"], body.dark { --btn: #4d5ff5; --btn-hover: #5b6dff; --btn-ink: #ffffff; }
+
+/* the page: a faint dot grid that fades out below the top of the screen, and a soft light behind the header */
+body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background-image: radial-gradient(circle at 1px 1px, var(--grid) 1px, transparent 1.4px); background-size: 22px 22px; -webkit-mask-image: radial-gradient(120% 80% at 50% 0%, #000 20%, transparent 75%); mask-image: radial-gradient(120% 80% at 50% 0%, #000 20%, transparent 75%); }
+body::after { content: ""; position: fixed; left: 0; right: 0; top: 0; height: 520px; z-index: -1; pointer-events: none; background: radial-gradient(60% 100% at 50% -20%, var(--glow), transparent 70%); }
 @media print { body::before, body::after { display: none; } }
 
-::selection { background: var(--accent); color: var(--accent-ink); }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); color: var(--text); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 .sr-only { position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 @media (forced-colors: active) { body::before, body::after { display: none; } }
 
+/* the logo: a rounded tile holding the integral sign */
+.mark, .brand-mark { display: inline-grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, var(--btn) 0%, #6a4cff 100%); color: #fff !important; font: 400 23px/1 var(--glyph); box-shadow: 0 1px 0 rgba(255, 255, 255, .25) inset, 0 6px 14px -6px rgba(51, 82, 245, .7); padding-bottom: 2px; }
+
 /* in-page confirm / prompt (js/dialog.js) */
-dialog.cs-dialog { margin: auto; width: min(440px, 92vw); padding: 20px 22px 18px; background: var(--surface-solid); color: var(--text); border: 1px solid var(--ink); border-radius: var(--r-lg); box-shadow: 0 18px 40px -20px rgba(15, 22, 35, .55); }
-dialog.cs-dialog::backdrop { background: rgba(15, 22, 35, .5); }
+dialog.cs-dialog { margin: auto; width: min(440px, 92vw); padding: 22px 22px 18px; background: var(--surface-solid); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--r-lg); box-shadow: var(--shadow-lg); }
+dialog.cs-dialog::backdrop { background: rgba(8, 11, 19, .45); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
 .cs-dialog p { margin: 0 0 14px; font: 400 16px/1.5 var(--font); }
 .cs-dialog input { width: 100%; margin: 0 0 14px; padding: 10px 12px; font: 400 16px var(--font); color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-md); }
 .cs-dialog-row { display: flex; justify-content: flex-end; gap: 10px; }
 .cs-dialog-row .btn { flex: 0 0 auto; min-width: 96px; }
 .cs-dialog input[type="text"] { font-family: var(--font); }
 .btn-danger { border-color: var(--err); }
-.btn.btn-danger.btn-solid, .btn.btn-danger.btn-primary { background: var(--err); border-color: var(--err); color: #fff; }
-:root[data-theme="dark"] .btn.btn-danger.btn-solid, :root[data-theme="dark"] .btn.btn-danger.btn-primary { color: #0f1621; }
+.btn.btn-danger.btn-solid, .btn.btn-danger.btn-primary { background: var(--err); border-color: var(--err); color: #fff; box-shadow: none; }
+:root[data-theme="dark"] .btn.btn-danger.btn-solid, :root[data-theme="dark"] .btn.btn-danger.btn-primary { color: #080b13; }
 
 /* The hidden attribute always wins over a component's display rule (.btn, .finish, .timer-bar…). */
 [hidden] { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; } }

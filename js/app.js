@@ -846,7 +846,7 @@
         $('themeToggle').innerHTML = icon(dark ? 'moon' : 'sun');
         $('themeToggle').setAttribute('aria-pressed', String(dark));
         document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-        document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#0f1621' : '#f8f7ef');
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#080b13' : '#f5f6fa');
         if (persistMode) { themeMode = persistMode; store.set('themeMode', persistMode); store.set('theme', dark ? 'dark' : 'light'); }
         document.querySelectorAll('#themeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.theme === themeMode)));
     }
@@ -878,7 +878,7 @@
         const act = document.querySelector('.tab.active'), ind = $('tabIndicator');
         if (!act || !ind) return;
         ind.style.width = act.offsetWidth + 'px';
-        ind.style.transform = `translateX(${act.offsetLeft - 5}px)`;
+        ind.style.transform = `translateX(${act.offsetLeft}px)`;
     }
 
     // ------------------------------------------------------------------
@@ -1374,17 +1374,17 @@
     // ------------------------------------------------------------------
     // Plotting
     // ------------------------------------------------------------------
-    const COLORS = ['#d6453d', '#3b73c9', '#2f9460', '#c18a1c', '#8b5cc0', '#7a8599'];
+    const COLORS = ['#3d5bf5', '#e5483c', '#12a37a', '#d99a14', '#8b5cf6', '#7a8599'];
 
     function plotTheme() {
         const dark = isDark();
         return {
-            family: '"Atkinson Hyperlegible", system-ui, sans-serif',
-            text: dark ? '#e8ecf4' : '#15203b',
-            grid: dark ? 'rgba(150,178,230,0.16)' : 'rgba(55,95,165,0.18)',
-            zero: dark ? 'rgba(232,236,244,0.5)' : 'rgba(21,32,59,0.5)',
+            family: '"Geist", "Atkinson Hyperlegible", system-ui, sans-serif',
+            text: dark ? '#eceff8' : '#0b1020',
+            grid: dark ? 'rgba(222,230,255,0.08)' : 'rgba(16,24,48,0.08)',
+            zero: dark ? 'rgba(236,239,248,0.45)' : 'rgba(11,16,32,0.45)',
             bg: 'rgba(0,0,0,0)',
-            scene: dark ? 'rgba(15,22,35,0.95)' : 'rgba(255,254,250,0.95)'
+            scene: dark ? 'rgba(15,19,32,0.95)' : 'rgba(255,255,255,0.95)'
         };
     }
 
@@ -1525,11 +1525,11 @@
                 }
             }
             if (spec.bars && spec.bars.length) {
-                traces.push({ type: 'bar', x: spec.bars.map(b => (b.x0 + b.x1) / 2), y: spec.bars.map(b => b.y), width: spec.bars.map(b => b.x1 - b.x0), marker: { color: 'rgba(29,74,160,.26)', line: { color: '#1d4aa0', width: 1 } }, name: 'rectangles', hovertemplate: 'f ≈ %{y:.5g}<extra></extra>' });
+                traces.push({ type: 'bar', x: spec.bars.map(b => (b.x0 + b.x1) / 2), y: spec.bars.map(b => b.y), width: spec.bars.map(b => b.x1 - b.x0), marker: { color: 'rgba(139,92,246,.22)', line: { color: '#8b5cf6', width: 1 } }, name: 'rectangles', hovertemplate: 'f ≈ %{y:.5g}<extra></extra>' });
                 spec.bars.forEach(b => allY.push(b.y));
             }
             if (spec.trap && spec.trap.length) {
-                traces.push({ type: 'scatter', mode: 'lines', x: spec.trap.map(p => p.x), y: spec.trap.map(p => p.y), fill: 'tozeroy', fillcolor: 'rgba(29,74,160,.24)', line: { color: '#1d4aa0', width: 1.5 }, name: 'trapezoids' });
+                traces.push({ type: 'scatter', mode: 'lines', x: spec.trap.map(p => p.x), y: spec.trap.map(p => p.y), fill: 'tozeroy', fillcolor: 'rgba(139,92,246,.2)', line: { color: '#8b5cf6', width: 1.5 }, name: 'trapezoids' });
             }
             if (spec.shade2) {
                 const a2 = Math.max(spec.shade2.a, lo), b2 = Math.min(spec.shade2.b, hi), m2 = 240;
