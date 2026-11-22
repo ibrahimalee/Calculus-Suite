@@ -70,7 +70,7 @@
         var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
         root.setAttribute('data-theme', next); paintGlyph();
         try { localStorage.setItem('themeMode', next); localStorage.setItem('theme', next); } catch (e) { /* storage blocked */ }
-        var m = doc.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', next === 'dark' ? '#080b13' : '#f5f6fa');
+        var m = doc.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', next === 'dark' ? '#0f1621' : '#f8f7ef');
     });
 
     /* ---------- Figure 1 ---------- */
@@ -85,11 +85,9 @@
     function el(name, attrs, parent) { var n = doc.createElementNS(NS, name); for (var k in attrs) n.setAttribute(k, attrs[k]); (parent || svg).appendChild(n); return n; }
 
     var defs = el('defs', {});
-    var grad = el('linearGradient', { id: 'areaFill', x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
-    el('stop', { offset: '0', 'class': 'stop-a' }, grad);
-    el('stop', { offset: '1', 'class': 'stop-b' }, grad);
-    var glow = el('filter', { id: 'soft', x: '-20%', y: '-20%', width: '140%', height: '140%' }, defs);
-    el('feGaussianBlur', { stdDeviation: 6 }, glow);
+    var pat = el('pattern', { id: 'hatch', width: 7, height: 7, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+    el('rect', { width: 7, height: 7, fill: 'var(--link)', 'fill-opacity': '.07' }, pat);
+    el('line', { x1: 0, y1: 0, x2: 0, y2: 7, 'class': 'hatch-line' }, pat);
     var clip = el('clipPath', { id: 'plotclip' }, defs); el('rect', { x: L, y: T, width: R - L, height: B - T }, clip);
 
     var y;
@@ -108,8 +106,6 @@
     for (i = 0; i <= N; i++) { var xx = XM * i / N; pts.push([xx, f(xx)]); }
     var area = el('path', { 'class': 'area' });
     var edge = el('path', { 'class': 'area-edge' });
-    var cd = pts.map(function (p, k) { return (k ? 'L' : 'M') + sx(p[0]).toFixed(1) + ' ' + sy(p[1]).toFixed(1); }).join('');
-    el('path', { 'class': 'curve-glow', d: cd, filter: 'url(#soft)' });
     el('path', { 'class': 'curve', d: pts.map(function (p, k) { return (k ? 'L' : 'M') + sx(p[0]).toFixed(1) + ' ' + sy(p[1]).toFixed(1); }).join('') });
     var tan = el('line', { 'class': 'tan', 'clip-path': 'url(#plotclip)' });
     var guide = el('line', { 'class': 'guide' });

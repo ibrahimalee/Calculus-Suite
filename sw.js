@@ -4,7 +4,7 @@
    - vendor/ (libraries, fonts): cache first, in a cache that survives app releases, because those files never change in place.
    - The 4.8 MB plotting library is not fetched at install time; the page asks for it once it is idle (see 'warm').
    Query strings are ignored for caching, so ?ask=… and ?tool=… links do not each add a copy. */
-const VERSION = 'cs-v34';
+const VERSION = 'cs-v33';
 const SHELL = VERSION + '-shell';
 const VENDOR = 'cs-vendor-v2';
 const NETWORK_WAIT_MS = 4000;
@@ -15,7 +15,7 @@ const CORE = ['./', 'index.html', 'app.html', 'teacher.html', 'worksheet.html',
     'icon.svg', 'manifest.webmanifest'];
 const VENDOR_CORE = ['vendor/math-15.2.0.min.js', 'vendor/algebrite.min.js', 'vendor/katex/katex.min.js', 'vendor/katex/katex.min.css', 'vendor/qrcode/qrcode.js',
     'vendor/fonts/atkinson-hyperlegible-latin-400-normal.woff2', 'vendor/fonts/atkinson-hyperlegible-latin-400-italic.woff2', 'vendor/fonts/atkinson-hyperlegible-latin-700-normal.woff2',
-    'vendor/fonts/atkinson-hyperlegible-mono-latin-400-normal.woff2', 'vendor/fonts/atkinson-hyperlegible-mono-latin-600-normal.woff2', 'vendor/fonts/geist-latin-wght-normal.woff2', 'vendor/katex/fonts/KaTeX_Main-Regular.woff2'];
+    'vendor/fonts/atkinson-hyperlegible-mono-latin-400-normal.woff2', 'vendor/fonts/atkinson-hyperlegible-mono-latin-600-normal.woff2', 'vendor/fonts/source-serif-4-latin-wght-normal.woff2'];
 const VENDOR_HEAVY = ['vendor/plotly.min.js'];
 
 const keyFor = url => { const u = new URL(url, location.href); return new Request(u.origin + u.pathname); };
