@@ -846,7 +846,7 @@
         $('themeToggle').innerHTML = icon(dark ? 'moon' : 'sun');
         $('themeToggle').setAttribute('aria-pressed', String(dark));
         document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-        document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#0f1621' : '#f8f7ef');
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#0f0f0e' : '#f3f1ec');
         if (persistMode) { themeMode = persistMode; store.set('themeMode', persistMode); store.set('theme', dark ? 'dark' : 'light'); }
         document.querySelectorAll('#themeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.theme === themeMode)));
     }
@@ -878,7 +878,7 @@
         const act = document.querySelector('.tab.active'), ind = $('tabIndicator');
         if (!act || !ind) return;
         ind.style.width = act.offsetWidth + 'px';
-        ind.style.transform = `translateX(${act.offsetLeft - 5}px)`;
+        ind.style.transform = `translateX(${act.offsetLeft}px)`;
     }
 
     // ------------------------------------------------------------------
@@ -1374,17 +1374,17 @@
     // ------------------------------------------------------------------
     // Plotting
     // ------------------------------------------------------------------
-    const COLORS = ['#d6453d', '#3b73c9', '#2f9460', '#c18a1c', '#8b5cc0', '#7a8599'];
+    const COLORS = ['#ff4f00', '#2a62c9', '#17904c', '#c99400', '#0e8f8f', '#7a7770'];
 
     function plotTheme() {
         const dark = isDark();
         return {
-            family: '"Atkinson Hyperlegible", system-ui, sans-serif',
-            text: dark ? '#e8ecf4' : '#15203b',
-            grid: dark ? 'rgba(150,178,230,0.16)' : 'rgba(55,95,165,0.18)',
-            zero: dark ? 'rgba(232,236,244,0.5)' : 'rgba(21,32,59,0.5)',
+            family: '"Archivo", "Atkinson Hyperlegible", system-ui, sans-serif',
+            text: dark ? '#f3f1ec' : '#111111',
+            grid: dark ? 'rgba(243,241,236,0.12)' : 'rgba(17,17,17,0.12)',
+            zero: dark ? 'rgba(243,241,236,0.8)' : 'rgba(17,17,17,0.8)',
             bg: 'rgba(0,0,0,0)',
-            scene: dark ? 'rgba(15,22,35,0.95)' : 'rgba(255,254,250,0.95)'
+            scene: dark ? 'rgba(22,22,20,0.95)' : 'rgba(251,250,247,0.95)'
         };
     }
 
@@ -2077,7 +2077,7 @@
         if (valid < 25) return msg('alert', 'Cannot draw this surface', 'The function is undefined on almost the whole domain.');
         const flat = [].concat(...zv).filter(z => z !== null).sort((a, b) => a - b);
         const zlo = flat[0], zhi = flat[flat.length - 1];
-        const scale = isDark() ? [[0, '#1d4ed8'], [0.5, '#a855f7'], [1, '#f472b6']] : [[0, '#0f172a'], [0.5, '#2563eb'], [1, '#60a5fa']];
+        const scale = isDark() ? [[0, '#26261f'], [0.5, '#8f8a7e'], [1, '#ff5a14']] : [[0, '#111111'], [0.55, '#9a9488'], [1, '#ff4f00']];
         const traces = [];
         if (state.view3d === 'contour') {
             traces.push({ type: 'contour', x: xv, y: yv, z: zv, colorscale: scale, contours: { showlabels: true }, line: { width: 1 } });

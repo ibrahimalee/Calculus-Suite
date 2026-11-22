@@ -84,7 +84,7 @@ function head({ title, description, canonical, extra }) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>${esc(title)}</title>
     <meta name="description" content="${esc(description)}">
-    <meta name="theme-color" content="#f8f7ef">
+    <meta name="theme-color" content="#f3f1ec">
 ${canonical ? `    <link rel="canonical" href="${esc(canonical)}">\n` : ''}    <meta property="og:type" content="website">
     <meta property="og:site_name" content="${NAME}">
     <meta property="og:title" content="${esc(title)}">

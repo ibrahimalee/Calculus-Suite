@@ -70,7 +70,7 @@
         var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
         root.setAttribute('data-theme', next); paintGlyph();
         try { localStorage.setItem('themeMode', next); localStorage.setItem('theme', next); } catch (e) { /* storage blocked */ }
-        var m = doc.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', next === 'dark' ? '#0f1621' : '#f8f7ef');
+        var m = doc.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', next === 'dark' ? '#0f0f0e' : '#f3f1ec');
     });
 
     /* ---------- Figure 1 ---------- */
