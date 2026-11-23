@@ -46,7 +46,7 @@
             <span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span>
         </a>
         <nav class="bar-nav" aria-label="Sections">
-            <a href="#checked">How it checks</a>
+            <a href="#check-work">Check my work</a>
             <a href="#tools">Tools</a>
             <a href="problems/">Problems</a>
             <a href="guides/">Guides</a>
@@ -98,6 +98,24 @@
             </figure>
         </section>
 
+        <section class="sec wrap" id="check-work" aria-labelledby="h-cw">
+            <div class="split">
+                <div>
+                    <p class="kicker"><b>01</b> Check my work</p>
+                    <h2 id="h-cw">Already did the problem? Find your mistake.</h2>
+                    <p>Type the problem and your own working, one step per line. Every step is marked right or wrong, the first mistake is pointed out, and you are told what kind it is: a flipped sign, a missing chain-rule factor, a solution lost by dividing by x. You fix it yourself, so you learn from it.</p>
+                    <p>It checks derivatives, integrals (including integration by parts), equations solved line by line, and algebra.</p>
+                    <div class="cta-row"><a class="btn btn-solid" href="app.html?tool=check">Check my work <span aria-hidden="true">→</span></a><a href="tools/check-my-math-work.html">How it works</a></div>
+                </div>
+                <figure class="cw-demo" aria-label="Example: a student's integration by parts, checked">
+                    <div class="cw-row cw-q"><span class="cw-m" aria-hidden="true"></span><span>∫ x·eˣ dx</span></div>
+                    <div class="cw-row cw-bad"><span class="cw-m">✗</span><span>= x·eˣ + ∫ eˣ dx</span></div>
+                    <div class="cw-row cw-carry"><span class="cw-m">↳</span><span>= x·eˣ + eˣ + C</span></div>
+                    <figcaption><b>Step 1 is where it goes wrong.</b> The sign in front of the remaining integral is wrong: integration by parts is ∫ u dv = u·v − ∫ v du. Step 2 follows correctly from it, so it carries the mistake.</figcaption>
+                </figure>
+            </div>
+        </section>
+
         <section class="sec wrap" id="checked" aria-labelledby="h-chk">
             <div class="split">
                 <article class="specimen" aria-label="A worked result">
@@ -112,7 +130,7 @@
                     <p class="spec-ok">✓ Checked: differentiating the result gives back x · eˣ.</p>
                 </article>
                 <div>
-                    <p class="kicker"><b>01</b> Verification</p>
+                    <p class="kicker"><b>02</b> Verification</p>
                     <h2 id="h-chk">How the answers are checked</h2>
                     <p>Each tool tests its own answer a second way and says what it did.</p>
                     <ul class="plain">
@@ -127,9 +145,9 @@
         </section>
 
         <section class="sec wrap" id="tools" aria-labelledby="h-idx">
-            <p class="kicker"><b>02</b> Index</p>
+            <p class="kicker"><b>03</b> Index</p>
             <h2 id="h-idx">Tools</h2>
-            <p class="sec-intro"><span id="toolCount">26</span> tools. Each page explains one, with worked examples. <a href="tools/">See them all</a>.</p>
+            <p class="sec-intro"><span id="toolCount">27</span> tools. Each page explains one, with worked examples. <a href="tools/">See them all</a>.</p>
             <ol class="toc" id="toc">
                 <!-- tools:start -->
                 <li><a href="tools/derivative-calculator.html"><span class="g">∂</span><span><span class="t">Derivative</span><span class="d">Type a function of x and get its derivative, the rule used at each step, and a check that the answer is right</span></span></a></li>
@@ -137,6 +155,7 @@
                 <li><a href="tools/limit-calculator.html"><span class="g">lim</span><span><span class="t">Limits</span><span class="d">Find the limit of a function as x approaches a number or infinity, from either side</span></span></a></li>
                 <li><a href="tools/taylor-series-calculator.html"><span class="g">Σ</span><span><span class="t">Taylor series</span><span class="d">Expand a function as a Taylor polynomial about any point, see the table of derivatives behind each coefficient, and compare the polynomial with the function on a plot</span></span></a></li>
                 <li><a href="tools/critical-points-calculator.html"><span class="g">f</span><span><span class="t">Analysis</span><span class="d">Everything you need to sketch a curve: roots, critical points and their type, inflection points, vertical and horizontal asymptotes, and the intervals of increase and concavity</span></span></a></li>
+                <li><a href="tools/check-my-math-work.html"><span class="g">✓</span><span><span class="t">Check my work</span><span class="d">Type the problem on the first line and your working underneath, one step per line</span></span></a></li>
                 <li><a href="tools/graphing-calculator.html"><span class="g">∿</span><span><span class="t">Graph &amp; sliders</span><span class="d">Plot one or several functions, drag sliders for any parameters, animate them, and find where curves cross</span></span></a></li>
                 <li><a href="tools/riemann-sum-calculator.html"><span class="g">Δx</span><span><span class="t">Riemann sums</span><span class="d">Approximate an integral with left, right, midpoint, trapezoid or Simpson sums, see the rectangles drawn, and watch the sums approach the exact value as n grows</span></span></a></li>
                 <li><a href="tools/volume-of-revolution-calculator.html"><span class="g">V</span><span><span class="t">Area &amp; volume</span><span class="d">Applications of integration: the area between two curves, volumes of revolution by disks, washers or shells, arc length, surface area, the average value of a function and curvature</span></span></a></li>
@@ -163,7 +182,7 @@
         </section>
 
         <section class="sec wrap notes" aria-labelledby="h-about">
-            <p class="kicker"><b>03</b> Notes</p>
+            <p class="kicker"><b>04</b> Notes</p>
             <h2 id="h-about">About</h2>
             <p>Everything runs in your browser. The maths is done in a background worker and nothing you type goes to a server. The photo-to-text feature downloads its recognition model the first time you use the “Scan a photo” button, and it reads the picture on your device. After your first visit the app is cached, so once it is installed it works offline.</p>
             <p>It can be used from the keyboard and with screen readers, and it has been checked against WCAG 2 A and AA with axe. Results can be read aloud, plots can be described in words, and answers can be exported as Nemeth Code braille.</p>

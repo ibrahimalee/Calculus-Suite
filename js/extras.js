@@ -3411,6 +3411,305 @@
     });
 
     // ======================================================================
+    // Check my working: finds the first wrong line in a student's own solution and says what kind of mistake it is
+    // ======================================================================
+    const CW_FN = 'arcsinh|arccosh|arctanh|arcsin|arccos|arctan|asinh|acosh|atanh|asin|acos|atan|sinh|cosh|tanh|sin|cos|tan|sec|csc|cot|ln|log|exp|sqrt';
+    const CW_XS = [0.37, 0.81, 1.23, 1.71, 2.29, 2.93, 3.6, -0.43, -1.17, -2.06, 0.11, 4.4, -3.3, 0.57];
+    /** Student notation into engine notation: "sin x" → sin(x), "sin^2 x" → sin(x)^2, "ln|x|" → ln(abs(x)), "e^2x" → e^(2x). */
+    function cwTidy(s) {
+        let t = String(s).trim().replace(/[−–—]/g, '-').replace(/[·⋅×]/g, '*').replace(/’/g, "'")
+            .replace(/\b(ln|log)\s*\|([^|]+)\|/g, '$1(abs($2))');
+        t = t.replace(new RegExp(`\\b(${CW_FN})\\s*\\^\\s*(\\d+)\\s*(\\((?:[^()]|\\([^()]*\\))*\\)|-?[\\d.]*[a-zA-Z](?:\\^[\\w.]+)?)`, 'g'), '$1($3)^$2');
+        for (let i = 0; i < 4; i++) {
+            const b = t;
+            t = t.replace(new RegExp(`\\b(${CW_FN})\\s+(-?\\d*\\.?\\d*[a-zA-Z]?(?:\\^[\\w.]+)?)(?![\\w(])`, 'g'), (m, f, a) => (a && a !== '-' ? `${f}(${a})` : m));
+            if (t === b) break;
+        }
+        return t.replace(/(^|[^A-Za-z])e\s*\^\s*(-?\d*\.?\d*[a-zA-Z])(?![\w(^])/g, '$1e^($2)').replace(/\(\(([^()]*)\)\)\^/g, '($1)^');
+    }
+    function cwSplitEq(s) {
+        const out = []; let d = 0, cur = '';
+        for (const ch of s) { if ('([{'.includes(ch)) d++; else if (')]}'.includes(ch)) d--; if (ch === '=' && d === 0) { out.push(cur); cur = ''; } else cur += ch; }
+        out.push(cur); return out.map(x => x.trim());
+    }
+    function cwMatch(s, open) { const pairs = { '(': ')', '[': ']' }, cl = pairs[s[open]]; let d = 0; for (let k = open; k < s.length; k++) { if (s[k] === s[open]) d++; else if (s[k] === cl && --d === 0) return k; } return -1; }
+    const cwStripOuter = s => { s = s.trim(); while (/^[([]/.test(s) && cwMatch(s, 0) === s.length - 1) s = s.slice(1, -1).trim(); return s; };
+    const cwLabel = /^\s*(?:[a-zA-Z]\s*'+\s*(?:\(\s*[a-z]\s*\))?|d\s*[a-zA-Z]\s*\/\s*d\s*[a-z]|[A-Z]\s*\(\s*[a-z]\s*\)|[a-zA-Z]\s*\(\s*[a-z]\s*\))\s*$/;
+    const cwLead = s => s.replace(/^\s*(?:=>|⇒|→|->|∴|so|then|therefore|hence)\s*/i, '');
+    /** A line's own text with any d/dx(…) worked out and any ∫ … dx replaced by a placeholder whose derivative is the integrand. */
+    function cwExpand(seg, v, ints) {
+        let s = seg, i, guard = 0;
+        const reD = new RegExp(`d\\s*/\\s*d${v}\\s*([\\(\\[])`);
+        while ((i = s.search(reD)) >= 0 && guard++ < 20) {
+            const m = reD.exec(s.slice(i)), open = i + m[0].length - 1, close = cwMatch(s, open);
+            if (close < 0) throw new CalcError(`A bracket after d/d${v} is not closed.`);
+            const inner = engine.parse(cwTidy(s.slice(open + 1, close)));
+            s = s.slice(0, i) + '(' + engine.strOf(engine.diff(inner, v)) + ')' + s.slice(close + 1);
+        }
+        guard = 0;
+        while ((i = s.search(/∫|\bint\b/)) >= 0 && guard++ < 10) {
+            const rest = s.slice(i + (s[i] === '∫' ? 1 : 3));
+            let d = 0, j = -1;
+            for (let k = 0; k < rest.length; k++) {
+                const c = rest[k];
+                if ('(['.includes(c)) d++; else if (')]'.includes(c)) d--;
+                else if (d === 0 && c === 'd' && new RegExp(`^d\\s*${v}(?![A-Za-z0-9])`).test(rest.slice(k)) && !/[A-Za-z]/.test(rest[k - 1] || ' ')) { j = k; break; }
+            }
+            if (j < 0) throw new CalcError(`Each integral sign needs a d${v} after its integrand, as in ∫ x e^x d${v}.`);
+            const body = rest.slice(0, j).trim();
+            if (!body) throw new CalcError('An integral has nothing between ∫ and d' + v + '.');
+            ints.push(engine.parse(cwTidy(body)));
+            s = s.slice(0, i) + ` Iq${ints.length - 1} ` + rest.slice(j).replace(new RegExp(`^d\\s*${v}`), '');
+        }
+        return s;
+    }
+    function cwNum(y) { return typeof y === 'number' ? y : (y && typeof y.re === 'number' && Math.abs(y.im) < 1e-12 ? y.re : NaN); }
+    function cwFn(node, vars) { const f = engine.compile(node, vars); return (...a) => { try { return cwNum(f(...a)); } catch (e) { return NaN; } }; }
+    /** One student line as a numeric function of x, and (for integrals) as the numeric derivative of that line. */
+    function cwLine(raw, v, allow) {
+        const ints = [];
+        const text = cwTidy(cwExpand(cwTidy(raw), v, ints));
+        const node = engine.parse(text);
+        const phs = ints.map((_, k) => 'Iq' + k);
+        const others = engine.freeVars(node).filter(n => n !== v && !phs.includes(n));
+        const consts = others.filter(n => allow.consts && /^[CcK]$/.test(n));
+        const stray = others.filter(n => !consts.includes(n));
+        if (stray.length) throw new CalcError(`Line "${raw}" uses ${stray.join(', ')} as well as ${v}. Write it in terms of ${v} only.`);
+        if (phs.length && !allow.ints) throw new CalcError(`An integral sign only makes sense when the first line is an integral.`);
+        const f = cwFn(node, [v].concat(phs, consts));
+        const zeros = phs.map(() => 0).concat(consts.map(() => 0));
+        const gs = ints.map(g => cwFn(g, [v]));
+        const val = x => f(x, ...zeros);
+        const derS = sgn => x => {
+            const h = 1e-5 * Math.max(1, Math.abs(x));
+            let d = (f(x + h, ...zeros) - f(x - h, ...zeros)) / (2 * h);
+            phs.forEach((p, k) => { const up = zeros.slice(), dn = zeros.slice(); up[k] = 1; dn[k] = -1; d += sgn * (f(x, ...up) - f(x, ...dn)) / 2 * gs[k](x); });
+            return d;
+        };
+        const der = derS(1), derFlip = derS(-1);
+        let tex = '';
+        try { tex = engine.texOf(node).replace(/\bIq(\d+)/g, (q, k) => `\\int ${engine.texOf(ints[+k])}\\,d${v}`); } catch (e) { tex = ''; }
+        return { raw, node, val, der, derFlip, hasC: consts.length > 0, hasInt: phs.length > 0, tex };
+    }
+    function cwCompare(fa, fb, tol) {
+        let n = 0, bad = 0;
+        for (const x of CW_XS) { const a = fa(x), b = fb(x); if (!Number.isFinite(a) || !Number.isFinite(b)) continue; n++; if (Math.abs(a - b) > tol * (1 + Math.abs(a) + Math.abs(b))) bad++; }
+        return { n, ok: n >= 4 && bad === 0, unknown: n < 4 };
+    }
+    /** What kind of mistake: a sign, a constant factor, a constant term, or something else. */
+    function cwKind(fs, fe) {
+        const pts = CW_XS.map(x => [fs(x), fe(x)]).filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
+        const close = (arr) => arr.length >= 3 && arr.every(q => Math.abs(q - arr[0]) <= 1e-6 * (1 + Math.abs(arr[0])));
+        const rs = pts.filter(([, b]) => Math.abs(b) > 1e-9).map(([a, b]) => a / b);
+        if (close(rs)) { const r = rs[0]; if (Math.abs(r + 1) < 1e-6) return { kind: 'sign' }; if (Math.abs(r) > 1e-9) return { kind: 'factor', r }; }
+        const ds = pts.map(([a, b]) => a - b);
+        if (close(ds)) return { kind: 'constant', d: ds[0] };
+        return { kind: 'other' };
+    }
+    const cwNice = x => { const f = engine.fmt(x, 6); try { const fr = math.fraction(x); if (Math.abs(Number(fr.d)) <= 48 && Math.abs(Number(fr.s) * Number(fr.n) / Number(fr.d) - x) < 1e-9) return fr.d == 1 ? String(Number(fr.s) * Number(fr.n)) : `${Number(fr.s) * Number(fr.n)}/${fr.d}`; } catch (e) { /* plain decimal */ } return f; };
+    function cwDiffText(a, b) {
+        try {
+            const d = engine.strOf(I.simplifyNode(engine.parse(`(${a}) - (${b})`)));
+            return d.length <= 70 && !/Iq\d/.test(d) ? d : '';
+        } catch (e) { return ''; }
+    }
+    function cwRoots(fn) {
+        const roots = [], A = -60, B = 60, N = 24000, h = (B - A) / N;
+        let px = A, py = fn(A), ppy = NaN;
+        const push = r => { if (Number.isFinite(r) && !roots.some(q => Math.abs(q - r) < 1e-6 * (1 + Math.abs(r)))) roots.push(Math.abs(r) < 1e-10 ? 0 : r); };
+        for (let k = 1; k <= N; k++) {
+            const x = A + k * h, y = fn(x);
+            if (Number.isFinite(py) && Number.isFinite(y)) {
+                if (py === 0) push(px);
+                else if (py * y < 0 && Math.abs(py) + Math.abs(y) < 1e6) { let a = px, b = x, fa = py; for (let it = 0; it < 80; it++) { const m = (a + b) / 2, fm = fn(m); if (fa * fm <= 0) b = m; else { a = m; fa = fm; } } push((a + b) / 2); }
+                else if (Number.isFinite(ppy) && Math.abs(py) < Math.abs(ppy) && Math.abs(py) < Math.abs(y) && Math.abs(py) < 1e-3) {
+                    let a = px - h, b = x; for (let it = 0; it < 100; it++) { const m1 = a + (b - a) / 3, m2 = b - (b - a) / 3; if (Math.abs(fn(m1)) < Math.abs(fn(m2))) b = m2; else a = m1; }
+                    const r = (a + b) / 2; if (Math.abs(fn(r)) < 1e-9) push(r);
+                }
+            }
+            ppy = py; px = x; py = y;
+        }
+        return roots.sort((p, q) => p - q);
+    }
+    function cwEquation(raw, v) {
+        const line = cwLead(raw);
+        const orForm = new RegExp(`^\\s*${v}\\s*=(.*(?:,|\\bor\\b|±|\\+-).*)$`).exec(line);
+        const sides = orForm ? [v, orForm[1]] : cwSplitEq(line);
+        if (sides.length !== 2 || !sides[0] || !sides[1]) throw new CalcError(`"${raw}" should be one equation with a single "=".`);
+        // a final answer such as  x = 2 or x = -3,  x = 2, 3  or  x = ±2
+        if (new RegExp(`^${v}$`).test(sides[0].trim()) && /,|\bor\b|±|\+-/.test(sides[1])) {
+            const parts = sides[1].split(/,|\bor\b/).map(p => p.trim().replace(new RegExp(`^${v}\\s*=`), '').trim()).filter(Boolean);
+            const vals = [];
+            parts.forEach(p => {
+                const pm = /^(.*?)(?:±|\+-)(.*)$/.exec(p);
+                const exprs = pm ? [`${pm[1] || 0}+(${pm[2]})`, `${pm[1] || 0}-(${pm[2]})`] : [p];
+                exprs.forEach(e => { const y = cwNum(engine.compile(engine.parse(cwTidy(e)), [])()); if (!Number.isFinite(y)) throw new CalcError(`Could not read the value "${p}".`); vals.push(y); });
+            });
+            return { raw, set: [...new Set(vals.map(y => +y.toPrecision(12)))].sort((p, q) => p - q), tex: '' };
+        }
+        const node = engine.parse(`(${cwTidy(sides[0])}) - (${cwTidy(sides[1])})`);
+        const stray = engine.freeVars(node).filter(n => n !== v);
+        if (stray.length) throw new CalcError(`Line "${raw}" has more than one unknown (${[v].concat(stray).join(', ')}). The checker follows equations in one unknown.`);
+        const f = cwFn(node, [v]);
+        if (CW_XS.every(x => !Number.isFinite(f(x)) || Math.abs(f(x)) < 1e-12) && CW_XS.some(x => Number.isFinite(f(x)))) return { raw, set: 'all', tex: '' };
+        let tex = ''; try { tex = engine.texOf(engine.parse(cwTidy(sides[0]))) + '=' + engine.texOf(engine.parse(cwTidy(sides[1]))); } catch (e) { tex = ''; }
+        return { raw, set: cwRoots(f), tex };
+    }
+    const cwSetText = (s, v) => s === 'all' ? `every ${v}` : s.length ? s.map(cwNice).join(', ') : 'no real solution';
+    const cwSameSet = (a, b) => (a === 'all' || b === 'all') ? a === b : a.length === b.length && a.every((x, k) => Math.abs(x - b[k]) < 1e-5 * (1 + Math.abs(x)));
+
+    function runCheckWork(src, opt) {
+        const lines = String(src || '').split(/\n+/).map(l => l.trim()).filter(Boolean);
+        if (!lines.length) throw new CalcError('Type the problem on the first line, then your working underneath, one step per line.');
+        let v = (opt.variable || '').trim() || null;
+        const first = cwLead(lines[0]);
+        const firstSegs = cwSplitEq(first), head = firstSegs[0];
+        let task = null, m;
+        const named = /^\s*(?:([a-zA-Z])\s*\(\s*([a-z])\s*\)|(y))\s*=\s*(.+)$/.exec(first);
+        if ((m = /^(?:d\s*\/\s*d([a-z])|derivative of|differentiate|diff)\s*(.+)$/i.exec(head))) task = { kind: 'derivative', body: cwStripOuter(m[2]), v: m[1] };
+        else if ((m = /^\(\s*(.+)\s*\)\s*'$/.exec(head))) task = { kind: 'derivative', body: m[1] };
+        else if ((m = /^(?:∫|integrate|integral of|int\b)\s*(.+)$/i.exec(head))) {
+            let iv = null; const body = m[1].replace(/\s*d\s*([a-z])\s*$/, (q, x) => { iv = x; return ''; });
+            task = { kind: 'integral', body: cwStripOuter(body), v: iv };
+        } else if (named && lines.slice(1).some(l => /^\s*(?:[a-zA-Z]\s*'|d\s*[a-zA-Z]\s*\/\s*d\s*[a-z])/.test(l))) task = { kind: 'derivative', body: named[4], v: named[2], labelled: true };
+        if (task && task.v && !v) v = task.v;
+
+        const r = I.makeResult('check', 'Your working, checked');
+        const mark = (ok, unknown) => unknown ? '?' : ok ? '✓' : '✗';
+        const report = [];
+        const lastL = rep => { for (let k = rep.length - 1; k >= 0; k--) if (rep[k].L) return rep[k].L; return null; };
+        let firstBad = -1, diag = null, method = '';
+
+        if (task && (task.kind === 'derivative' || task.kind === 'integral')) {
+            const bodyNode = engine.parse(cwTidy(task.body));
+            if (!v) { const fv = engine.freeVars(bodyNode); v = fv.includes('x') ? 'x' : fv[0] || 'x'; }
+            const target = cwFn(bodyNode, [v]);
+            const stepText = task.labelled ? lines.slice(1) : firstSegs.slice(1).concat(lines.slice(1));
+            const steps = stepText.map(cwLead).flatMap(cwSplitEq).filter(q => q && !cwLabel.test(q));
+            if (!steps.length) throw new CalcError('Add your working under the first line, one step per line, so there is something to check.');
+            let truth = null;
+            if (task.kind === 'derivative') {
+                truth = engine.diff(bodyNode, v); const tf = cwFn(truth, [v]);
+                method = `Each line is compared with the true derivative of ${engine.strOf(bodyNode)} at ${CW_XS.length} test points.`;
+                steps.forEach((s, k) => {
+                    let L; try { L = cwLine(s, v, { consts: false, ints: false }); } catch (e) { report.push({ s, ok: false, unknown: true, note: e.message }); return; }
+                    const c = cwCompare(L.val, tf, 1e-7), prevL = lastL(report);
+                    const follows = !c.ok && !c.unknown && !!prevL && cwCompare(L.val, prevL.val, 1e-7).ok;
+                    report.push({ s, ok: c.ok, unknown: c.unknown, follows, tex: L.tex, L });
+                    if (!c.ok && !c.unknown && !follows && firstBad < 0) { firstBad = k; diag = { L, kind: cwKind(L.val, tf), right: engine.strOf(truth) }; }
+                });
+            } else {
+                method = `Each line is differentiated (numerically, at ${CW_XS.length} test points) and compared with the integrand ${engine.strOf(bodyNode)}. A leftover ∫ … d${v} counts as the function whose derivative is its integrand, and the constant of integration can be anything.`;
+                steps.forEach((s, k) => {
+                    let L; try { L = cwLine(s, v, { consts: true, ints: true }); } catch (e) { report.push({ s, ok: false, unknown: true, note: e.message }); return; }
+                    const c = cwCompare(L.der, target, 2e-5), prevL = lastL(report);
+                    const follows = !c.ok && !c.unknown && !!prevL && cwCompare(L.der, prevL.der, 2e-5).ok;
+                    report.push({ s, ok: c.ok, unknown: c.unknown, follows, tex: L.tex, L });
+                    if (!c.ok && !c.unknown && !follows && firstBad < 0) { firstBad = k; diag = { L, kind: L.hasInt && cwCompare(L.derFlip, target, 2e-5).ok ? { kind: 'parts' } : cwKind(L.der, target) }; }
+                });
+                const last = report[report.length - 1];
+                if (firstBad < 0 && last && last.L && !last.L.hasInt && !last.L.hasC) r.warnings.push('The last line has no constant of integration. Add + C: every antiderivative differs from another by a constant.');
+            }
+            r.title = task.kind === 'derivative' ? 'Your derivative, checked' : 'Your integral, checked';
+            r.items.push({ label: 'Problem:', text: `${task.kind === 'derivative' ? 'd/d' + v + ' (' : '∫ '}${engine.strOf(bodyNode)}${task.kind === 'integral' ? ' d' + v : ')'}`, tex: task.kind === 'derivative' ? `\\frac{d}{d${v}}\\left(${engine.texOf(bodyNode)}\\right)` : `\\int ${engine.texOf(bodyNode)}\\,d${v}`, inline: true });
+            if (diag) {
+                const k = diag.kind, D = task.kind === 'derivative';
+                const why = {
+                    sign: D ? 'The line is the negative of the right answer: a sign was flipped. Common causes: d/dx cos x = −sin x, the minus in the quotient rule, or a minus outside brackets.' : 'The line differentiates to the negative of the integrand: a sign was flipped. Remember ∫ sin x dx = −cos x, and that ∫ e^(−x) dx = −e^(−x).',
+                    factor: D ? `The line is ${k.r !== undefined ? cwNice(k.r) : 'a constant'} times the right answer: a constant factor is wrong. With a composite function this usually means the chain rule's inner derivative was left out or used twice; with powers, check that the old exponent came down in front.` : `The line differentiates to ${k.r !== undefined ? cwNice(k.r) : 'a constant'} times the integrand: a coefficient is off. In the power rule divide by the new exponent; in a substitution divide by the derivative of the inside (for ∫ e^(2x) dx that is 1/2).`,
+                    constant: D ? `The line differs from the right answer by the constant ${k.d !== undefined ? cwNice(k.d) : ''}. A constant term should differentiate to 0, so look for a constant that was kept, or one that appeared from nowhere.` : 'The line differs by a constant in its derivative, so a term that should depend on x is missing a factor of x.',
+                    parts: 'The sign in front of the remaining integral is wrong. Integration by parts is ∫ u dv = u·v − ∫ v du: the leftover integral is subtracted. With that sign changed the line would be correct.',
+                    other: D ? 'The line differs from the right answer by more than a sign or a constant factor, so a whole term is wrong or missing. Compare it term by term with the product, quotient and chain rules.' : 'The line does not differentiate back to the integrand: a term is wrong or missing. Differentiate your line yourself and compare it with what is under the integral sign.'
+                }[k.kind];
+                r.steps.push({ title: `Step ${firstBad + 1} is where it goes wrong`, text: why, tex: diag.L.tex });
+                if (D) {
+                    const dt = cwDiffText(engine.strOf(diag.L.node), diag.right);
+                    if (dt && dt !== '0') r.steps.push({ title: 'What is off', text: `Your line minus the correct derivative is ${dt}.`, tex: '' });
+                    r.steps.push({ title: 'A correct version of this line', text: `${diag.right}`, tex: engine.texOf(truth) });
+                }
+            }
+        } else {
+            const isEq = /[^=<>!]=[^=]/.test(' ' + first + ' ') && cwSplitEq(first).length === 2 && cwSplitEq(first)[0] !== '' && lines.every(l => /=/.test(l));
+            if (isEq) {
+                let eqs; const probe = engine.parse(`(${cwTidy(cwSplitEq(first)[0])}) - (${cwTidy(cwSplitEq(first)[1])})`);
+                if (!v) { const fv = engine.freeVars(probe); v = fv.includes('x') ? 'x' : fv[0] || 'x'; }
+                eqs = lines.map(l => { try { return cwEquation(l, v); } catch (e) { return { raw: l, err: e.message }; } });
+                if (eqs[0].err) throw new CalcError(eqs[0].err);
+                const base = eqs[0].set;
+                method = `Each line's real solutions (searched between −60 and 60) are compared with the first equation's: a correct step never loses or gains a solution.`;
+                r.title = 'Your equation steps, checked';
+                r.items.push({ label: 'Solutions of the first line:', text: cwSetText(base, v), tex: '', inline: true });
+                eqs.slice(1).forEach((q, k) => {
+                    if (q.err) { report.push({ s: q.raw, ok: false, unknown: true, note: q.err }); return; }
+                    const ok = cwSameSet(q.set, base), prevQ = eqs[k];
+                    const follows = !ok && !!prevQ && !prevQ.err && cwSameSet(q.set, prevQ.set);
+                    report.push({ s: q.raw, ok, follows, tex: q.tex });
+                    if (!ok && !follows && firstBad < 0) {
+                        firstBad = k;
+                        const prev = k === 0 ? base : eqs[k].set || base;
+                        const lost = Array.isArray(base) && Array.isArray(q.set) ? base.filter(x => !q.set.some(y => Math.abs(x - y) < 1e-5 * (1 + Math.abs(x)))) : [];
+                        const gained = Array.isArray(base) && Array.isArray(q.set) ? q.set.filter(x => !base.some(y => Math.abs(x - y) < 1e-5 * (1 + Math.abs(x)))) : [];
+                        let text = `This line's solutions are ${cwSetText(q.set, v)}, but the equation you started from has ${cwSetText(base, v)}.`;
+                        if (lost.length && !gained.length) text += ` You lost ${lost.map(x => v + ' = ' + cwNice(x)).join(' and ')}. Dividing both sides by something that can be zero (such as ${lost[0] === 0 ? v : v + ' − ' + cwNice(lost[0])}) loses solutions; move everything to one side and factor instead.`;
+                        else if (gained.length && !lost.length) text += ` You gained ${gained.map(x => v + ' = ' + cwNice(x)).join(' and ')}. Squaring both sides or multiplying by an expression with ${v} in it can add false solutions; substitute them back into the original equation.`;
+                        else text += ' Check the arithmetic in this step: whatever is done to one side must be done to the whole of the other side.';
+                        void prev;
+                        r.steps.push({ title: `Step ${k + 1} is where it goes wrong`, text, tex: q.tex });
+                    }
+                });
+            } else {
+                const segs = lines.map(cwLead).flatMap(cwSplitEq).filter(s => s && !cwLabel.test(s));
+                if (segs.length < 2) throw new CalcError('Put the problem on the first line and each step of your working on its own line (or separate steps with =).');
+                const start = cwLine(segs[0], v || (() => { const fv = engine.freeVars(engine.parse(cwTidy(segs[0]))); return fv.includes('x') ? 'x' : fv[0] || 'x'; })(), { consts: false, ints: false });
+                if (!v) { const fv = engine.freeVars(start.node); v = fv.includes('x') ? 'x' : fv[0] || 'x'; }
+                method = `Each line is compared with the first one at ${CW_XS.length} test values of ${v}: rewriting an expression must never change its value.`;
+                r.title = 'Your simplification, checked';
+                r.items.push({ label: 'Starting expression:', text: segs[0], tex: start.tex, inline: true });
+                segs.slice(1).forEach((s, k) => {
+                    let L; try { L = cwLine(s, v, { consts: false, ints: false }); } catch (e) { report.push({ s, ok: false, unknown: true, note: e.message }); return; }
+                    const c = cwCompare(L.val, start.val, 1e-7), prevL = lastL(report);
+                    const follows = !c.ok && !c.unknown && !!prevL && cwCompare(L.val, prevL.val, 1e-7).ok;
+                    report.push({ s, ok: c.ok, unknown: c.unknown, follows, tex: L.tex, L });
+                    if (!c.ok && !c.unknown && !follows && firstBad < 0) {
+                        firstBad = k;
+                        const kd = cwKind(L.val, start.val);
+                        const prevRaw = k === 0 ? segs[0] : segs[k];
+                        const dt = cwDiffText(engine.strOf(L.node), engine.strOf(engine.parse(cwTidy(cwExpand(prevRaw, v, [])))));
+                        const why = { sign: 'This line is the negative of the one before: a sign changed. A minus in front of brackets changes the sign of every term inside.', factor: `This line is ${kd.r !== undefined ? cwNice(kd.r) : 'a constant'} times the expression you started with: a coefficient changed.`, constant: `This line differs by the constant ${kd.d !== undefined ? cwNice(kd.d) : ''}: a constant term was lost or added. When expanding (a + b)², keep the b² term.`, other: 'This line is not equal to the one before it for every value of ' + v + '. A common cause is a rule that does not exist, such as (a + b)² = a² + b² or √(a + b) = √a + √b.' }[kd.kind];
+                        r.steps.push({ title: `Step ${k + 1} is where it goes wrong`, text: why + (dt && dt !== '0' ? ` Your line minus the previous one is ${dt}.` : ''), tex: L.tex });
+                    }
+                });
+            }
+        }
+
+        report.forEach((q, k) => r.items.push({ label: `${q.follows ? '↳' : mark(q.ok, q.unknown)} Step ${k + 1}:`, text: q.note ? `${q.s}  (${q.note})` : q.follows ? `${q.s}  (follows correctly from the step above, but carries its mistake)` : q.s, tex: q.note ? '' : (q.tex || ''), inline: true }));
+        // the diagnosis belongs next to the verdict, not only on the Steps tab
+        const wrongStep = r.steps.find(q => /is where it goes wrong$/.test(q.title));
+        if (wrongStep) {
+            const off = r.steps.find(q => q.title === 'What is off');
+            r.items.splice(1, 0, { label: 'What went wrong:', text: wrongStep.text + (off ? ' ' + off.text : ''), tex: '', inline: true });
+        }
+        const checked = report.filter(q => !q.unknown).length;
+        if (!report.length) throw new CalcError('Add your working under the first line, one step per line, so there is something to check.');
+        if (firstBad >= 0) {
+            r.main = { label: 'First mistake:', text: `step ${firstBad + 1}:  ${report[firstBad].s}`, tex: report[firstBad].tex ? `\\text{First mistake, step ${firstBad + 1}:}\\quad ${report[firstBad].tex}` : '' };
+            r.badges.push({ kind: 'warn', text: `Step ${firstBad + 1} of ${report.length} is wrong` });
+            const later = report.slice(firstBad + 1).filter(q => q.ok).length;
+            if (later) r.meta.push(`${later} later step${later === 1 ? ' is' : 's are'} right again, so the slip may have been copied out and fixed.`);
+        } else if (checked === 0) {
+            r.main = { label: 'Result:', text: 'None of the steps could be checked.', tex: '' };
+        } else {
+            r.main = { label: 'Result:', text: checked === report.length ? (checked === 1 ? 'The step is correct.' : `All ${checked} steps are correct.`) : `${checked} of ${report.length} steps are correct; the others could not be read.`, tex: '' };
+            r.badges.push({ kind: 'ok', text: `Verified: every readable step agrees with the problem at ${CW_XS.length} test points` });
+        }
+        if (report.some(q => q.unknown)) r.warnings.push('Lines marked ? could not be read or could not be evaluated at enough test points. Use * for multiplication if a line is misread, and write functions with brackets, e.g. sin(2x).');
+        r.steps.push({ title: 'How this was checked', text: method + ' A numerical test like this catches every wrong step, but it cannot judge whether a correct step is the best one or whether your method would get full marks.', tex: '' });
+        r.meta.push('Method: line-by-line equivalence check');
+        return I.finalizeText(r);
+    }
+    register({ check: runCheckWork });
+
+    // ======================================================================
     // Guard: a transform or complex-plane picture of a non-finite constant (∞, 1e5000) is meaningless
     // ======================================================================
     function nonFiniteConstant(src) {

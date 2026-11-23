@@ -6,7 +6,9 @@ Open `index.html` for the home page or `app.html` for the app. Links such as `ap
 
 ## What it covers
 
-There are 26 tools, listed in `js/app.js` (`MODES`) and on the home page:
+There are 27 tools, listed in `js/app.js` (`MODES`) and on the home page:
+
+- **Check my work:** type a problem and your own working, one step per line; it finds the first wrong step and says what kind of mistake it is (a sign, a missing factor, a lost or false solution). Works for derivatives, integrals, equations and simplification.
 
 - **Calculus:** derivatives, integrals (indefinite, definite, improper), Taylor series and Padé approximants, limits, function analysis, Riemann sums, area, volume and arc length, root finding, Fourier series, multivariable and vector calculus.
 - **Differential equations:** first and second order, systems, series solutions, slope fields, phase portraits, heat and wave equations, and a lab that compares numerical methods.

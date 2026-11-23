@@ -23,6 +23,27 @@ module.exports = [
         related: ['implicit-differentiation-calculator', 'partial-derivative-calculator', 'critical-points-calculator', 'taylor-series-calculator']
     },
     {
+        slug: 'check-my-math-work', mode: 'check', primary: true,
+        title: 'Check My Math Work: Find the First Wrong Step',
+        description: 'Type a problem and your own working, one step per line. It finds the first wrong step and says what kind of mistake it is: a sign, a missing factor, a lost solution.',
+        h1: 'Check my math work',
+        lede: 'Type the problem on the first line and your working underneath, one step per line. You get every step marked right or wrong, the first mistake pointed out, and what kind of mistake it is, without being handed a whole new solution.',
+        how: [
+            'The first line says what you are doing: d/dx(…) for a derivative, ∫ … dx for an integral, an equation you are solving, or an expression you are simplifying. Each later line is one step of your own working.',
+            'Derivative steps are compared with the true derivative; integral steps are differentiated back and compared with the integrand (a leftover ∫ … dx in a by-parts step is understood); equation steps must keep exactly the same solutions; simplification steps must keep the same value.',
+            'For the first wrong step it says what went wrong: a flipped sign, a constant factor such as a forgotten chain-rule factor or a missing 1/2, a lost or added term, a solution lost by dividing by x, or a false solution gained by squaring.'
+        ],
+        check: 'Every step is tested numerically at fourteen values of x, so a wrong step cannot slip through because it happens to look similar. Steps that follow correctly from an earlier mistake are marked separately, so you see the one place where things went wrong.',
+        tips: ['Put each step on its own line, or separate steps with =.', 'Write functions with brackets when in doubt, for example sin(2x), and use * if a product is misread.', 'Finish an integral with + C; the checker reminds you if you forget.'],
+        faq: [
+            ['Does it give me the answer?', 'Only for the step that is wrong, and only on the Steps tab. The point is to find your own mistake, so it shows where and what kind, and you fix it.'],
+            ['Which kinds of problems can it check?', 'Derivatives, indefinite integrals (including integration by parts with a leftover integral), equations in one unknown solved line by line, and algebraic simplification and expansion.'],
+            ['Can teachers use it?', 'Yes. Paste a student\'s working to find the first error quickly, or use it in class to discuss common mistakes such as (a + b)² = a² + b².']
+        ],
+        examples: [['check', 0], ['check', 2], ['check', 3], ['check', 4], ['check', 5], ['check', 7]],
+        related: ['derivative-calculator', 'integral-calculator', 'equation-solver']
+    },
+    {
         slug: 'implicit-differentiation-calculator', mode: 'derivative',
         title: 'Implicit Differentiation Calculator (dy/dx)',
         description: 'Find dy/dx for an equation in x and y, such as x² + y² = 25, with the steps, the slope and tangent line at a point, second derivatives and a plot of the curve.',

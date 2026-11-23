@@ -588,6 +588,21 @@
             { label: '1 atm → psi', fn: '1 atm to psi', opts: {} }, { label: '500 kcal → kJ', fn: '500 kcal to kJ', opts: {} }
         ]
     };
+    MODES.check = {
+        label: 'Check my work', icon: '✓',
+        input: () => ({ label: 'The problem, then your working (one step per line)', placeholder: 'd/dx(x^2 sin x)\n= 2x sin x + x^2 cos x', hint: 'First line: the problem, as d/dx(…), ∫ … dx, an equation to solve, or an expression to simplify. Then every step of your working on its own line. The checker finds the first wrong step and says what kind of mistake it is.' }),
+        fields: [],
+        examples: [
+            { label: 'Derivative with a chain-rule slip', fn: 'd/dx(sin(x^2))\n= cos(x^2)', opts: {} },
+            { label: 'Product rule, done right', fn: 'd/dx(x^2 sin x)\n= 2x sin x + x^2 cos x', opts: {} },
+            { label: 'Integration by parts, sign slip', fn: '∫ x e^x dx\n= x e^x + ∫ e^x dx\n= x e^x + e^x + C', opts: {} },
+            { label: 'Integral missing a factor 1/2', fn: '∫ e^(2x) dx\n= e^(2x) + C', opts: {} },
+            { label: 'Dividing by x loses a solution', fn: 'x^2 = 5x\nx = 5', opts: {} },
+            { label: 'Squaring adds a false solution', fn: 'sqrt(x) = x - 2\nx = x^2 - 4x + 4\nx^2 - 5x + 4 = 0\nx = 1 or x = 4', opts: {} },
+            { label: 'Solving step by step, correct', fn: '3(x - 2) + 4 = 13\n3x - 6 + 4 = 13\n3x = 15\nx = 5', opts: {} },
+            { label: 'Expanding (a + b)² wrongly', fn: '(x + 3)^2 - 9\n= x^2 + 9 - 9\n= x^2', opts: {} }
+        ]
+    };
     MODES.complex = {
         label: 'Complex', icon: 'ℂ',
         input: v => ({ map: { label: 'Analytic function f(z)', placeholder: 'e.g. (z-1)/(z+1)   or   z^2   or   exp(z)', hint: 'Draws the image of a grid under w = f(z). Angles between grid lines are preserved wherever f′(z) ≠ 0 (that is what conformal means), and the tool checks this numerically.' }, mobius: { label: 'Three points  z → w  (separated by ;)', placeholder: 'e.g. 0 -> -1 ; 1 -> 0 ; inf -> 1', hint: 'Finds the unique Möbius transformation (az+b)/(cz+d) through three point pairs. Use inf for ∞ and i for the imaginary unit.' }, residue: { label: 'Rational function f(z)', placeholder: 'e.g. 1/(z^2*(z-1))', hint: 'Finds every pole with its order and residue, checked two independent ways.' }, contour: { label: 'Rational function f(z)', placeholder: 'e.g. 1/(z^2+1)', hint: 'The integral around a counter-clockwise circle is 2πi times the sum of the residues inside; checked by integrating directly.' }, realint: { label: 'Rational function f(x)', placeholder: 'e.g. 1/(x^4+1)', hint: 'Needs no poles on the real axis and degree(denominator) ≥ degree(numerator) + 2. Closes the contour in the upper half-plane.' }, domain: { label: 'f(z)', placeholder: 'e.g. (z^2-1)/(z^2+1)', hint: 'Domain colouring shows the argument of f(z) as hue; zeros and poles are marked for rational functions.' }, roots: { label: 'Polynomial p(z)', placeholder: 'e.g. z^4 - 1', hint: 'All complex roots with multiplicity, plotted in the complex plane.' }, arith: { label: 'Complex expression', placeholder: 'e.g. (3+4i)*(1-2i)/(2+i)', hint: 'Use i for the imaginary unit. Gives rectangular and polar form, roots and the Argand diagram.' } }[v.op || 'domain']),
@@ -741,14 +756,14 @@
     Object.setPrototypeOf(MODES, null);
 
     const MODE_GROUPS = [
-        ['Core calculus', ['derivative', 'integral', 'limit', 'series', 'analysis']],
+        ['Core calculus', ['derivative', 'integral', 'limit', 'series', 'analysis', 'check']],
         ['Explore & visualise', ['graph', 'riemann', 'applications', 'root', 'fourier', 'geometry']],
         ['Algebra & sums', ['calc', 'solve', 'algebra', 'sums', 'number', 'units', 'stats', 'discrete']],
         ['Advanced', ['ode', 'multivariable', 'vector', 'matrix', 'laplace', 'complex', 'numerical']]
     ];
     const MODE_ORDER = MODE_GROUPS.flatMap(g => g[1]);
     const MODE_DESC = {
-        derivative: 'Rules, steps, tangent', integral: 'Symbolic, definite, improper', limit: 'Two-sided & at ∞', series: 'Taylor / Maclaurin', analysis: 'Roots, extrema, asymptotes',
+        derivative: 'Rules, steps, tangent', check: 'Find the first wrong step', integral: 'Symbolic, definite, improper', limit: 'Two-sided & at ∞', series: 'Taylor / Maclaurin', analysis: 'Roots, extrema, asymptotes',
         graph: 'Sliders & intersections', riemann: 'Left, mid, trap, Simpson', applications: 'Area, volume, arc length', root: 'Newton, bisection, secant', fourier: 'Coefficients & Gibbs',
         calc: 'Variables, exact, ans', solve: 'Equations & inequalities', sums: 'Convergence tests', ode: 'Closed form + RK45', multivariable: '∇, Hessian, ∬, curl', matrix: 'det, inverse, eigen, SVD, LU, QR',
         laplace: 'Laplace, inverse, Fourier', vector: 'Jacobian, ∮, work, ∭', stats: 'Describe, fit, distributions', number: 'Factor, gcd, mod, CRT', units: 'Convert anything', complex: 'Domain colouring, roots', numerical: 'Splines, quadrature, errors', geometry: 'Triangles, conics, circles', discrete: 'Logic, graphs'
@@ -959,6 +974,7 @@
         state.mode = mode;
         document.querySelectorAll('.mode-btn').forEach(b => { const on = b.dataset.mode === mode; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
         renderOptions();
+        $('functionInput').rows = mode === 'check' ? 7 : 2;
         updateInputLabels();
         renderExamples();
         if (!keepInput) validateInput();
@@ -1054,7 +1070,7 @@
                 preview.innerHTML = `<span class="preview-tex plain">${esc(lines[0] || '')}</span><span class="preview-meta">${lines.length} line${lines.length === 1 ? '' : 's'}</span>`;
                 return true;
             }
-            if (['number', 'units', 'stats', 'vector'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur', 'gf', 'lp'].includes(currentValues().op)) || (state.mode === 'applications' && currentValues().op === 'curvature' && src.includes(';')) || (state.mode === 'ode' && ['linear2', 'equilibria'].includes(currentValues().odeType)) || (state.mode === 'laplace' && ['ztrans', 'iztrans', 'zdiff'].includes(currentValues().op)) || (state.mode === 'complex' && currentValues().op === 'mobius') || (state.mode === 'numerical' && ['lagrange', 'spline'].includes(currentValues().op || 'lagrange')) || state.mode === 'geometry' || state.mode === 'discrete' || (state.mode === 'laplace' && (/\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src) || /(^|[\s;)])(for|if|when|otherwise)(\s|$|(?=[-+(\d]))/i.test(src)))) {
+            if (['number', 'units', 'stats', 'vector', 'check'].includes(state.mode) || (state.mode === 'algebra' && ['gcd', 'recur', 'gf', 'lp'].includes(currentValues().op)) || (state.mode === 'applications' && currentValues().op === 'curvature' && src.includes(';')) || (state.mode === 'ode' && ['linear2', 'equilibria'].includes(currentValues().odeType)) || (state.mode === 'laplace' && ['ztrans', 'iztrans', 'zdiff'].includes(currentValues().op)) || (state.mode === 'complex' && currentValues().op === 'mobius') || (state.mode === 'numerical' && ['lagrange', 'spline'].includes(currentValues().op || 'lagrange')) || state.mode === 'geometry' || state.mode === 'discrete' || (state.mode === 'laplace' && (/\b(dirac|delta|heaviside|unitstep|step|H|u)\s*\(/.test(src) || /(^|[\s;)])(for|if|when|otherwise)(\s|$|(?=[-+(\d]))/i.test(src)))) {
                 preview.className = 'preview-box valid';
                 const n = src.split(/[\n;]+/).filter(x => x.trim()).length;
                 preview.innerHTML = `<span class="preview-tex plain">${esc(src.length > 160 ? src.slice(0, 160) + '…' : src)}</span><span class="preview-meta">${state.mode === 'stats' ? (src.split(/[\s,;]+/).filter(Boolean).length + ' values') : state.mode === 'vector' ? (n + ' component' + (n === 1 ? '' : 's')) : 'ready'}</span>`;

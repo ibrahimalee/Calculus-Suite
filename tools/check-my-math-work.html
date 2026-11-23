@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Check My Math Work: Find the First Wrong Step | Calculus Suite</title>
+    <meta name="description" content="Type a problem and your own working, one step per line. It finds the first wrong step and says what kind of mistake it is: a sign, a missing factor, a lost solution.">
+    <meta name="theme-color" content="#f3f1ec">
+    <link rel="canonical" href="https://calculus-suite.vercel.app/tools/check-my-math-work.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Calculus Suite">
+    <meta property="og:title" content="Check My Math Work: Find the First Wrong Step | Calculus Suite">
+    <meta property="og:description" content="Type a problem and your own working, one step per line. It finds the first wrong step and says what kind of mistake it is: a sign, a missing factor, a lost solution.">
+    <meta property="og:url" content="https://calculus-suite.vercel.app/tools/check-my-math-work.html">
+    <meta property="og:image" content="https://calculus-suite.vercel.app/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="../manifest.webmanifest">
+    <link rel="stylesheet" href="../vendor/katex/katex.min.css">
+    <link rel="stylesheet" href="../css/tokens.css">
+    <link rel="stylesheet" href="../css/home.css">
+    <script src="../js/theme-init.js"></script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Check my math work – Calculus Suite","description":"Type a problem and your own working, one step per line. It finds the first wrong step and says what kind of mistake it is: a sign, a missing factor, a lost solution.","applicationCategory":"EducationalApplication","operatingSystem":"Any (runs in a web browser)","browserRequirements":"Requires JavaScript","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"url":"https://calculus-suite.vercel.app/app.html?tool=check"}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does it give me the answer?","acceptedAnswer":{"@type":"Answer","text":"Only for the step that is wrong, and only on the Steps tab. The point is to find your own mistake, so it shows where and what kind, and you fix it."}},{"@type":"Question","name":"Which kinds of problems can it check?","acceptedAnswer":{"@type":"Answer","text":"Derivatives, indefinite integrals (including integration by parts with a leftover integral), equations in one unknown solved line by line, and algebraic simplification and expansion."}},{"@type":"Question","name":"Can teachers use it?","acceptedAnswer":{"@type":"Answer","text":"Yes. Paste a student's working to find the first error quickly, or use it in class to discuss common mistakes such as (a + b)² = a² + b²."}}]}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://calculus-suite.vercel.app/"},{"@type":"ListItem","position":2,"name":"Tools","item":"https://calculus-suite.vercel.app/tools/"},{"@type":"ListItem","position":3,"name":"Check my math work","item":"https://calculus-suite.vercel.app/tools/check-my-math-work.html"}]}</script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="bar">
+        <a class="wordmark" href="../" aria-label="Calculus Suite, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span></a>
+        <nav class="bar-nav" aria-label="Sections"><a href="../tools/" aria-current="page">Tools</a><a href="../problems/">Problems</a><a href="../guides/">Guides</a><a href="../teacher.html">Teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">Source</a></nav>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
+        <a class="btn btn-solid bar-cta" href="../app.html">Open the app</a>
+    </header>
+    <main id="main" class="wrap tool-page">
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="../">Home</a> <span aria-hidden="true">›</span> <a href="./">Tools</a> <span aria-hidden="true">›</span> <span aria-current="page">Check my math work</span></nav>
+        <h1>Check my math work</h1>
+        <p class="lede">Type the problem on the first line and your working underneath, one step per line. You get every step marked right or wrong, the first mistake pointed out, and what kind of mistake it is, without being handed a whole new solution.</p>
+        <p class="cta-row"><a class="btn btn-solid btn-lg" href="../app.html?tool=check">Open the check my work tool</a><span class="fine">Free, no account. Runs in your browser and works offline.</span></p>
+
+        <section class="sec" aria-labelledby="h-eg">
+            <h2 id="h-eg">Worked examples</h2>
+            <p>Each answer below was computed by the tool itself. Open one to see the steps and the plot.</p>
+            <ol class="eg-table">
+                <li><div class="eg-q"><b>Derivative with a chain-rule slip</b><code>d/dx(sin(x^2))
+= cos(x^2)</code></div><div class="eg-a"><span class="tex" tabindex="0" role="group" aria-label="Answer"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:1.2em;vertical-align:-0.35em;"></span><span class="mord text"><span class="mord">First mistake, step 1:</span></span><span class="mspace" style="margin-right:1em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mop">cos</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="minner"><span class="mopen delimcenter" style="top:0em;"><span class="delimsizing size1">(</span></span><span class="mord"><span class="mord"><span class="mord mathnormal">x</span></span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span><span class="mclose delimcenter" style="top:0em;"><span class="delimsizing size1">)</span></span></span></span></span></span></span></div><a class="eg-open" href="../app.html#s=eyJtIjoiY2hlY2siLCJmIjoiZC9keChzaW4oeF4yKSlcbj0gY29zKHheMikiLCJvIjp7fX0">Open with steps</a></li>
+                <li><div class="eg-q"><b>Integration by parts, sign slip</b><code>∫ x e^x dx
+= x e^x + ∫ e^x dx
+= x e^x + e^x + C</code></div><div class="eg-a"><span class="tex" tabindex="0" role="group" aria-label="Answer"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord text"><span class="mord">First mistake, step 1:</span></span><span class="mspace" style="margin-right:1em;"></span><span class="mord mathnormal">x</span><span class="mspace nobreak"> </span><span class="mord"><span class="mord"><span class="mord mathnormal">e</span></span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.6644em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">x</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:1.1111em;vertical-align:-0.3061em;"></span><span class="mop op-symbol small-op" style="margin-right:0.1945em;position:relative;top:-0.0006em;">∫</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">e</span></span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.6644em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">x</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal">d</span><span class="mord mathnormal">x</span></span></span></span></span></div><a class="eg-open" href="../app.html#s=eyJtIjoiY2hlY2siLCJmIjoi4oirIHggZV54IGR4XG49IHggZV54ICsg4oirIGVeeCBkeFxuPSB4IGVeeCArIGVeeCArIEMiLCJvIjp7fX0">Open with steps</a></li>
+                <li><div class="eg-q"><b>Integral missing a factor 1/2</b><code>∫ e^(2x) dx
+= e^(2x) + C</code></div><div class="eg-a"><span class="tex" tabindex="0" role="group" aria-label="Answer"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:1.0085em;vertical-align:-0.1944em;"></span><span class="mord text"><span class="mord">First mistake, step 1:</span></span><span class="mspace" style="margin-right:1em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">e</span></span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">2</span><span class="mspace nobreak mtight"><span class="mtight"> </span></span><span class="mord mathnormal mtight">x</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6833em;"></span><span class="mord mathrm">C</span></span></span></span></span></div><a class="eg-open" href="../app.html#s=eyJtIjoiY2hlY2siLCJmIjoi4oirIGVeKDJ4KSBkeFxuPSBlXigyeCkgKyBDIiwibyI6e319">Open with steps</a></li>
+                <li><div class="eg-q"><b>Dividing by x loses a solution</b><code>x^2 = 5x
+x = 5</code></div><div class="eg-a"><span class="tex" tabindex="0" role="group" aria-label="Answer"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord text"><span class="mord">First mistake, step 1:</span></span><span class="mspace" style="margin-right:1em;"></span><span class="mord mathnormal">x</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">5</span></span></span></span></span></div><a class="eg-open" href="../app.html#s=eyJtIjoiY2hlY2siLCJmIjoieF4yID0gNXhcbnggPSA1IiwibyI6e319">Open with steps</a></li>
+                <li><div class="eg-q"><b>Squaring adds a false solution</b><code>sqrt(x) = x - 2
+x = x^2 - 4x + 4
+x^2 - 5x + 4 = 0
+x = 1 or x = 4</code></div><div class="eg-a"><span class="tex" tabindex="0" role="group" aria-label="Answer"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord text"><span class="mord">First mistake, step 1:</span></span><span class="mspace" style="margin-right:1em;"></span><span class="mord mathnormal">x</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.8974em;vertical-align:-0.0833em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">x</span></span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">4</span><span class="mspace nobreak"> </span><span class="mord mathnormal">x</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">4</span></span></span></span></span></div><a class="eg-open" href="../app.html#s=eyJtIjoiY2hlY2siLCJmIjoic3FydCh4KSA9IHggLSAyXG54ID0geF4yIC0gNHggKyA0XG54XjIgLSA1eCArIDQgPSAwXG54ID0gMSBvciB4ID0gNCIsIm8iOnt9fQ">Open with steps</a></li>
+                <li><div class="eg-q"><b>Expanding (a + b)² wrongly</b><code>(x + 3)^2 - 9
+= x^2 + 9 - 9
+= x^2</code></div><div class="eg-a"><span class="tex" tabindex="0" role="group" aria-label="Answer"><span class="katex"><span class="katex-html" aria-hidden="true"><span class="katex-base"><span class="katex-strut" style="height:1.0085em;vertical-align:-0.1944em;"></span><span class="mord text"><span class="mord">First mistake, step 1:</span></span><span class="mspace" style="margin-right:1em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">x</span></span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="katex-sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">9</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="katex-base"><span class="katex-strut" style="height:0.6444em;"></span><span class="mord">9</span></span></span></span></span></div><a class="eg-open" href="../app.html#s=eyJtIjoiY2hlY2siLCJmIjoiKHggKyAzKV4yIC0gOVxuPSB4XjIgKyA5IC0gOVxuPSB4XjIiLCJvIjp7fX0">Open with steps</a></li>
+            </ol>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-how">
+            <h2 id="h-how">How it works</h2>
+            <p>The first line says what you are doing: d/dx(…) for a derivative, ∫ … dx for an integral, an equation you are solving, or an expression you are simplifying. Each later line is one step of your own working.</p>
+            <p>Derivative steps are compared with the true derivative; integral steps are differentiated back and compared with the integrand (a leftover ∫ … dx in a by-parts step is understood); equation steps must keep exactly the same solutions; simplification steps must keep the same value.</p>
+            <p>For the first wrong step it says what went wrong: a flipped sign, a constant factor such as a forgotten chain-rule factor or a missing 1/2, a lost or added term, a solution lost by dividing by x, or a false solution gained by squaring.</p>
+            <h3>How the answer is checked</h3>
+            <p>Every step is tested numerically at fourteen values of x, so a wrong step cannot slip through because it happens to look similar. Steps that follow correctly from an earlier mistake are marked separately, so you see the one place where things went wrong.</p>
+            <h3>Typing your input</h3>
+            <ul class="plain">
+                <li>First line: the problem, as d/dx(…), ∫ … dx, an equation to solve, or an expression to simplify. Then every step of your working on its own line. The checker finds the first wrong step and says what kind of mistake it is.</li>
+                <li>Put each step on its own line, or separate steps with =.</li>
+                <li>Write functions with brackets when in doubt, for example sin(2x), and use * if a product is misread.</li>
+                <li>Finish an integral with + C; the checker reminds you if you forget.</li>
+            </ul>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-faq">
+            <h2 id="h-faq">Questions</h2>
+            <h3>Does it give me the answer?</h3>
+            <p>Only for the step that is wrong, and only on the Steps tab. The point is to find your own mistake, so it shows where and what kind, and you fix it.</p>
+            <h3>Which kinds of problems can it check?</h3>
+            <p>Derivatives, indefinite integrals (including integration by parts with a leftover integral), equations in one unknown solved line by line, and algebraic simplification and expansion.</p>
+            <h3>Can teachers use it?</h3>
+            <p>Yes. Paste a student's working to find the first error quickly, or use it in class to discuss common mistakes such as (a + b)² = a² + b².</p>
+        </section>
+
+        <section class="sec" aria-labelledby="h-rel">
+            <h2 id="h-rel">Related tools</h2>
+            <ul class="rel"><li><a href="derivative-calculator.html">Derivative calculator with steps</a></li><li><a href="integral-calculator.html">Integral calculator with steps</a></li><li><a href="equation-solver.html">Equation and inequality solver</a></li><li><a href="./">All 32 tool pages</a></li></ul>
+        </section>
+    </main>
+    <footer class="foot">
+        <div class="wrap foot-in">
+            <span>Calculus Suite · MIT licence · free, no account, works offline</span>
+            <span class="foot-links"><a href="../">Home</a><a href="../tools/">All tools</a><a href="../problems/">Worked problems</a><a href="../guides/">Guides</a><a href="../app.html">App</a><a href="../teacher.html">For teachers</a><a href="https://github.com/ibrahimalee/calculus-suite" rel="noopener">GitHub</a></span>
+        </div>
+    </footer>
+    <script src="../js/home.js"></script>
+</body>
+</html>
