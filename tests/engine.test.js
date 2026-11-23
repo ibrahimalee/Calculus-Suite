@@ -609,3 +609,13 @@ test('every result carries trust badges where something was verified', () => {
     assert.ok(E.run.integral('x*e^x', {}).badges.some(b => b.kind === 'info'));
     assert.ok(E.run.matrix('1 2 ; 3 4', { op: 'inverse' }).badges.some(b => b.kind === 'ok'));
 });
+
+test('integrals with a repeated irreducible factor are found quickly and are right (they used to hang: the root finder smeared (x²+1)⁴ into eight scattered roots)', { timeout: 20000 }, () => {
+  const { createEngine } = require('../lib/index.js'); const e = createEngine();
+  for (const f of ['x^6/(x^2+1)^4', '1/(x^2+1)^3', '1/((x-1)^2*(x^2+4)^2)', 'x^4/(x-2)^5', '1/(x^2+2x+5)^3', '3*((x^3)/((x)^2+1))^2*(((3*x^2)*((x)^2+1) - (x^3)*2*(x)*1)/((x)^2+1)^2)']) {
+    const t = Date.now(), r = e.run.integral(f, {}), ms = Date.now() - t;
+    assert.ok(ms < 3000, `${f} took ${ms} ms`);
+    assert.ok(!/No closed form/i.test(r.main.text), f + ' should have a closed form');
+    assert.ok(r.meta.some(m => /Verified/.test(m)), f + ' should be verified by differentiating');
+  }
+});

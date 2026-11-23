@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Accuracy: how often the answers are right</title>
+    <meta name="description" content="We tested 918 calculus and algebra problems against independent ground truth and published every number, including the failures. Rerun it yourself.">
+    <meta name="theme-color" content="#f3f1ec">
+    <link rel="canonical" href="https://calculus-suite.vercel.app/accuracy.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Calculus Suite">
+    <meta property="og:title" content="Accuracy: how often the answers are right">
+    <meta property="og:description" content="We tested 918 calculus and algebra problems against independent ground truth and published every number, including the failures. Rerun it yourself.">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/home.css">
+    <script src="js/theme-init.js"></script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="bar">
+        <a class="wordmark" href="./" aria-label="Calculus Suite, home"><span class="mark" aria-hidden="true">∫</span><span class="wm-name">Calculus Suite</span></a>
+        <nav class="bar-nav" aria-label="Sections"><a href="tools/">Tools</a><a href="problems/">Problems</a><a href="guides/">Guides</a><a href="teacher.html">Teachers</a><a href="accuracy.html" aria-current="page">Accuracy</a></nav>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch colour theme"><span id="themeGlyph" aria-hidden="true">◐</span></button>
+        <a class="btn btn-solid bar-cta" href="app.html">Open the app</a>
+    </header>
+    <main id="main" class="wrap tool-page">
+        <p class="crumbs"><a href="./">Home</a> › Accuracy</p>
+        <h1>How often is it right?</h1>
+        <p class="lede">Of 918 problems, <b>903 were answered correctly</b>, <b>15 were declined</b> with an explanation, and <b>none were answered wrongly</b>. Every number on this page is produced by a script anyone can run, against answers the engine did not supply.</p>
+
+        <section class="sec" aria-labelledby="h-res">
+            <p class="kicker"><b>01</b> Results</p>
+            <h2 id="h-res">The numbers</h2>
+            <div class="tbl-scroll" tabindex="0" role="region" aria-label="Results table, scrollable"><table class="acc">
+                <thead><tr><th scope="col">Kind of problem</th><th scope="col">Problems</th><th scope="col">Right</th><th scope="col">Declined</th><th scope="col">Wrong</th><th scope="col">Unread</th></tr></thead>
+                <tbody><tr><th scope="row">Derivatives</th><td>300</td><td>300</td><td>0</td><td>0</td><td>0</td></tr><tr><th scope="row">Indefinite integrals</th><td>150</td><td>135</td><td>15</td><td>0</td><td>0</td></tr><tr><th scope="row">Definite integrals</th><td>120</td><td>120</td><td>0</td><td>0</td><td>0</td></tr><tr><th scope="row">Limits</th><td>28</td><td>28</td><td>0</td><td>0</td><td>0</td></tr><tr><th scope="row">Equations</th><td>100</td><td>100</td><td>0</td><td>0</td><td>0</td></tr><tr><th scope="row">Matrices</th><td>160</td><td>160</td><td>0</td><td>0</td><td>0</td></tr><tr><th scope="row">Taylor series</th><td>60</td><td>60</td><td>0</td><td>0</td><td>0</td></tr><tr class="tot"><th scope="row">All</th><td>918</td><td>903</td><td>15</td><td>0</td><td>0</td></tr></tbody>
+            </table></div>
+            <p><b>Declined</b> means the tool said it could not do it (for example “no closed form found”), which is the honest answer, so it is not counted as wrong. <b>Unread</b> means the test script could not read the tool’s output, so the problem is not scored either way.</p>
+            <h3>What it declined</h3>
+            <p>These are some of the 15 integrals it said it could not do. Each has an elementary answer (it is a derivative of a known function), so they are gaps to close, not impossible problems:</p>
+            <ul class="plain"><li><code>(2*(x^2)*(2*x^1)/((x^2)^2+1))*(exp((x^2)/4)) + (ln((x^2)^2+1))*(exp((x^2)/4)*((2*x^1)/4))</code></li><li><code>(1 + 1)*(exp((x^2)/4)) + (x + x)*(exp((x^2)/4)*((2*x^1)/4))</code></li><li><code>(2*(3*x)*(3)/((3*x)^2+1))*(sin(2*x)) + (ln((3*x)^2+1))*(cos(2*x)*(2))</code></li><li><code>(-sin(x^4)*(4*x^3)) + (((3*x^2)*((5*x)^2+1) - (x^3)*2*(5*x)*(5))/((5*x)^2+1)^2)</code></li><li><code>(((3*x^2)*((2*x)^2+1) - (x^3)*2*(2*x)*(2))/((2*x)^2+1)^2) + ((x)*1/sqrt((x)^2+1))</code></li><li><code>((3)*(5*x) + (3*x)*(5)) - (-sin(x^4)*(4*x^3))</code></li></ul>
+
+            <p>There were no wrong answers in this run.</p>
+        </section>
+
+        <section class="sec" aria-labelledby="h-cw">
+            <p class="kicker"><b>02</b> Check my work</p>
+            <h2 id="h-cw">Does it catch real mistakes, and leave correct work alone?</h2>
+            <p><a href="tools/check-my-math-work.html">Check my work</a> was given 880 correct solutions, written in several equivalent ways, and 1140 solutions with one planted mistake. It accepted <b>880 of 880</b> correct solutions and caught <b>1140 of 1140</b> planted mistakes.</p>
+            <div class="tbl-scroll" tabindex="0" role="region" aria-label="Results table, scrollable"><table class="acc">
+                <thead><tr><th scope="col">Planted mistake</th><th scope="col">Tried</th><th scope="col">Caught</th><th scope="col">Rate</th></tr></thead>
+                <tbody><tr><th scope="row">A flipped sign</th><td>196</td><td>196</td><td>100%</td></tr><tr><th scope="row">A wrong constant factor</th><td>196</td><td>196</td><td>100%</td></tr><tr><th scope="row">A stray constant added</th><td>196</td><td>196</td><td>100%</td></tr><tr><th scope="row">The derivative of a different function</th><td>196</td><td>196</td><td>100%</td></tr><tr><th scope="row">The function itself, not its derivative</th><td>196</td><td>196</td><td>100%</td></tr><tr><th scope="row">A solution lost in an equation</th><td>80</td><td>80</td><td>100%</td></tr><tr><th scope="row">A wrong root in an equation</th><td>80</td><td>80</td><td>100%</td></tr></tbody>
+            </table></div>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-ocr">
+            <p class="kicker"><b>03</b> Photos</p>
+            <h2 id="h-ocr">Reading working from a photo</h2>
+            <p>The “Scan a photo” button reads printed or typed maths on your device and puts the text in the box for you to check. We measured how well it does on eight short worked solutions: <b>92.8%</b> of characters correct in clean print, <b>86.8%</b> in a slanted serif font and <b>72.4%</b> in a handwriting-like style, with <b>3</b>, <b>2</b> and <b>0</b> of 8 solutions read perfectly. Even clean print can lose an exponent or a minus sign, and a misread character would look like a mistake in your working. So the app does not claim to read handwriting, it always shows you the text to correct before it is used, and it says so in the scan window. The test is <code>scripts/ocr-benchmark.js</code> in the repository.</p>
+        </section>
+
+        <section class="sec notes" aria-labelledby="h-how">
+            <p class="kicker"><b>04</b> Method</p>
+            <h2 id="h-how">How it is tested</h2>
+            <p>The problems are generated from a fixed random seed (20261123), so every run uses the same ones. The right answers never come from the engine being tested: the test script has its own differentiator, its own numerical integrator, known textbook limits, roots built from chosen integers, and matrix products to check inverses.</p>
+            <ul class="plain"><li><b>Derivatives.</b> Random compositions of sin, cos, exp, ln, √, arctan, powers, sums, products and quotients. Each answer is compared with an independent numerical derivative at 7 points.</li><li><b>Indefinite integrals.</b> Integrands that are known to have elementary antiderivatives (they are derivatives of random functions). Each answer is differentiated numerically and compared with the integrand.</li><li><b>Definite integrals.</b> Random functions on random finite intervals. Each value is compared with an independent 1,280-point Gauss–Legendre quadrature.</li><li><b>Limits.</b> Classic limits with values known from textbooks, including one-sided limits and limits at infinity.</li><li><b>Equations.</b> Polynomials built from chosen integer roots (the answer must be exactly those roots), and equations with mixed trigonometric and polynomial terms (the answer must match an independent sign-change scan on [−10, 10]).</li><li><b>Matrices.</b> Random integer matrices. Determinants are compared with an independent computation; inverses must multiply back to the identity; singular matrices must be reported as singular.</li><li><b>Taylor series.</b> Random functions expanded about 0 to order 5. The polynomial must agree with the function at x = 0.02, where the first dropped term is far below the tolerance.</li></ul>
+            <h3>What this does not show</h3>
+            <p>It does not prove the tool is right on every input. The problems are random compositions of standard functions and classic textbook cases, not a sample of everything students meet, and a numerical check can in principle miss an answer that is wrong only at a point or two. Treat it as strong evidence, not a guarantee, and report anything you find: <a href="https://github.com/ibrahimalee/calculus-suite/issues" rel="noopener">open an issue</a> with the input.</p>
+            <h3>Run it yourself</h3>
+            <pre class="cmd" tabindex="0" aria-label="Commands to run the benchmark">git clone https://github.com/ibrahimalee/calculus-suite
+cd calculus-suite
+npm install
+npm run benchmark</pre>
+            <p class="fine">Last run: 2026-11-23. The raw results are in <a href="accuracy-results.json">accuracy-results.json</a>.</p>
+        </section>
+    </main>
+    <footer class="foot">
+        <div class="wrap foot-in">
+            <span>Calculus Suite · MIT licence · free, no account, works offline</span>
+            <span class="foot-links"><a href="./">Home</a><a href="tools/">All tools</a><a href="problems/">Worked problems</a><a href="guides/">Guides</a><a href="app.html">App</a><a href="teacher.html">For teachers</a></span>
+        </div>
+    </footer>
+    <script src="js/home.js"></script>
+</body>
+</html>

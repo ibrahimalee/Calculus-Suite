@@ -445,3 +445,7 @@ html[dir="rtl"] :is(p, li, td, th, dd, dt, summary, label, .hint, .badge, .alert
 @media (max-width: 359px) { .brand-name { display: none; } }
 /* the answer box is paper-white now, so its scroll shading must fade into that */
 .result-content, .result-main { --cover: var(--surface-solid); }
+/* "Practise similar problems" after a checked mistake */
+.cw-next { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid var(--ink); }
+.cw-next span { font-size: 14px; color: var(--text-2); max-width: 52ch; }
+.lang-feedback { display: inline-block; margin-top: 8px; font-size: 13.5px; }

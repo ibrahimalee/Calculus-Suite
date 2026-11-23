@@ -3,7 +3,7 @@
 const { chromium } = require('playwright'); const fs = require('fs'), path = require('path');
 const BASE = process.env.BASE_ROOT || process.env.BASE || 'http://localhost:8099';
 const axeSrc = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
-const PAGES = ['index.html', 'app.html', 'teacher.html', 'worksheet.html', 'tools/', 'tools/derivative-calculator.html', 'problems/', 'guides/', '404.html'];
+const PAGES = ['index.html', 'app.html', 'teacher.html', 'worksheet.html', 'tools/', 'tools/derivative-calculator.html', 'problems/', 'guides/', 'accuracy.html', 'tools/check-my-math-work.html', '404.html'];
 (async () => {
     const b = await chromium.launch(); let bad = 0;
     for (const scheme of ['light', 'dark']) for (const [w, h] of [[1280, 900], [390, 844]]) {

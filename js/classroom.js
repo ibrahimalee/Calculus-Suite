@@ -197,6 +197,44 @@
             }
         } catch (e) { return { ok: false, note: e.message || 'unreadable' }; }
     }
+    // ---------- what kind of mistake: a sign, a factor, a stray constant, lost or extra solutions ----------
+    const KIND_LABEL = { sign: 'A sign is flipped', factor: 'A constant factor is wrong', constant: 'A stray constant, or one missing', missing: 'Solutions are missing', extra: 'An extra wrong solution', size: 'Wrong size', unreadable: 'Could not be read', other: 'Something else is wrong' };
+    const KIND_TIP = {
+        sign: 'Look for a minus lost when differentiating or integrating (d/dx cos x = −sin x, ∫ sin x dx = −cos x) or a minus in front of brackets.',
+        factor: 'Look for a missing or doubled chain-rule factor, or a coefficient forgotten when integrating (∫ e^(2x) dx needs the 1/2).',
+        constant: 'Look for a constant that was kept after differentiating, or one that appeared from nowhere. Remind students that a constant differentiates to 0.',
+        missing: 'Look for division by something that can be zero (such as x), which loses solutions. Factor instead of dividing.',
+        extra: 'Look for squaring both sides, which can add false solutions. Substitute every answer back into the original equation.',
+        size: 'Look for the wrong number of rows or columns.',
+        unreadable: 'Students may be using notation the checker cannot read. Show them the format on the question.',
+        other: 'Not a simple slip: a term is wrong or missing. Worth going through on the board.'
+    };
+    /** Classify pairs of (student value, correct value) as a sign, a constant factor, a constant offset, or something else. */
+    function classifyPairs(pairs) {
+        const ps = pairs.filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b)); if (ps.length < 3) return 'other';
+        const flat = arr => arr.every(q => Math.abs(q - arr[0]) <= 1e-6 * (1 + Math.abs(arr[0])));
+        const rs = ps.filter(([, b]) => Math.abs(b) > 1e-9).map(([a, b]) => a / b);
+        if (rs.length >= 3 && flat(rs)) { const r = rs[0]; if (Math.abs(r + 1) < 1e-6) return 'sign'; if (Math.abs(r) > 1e-9 && Math.abs(r - 1) > 1e-6) return 'factor'; }
+        if (flat(ps.map(([a, b]) => a - b))) return 'constant';
+        return 'other';
+    }
+    function diagnose(q, answer) {
+        const raw = clip(answer, LIMITS.answer).trim(); if (!raw) return null;
+        try {
+            if (q.type === 'number') { const v = numeric(raw), k = numeric(q.key); if (near(v, -k, q.tol) && k !== 0) return 'sign'; if (k !== 0 && v !== 0) { const r = v / k; if (Math.abs(r - Math.round(r)) < 1e-6 * Math.abs(r) && Math.abs(Math.round(r)) >= 2 || Math.abs(1 / r - Math.round(1 / r)) < 1e-6 / Math.abs(r) && Math.abs(Math.round(1 / r)) >= 2) return 'factor'; } return 'other'; }
+            if (q.type === 'list') { const a = numList(raw), k = numList(q.key), inK = v => k.some(kv => near(v, kv, q.tol)), inA = v => a.some(av => near(v, av, q.tol)); if (a.length === k.length && a.every(av => k.some(kv => near(av, -kv, q.tol))) && a.some(av => !inK(av))) return 'sign'; if (a.length < k.length && a.every(inK)) return 'missing'; if (a.length > k.length && k.every(inA)) return 'extra'; return 'other'; }
+            if (q.type === 'matrix') { const a = parseMatrix(raw), k = parseMatrix(q.key); if (a.length !== k.length || a[0].length !== k[0].length) return 'size'; if (a.every((r, i) => r.every((v, j) => near(v, -k[i][j], q.tol))) ) return 'sign'; return 'other'; }
+            if (q.type === 'expr') {
+                const strip = x => (q.plusC ? String(x).replace(/\s*[+-]\s*C\s*$/i, '') : String(x)); const a = safeParse(strip(raw)), k = safeParse(strip(q.key));
+                const names = [...new Set(a.vars.concat(k.vars))]; const scopes = sampleScopes(names, 30);
+                if (!q.plusC) return classifyPairs(scopes.map(sc => [evalAt(a, sc), evalAt(k, sc)]));
+                if (names.length !== 1) return 'other';   // integrals: compare the derivatives of the two answers
+                const v = names[0], d = (p, sc) => { const x = sc[v], h = 1e-5 * Math.max(1, Math.abs(x)); return (evalAt(p, Object.assign({}, sc, { [v]: x + h })) - evalAt(p, Object.assign({}, sc, { [v]: x - h }))) / (2 * h); };
+                const kind = classifyPairs(scopes.map(sc => [d(a, sc), d(k, sc)])); return kind === 'constant' ? 'other' : kind;
+            }
+        } catch (e) { return 'unreadable'; }
+        return null;
+    }
     /** Is this answer at least well-formed? (used for a live hint on the student page) */
     function readable(q, answer) {
         const raw = clip(answer, LIMITS.answer).trim(); if (!raw) return { ok: true };
@@ -229,7 +267,8 @@
         const per = qs.map((q, i) => {
             const r = check(q, sub.a[i]); let pts = r.ok ? q.points : (ws.partial && r.frac > 0 ? Math.round(r.frac * q.points * 100) / 100 : 0); const auto = pts; let over = false, comment = '';
             const o = ov && ov[nk + '|' + i]; if (o && Number.isFinite(+o.pts)) { pts = Math.max(0, Math.min(q.points, Math.round(+o.pts * 100) / 100)); over = true; comment = clip(o.note, 200); }
-            return { ok: pts >= q.points, note: r.note, pts, auto, over, comment, partial: pts > 0 && pts < q.points, max: q.points, answer: sub.a[i] || '', shown: q.type === 'choice' && sub.a[i] !== undefined && sub.a[i] !== '' ? (q.options[+sub.a[i]] || sub.a[i]) : (sub.a[i] || ''), prompt: q.prompt, expect: q.type === 'choice' ? (q.options[+q.key] || '') : q.key };
+            const kind = !r.ok && !over && String(sub.a[i] || '').trim() && q.type !== 'choice' && q.type !== 'text' ? diagnose(q, sub.a[i]) : null;
+            return { ok: pts >= q.points, kind, note: r.note, pts, auto, over, comment, partial: pts > 0 && pts < q.points, max: q.points, answer: sub.a[i] || '', shown: q.type === 'choice' && sub.a[i] !== undefined && sub.a[i] !== '' ? (q.options[+sub.a[i]] || sub.a[i]) : (sub.a[i] || ''), prompt: q.prompt, expect: q.type === 'choice' ? (q.options[+q.key] || '') : q.key };
         });
         return { name: sub.n, time: sub.t, seed, used: sub.d === undefined ? null : sub.d, over: !!sub.o, per, score: Math.round(per.reduce((a, p) => a + p.pts, 0) * 100) / 100, max: ws.questions.reduce((a, q) => a + q.points, 0) };
     }
@@ -241,7 +280,9 @@
         const common = ws.questions.map((q, i) => { if (rnd) return []; const m = new Map(); rows.forEach(r => { const p = r.per[i]; if (p.ok || !String(p.answer).trim()) return; const k = String(p.answer).trim().toLowerCase().replace(/\s+/g, ' '); const e = m.get(k) || { raw: String(p.answer).trim(), count: 0 }; e.count++; m.set(k, e); }); return [...m.values()].filter(e => e.count >= 2).sort((a, b) => b.count - a.count).slice(0, 3).map(e => ({ answer: q.type === 'choice' ? `${String.fromCharCode(65 + (+e.raw || 0))}. ${(q.options || [])[+e.raw] || e.raw}` : e.raw, count: e.count })); });
         const pct = rows.map(r => (r.max ? r.score / r.max : 0)).sort((a, b) => a - b); const mean = n ? pct.reduce((a, b) => a + b, 0) / n : 0, median = n ? (pct[Math.floor((n - 1) / 2)] + pct[Math.ceil((n - 1) / 2)]) / 2 : 0;
         const bins = [0, 0, 0, 0, 0]; pct.forEach(v => { bins[Math.min(4, Math.floor(v * 5))]++; });
-        return { rows, skipped, perQuestion: perQ, blank, common, bins, mean, median, count: n };
+        const tally = rs => { const m = new Map(); rs.forEach(k => { if (k) m.set(k, (m.get(k) || 0) + 1); }); return [...m].map(([kind, count]) => ({ kind, count, label: KIND_LABEL[kind] })).sort((x, y) => y.count - x.count); };
+        const mistakes = ws.questions.map((q, i) => tally(rows.map(r => r.per[i].kind))), mistakeTotals = tally(rows.flatMap(r => r.per.map(p => p.kind)));
+        return { rows, skipped, perQuestion: perQ, blank, common, bins, mean, median, count: n, mistakes, mistakeTotals };
     }
     // ---------- roster, review sets, shared questions ----------
     function lev(a, b) { if (Math.abs(a.length - b.length) > 3) return 9; const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }
@@ -289,5 +330,5 @@
         }
         return out;
     }
-    return { TYPES, TYPE_LABEL, LIMITS, showKey, uid, normalise, encodeStudent, decodeStudent, check, readable, makeSubmission, parseSubmission, parseMany, grade, gradeAll, toTSV, toGradeFile, toCSV, fromPractice, safeParse, parseVars, fill, instantiate, instantiateQuestion, isRandomised, variantSeed, normName, matchRoster, reviewQuestions, qKey, encodeQuestions, decodeQuestions, _fnv: fnv };
+    return { TYPES, TYPE_LABEL, LIMITS, KIND_LABEL, KIND_TIP, diagnose, showKey, uid, normalise, encodeStudent, decodeStudent, check, readable, makeSubmission, parseSubmission, parseMany, grade, gradeAll, toTSV, toGradeFile, toCSV, fromPractice, safeParse, parseVars, fill, instantiate, instantiateQuestion, isRandomised, variantSeed, normName, matchRoster, reviewQuestions, qKey, encodeQuestions, decodeQuestions, _fnv: fnv };
 });

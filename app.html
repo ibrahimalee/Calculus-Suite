@@ -52,6 +52,7 @@
                 <div class="seg" id="themeSeg"><button type="button" data-theme="light">Light</button><button type="button" data-theme="dark">Dark</button><button type="button" data-theme="auto">Auto</button></div>
                 <h4>Language</h4>
                 <select id="langSelect" aria-label="Language"></select>
+                <a class="lang-feedback" id="langFeedback" href="https://github.com/ibrahimalee/calculus-suite/issues/new?template=translation.md&amp;title=Translation%3A+" target="_blank" rel="noopener" hidden>Is a translation wrong? Tell us</a>
                 <h4>Learning</h4>
                 <label class="toggle-row"><input type="checkbox" id="teachToggle"> <span>Teaching mode – hide answers and steps until I ask</span></label>
                 <p class="density-note">Your choices are remembered on this device. Plots follow the theme automatically.</p>
@@ -254,7 +255,7 @@
     <dialog id="scanDialog" aria-labelledby="scanTitle">
         <div class="sheet scan-sheet">
             <div class="sheet-head"><h2 id="scanTitle">Scan an expression</h2><button class="icon-btn square" id="scanClose" type="button" aria-label="Close"><span data-icon="x"></span></button></div>
-            <p class="scan-help">Photograph or upload <b>printed or typed</b> maths on a plain background. Recognition runs on your device and the picture is never uploaded. The recogniser (about 11&nbsp;MB) downloads only the first time you use this.</p>
+            <p class="scan-help">Photograph or upload <b>printed or typed</b> maths on a plain background. Recognition runs on your device and the picture is never uploaded. The recogniser (about 11&nbsp;MB) downloads only the first time you use this. <b>Handwriting is often misread</b> (in our test, about a quarter of characters), so always read every line before using the text: a misread exponent or minus sign would look like a mistake in your working.</p>
             <div class="scan-actions">
                 <label class="btn btn-primary scan-pick"><span>Take photo or choose image</span><input id="scanFile" type="file" accept="image/*" capture="environment" hidden></label>
             </div>

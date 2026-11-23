@@ -88,6 +88,7 @@
     }
     function set(l) {
         if (!LANGS.some(x => x[0] === l)) l = 'en'; lang = l; if (l !== 'en') loadTools(); const meta = LANGS.find(x => x[0] === l);
+        { const fb = document.getElementById('langFeedback'); if (fb) { fb.hidden = l === 'en'; fb.href = 'https://github.com/ibrahimalee/calculus-suite/issues/new?template=translation.md&title=' + encodeURIComponent('Translation: ' + meta[1]); } }
         document.documentElement.lang = l; document.documentElement.dir = meta[2]; document.body.classList.toggle('rtl', meta[2] === 'rtl'); store.set(l); apply(document.body, l);
     }
     function init() {

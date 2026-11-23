@@ -148,8 +148,16 @@
         const box = $('analysis'), body = $('analysisBody'); body.textContent = ''; if (!res.count) { box.hidden = true; return; } box.hidden = false;
         const labels = ['0–19%', '20–39%', '40–59%', '60–79%', '80–100%'], top = Math.max(1, ...res.bins);
         body.appendChild(h('div', { class: 'hbars', role: 'img', 'aria-label': 'Score distribution: ' + labels.map((l, i) => `${l}: ${res.bins[i]} student${res.bins[i] === 1 ? '' : 's'}`).join(', ') }, labels.map((l, i) => h('div', { class: 'hbar' }, h('span', { text: l }), h('i', { style: `width:${Math.round(100 * res.bins[i] / top)}%` }), h('b', { text: String(res.bins[i]) })))));
-        const t = h('table', { class: 'grades qa' }, h('thead', null, h('tr', null, ['Question', 'Credit', 'Blank', 'Common wrong answers'].map(x => h('th', { scope: 'col', text: x })))));
-        const tb = h('tbody'); ws.questions.forEach((q, i) => tb.appendChild(h('tr', null, h('td', { text: `Q${i + 1} · ${q.prompt.replace(/\s+/g, ' ').slice(0, 60)}` }), h('td', { text: Math.round(res.perQuestion[i] * 100) + '%' }), h('td', { text: String(res.blank[i]) }), h('td', { text: res.common[i].length ? res.common[i].map(c => `${c.answer} (×${c.count})`).join('; ') : (C.isRandomised(ws) ? 'varies by student' : '–') })))); t.appendChild(tb); body.appendChild(h('div', { class: 'tbl-wrap', tabindex: 0, role: 'region', 'aria-label': 'Question analysis table' }, t));
+        if (res.mistakeTotals && res.mistakeTotals.length) {
+            const mt = res.mistakeTotals, mtop = Math.max(1, mt[0].count);
+            body.appendChild(h('h4', { class: 'mistake-h', text: 'Most common mistakes across the class' }));
+            body.appendChild(h('ol', { class: 'mistakes' }, mt.slice(0, 4).map(m => h('li', null,
+                h('div', { class: 'mk-top' }, h('b', { text: m.label }), h('span', { text: `${m.count} answer${m.count === 1 ? '' : 's'}` })),
+                h('div', { class: 'mk-bar', 'aria-hidden': 'true' }, h('i', { style: `width:${Math.round(100 * m.count / mtop)}%` })),
+                h('p', { text: C.KIND_TIP[m.kind] || '' })))));
+        }
+        const t = h('table', { class: 'grades qa' }, h('thead', null, h('tr', null, ['Question', 'Credit', 'Blank', 'What went wrong', 'Common wrong answers'].map(x => h('th', { scope: 'col', text: x })))));
+        const tb = h('tbody'); ws.questions.forEach((q, i) => tb.appendChild(h('tr', null, h('td', { text: `Q${i + 1} · ${q.prompt.replace(/\s+/g, ' ').slice(0, 60)}` }), h('td', { text: Math.round(res.perQuestion[i] * 100) + '%' }), h('td', { text: String(res.blank[i]) }), h('td', { text: res.mistakes && res.mistakes[i].length ? res.mistakes[i].map(m => `${m.label} (×${m.count})`).join('; ') : '–' }), h('td', { text: res.common[i].length ? res.common[i].map(c => `${c.answer} (×${c.count})`).join('; ') : (C.isRandomised(ws) ? 'varies by student' : '–') })))); t.appendChild(tb); body.appendChild(h('div', { class: 'tbl-wrap', tabindex: 0, role: 'region', 'aria-label': 'Question analysis table' }, t));
     }
     function renderGrades() {
         const s = gradeSheet(), tbl = $('grades'); tbl.textContent = ''; $('stats').textContent = ''; $('skipNote').textContent = ''; $('analysis').hidden = true; $('reviewNote').textContent = '';

@@ -50,7 +50,7 @@ BASE=http://localhost:8080 npm run e2e    # browser tests under the real CSP, in
 
 ## Limits
 
-Symbolic integration is not complete: `e^(x²)` has no elementary antiderivative, and the app says so. Limits, roots and extrema are numerical, not proofs. Closed-form ODE solutions cover linear and separable first-order equations and constant-coefficient second-order ones; everything else is numerical. The Fourier transform is refused for functions that don't decay. The translations have not been reviewed by native speakers (`npm run i18n:export` writes `translations-review.csv` for reviewers), and the plain-English parser only understands English. Braille is an automatic transcription and should be checked by a transcriber before it is used for exams. Scanning reads printed text only and often misreads exponents, so it always shows the text for correction first.
+Symbolic integration is not complete: `e^(x²)` has no elementary antiderivative, and the app says so. Limits, roots and extrema are numerical, not proofs. Closed-form ODE solutions cover linear and separable first-order equations and constant-coefficient second-order ones; everything else is numerical. The Fourier transform is refused for functions that don't decay. The translations have not been reviewed by native speakers (`npm run i18n:export` writes `translations-review.csv` for reviewers; see [TRANSLATING.md](TRANSLATING.md) if you can help), and the plain-English parser only understands English. Braille is an automatic transcription and should be checked by a transcriber before it is used for exams. Scanning reads printed text only and often misreads exponents, so it always shows the text for correction first.
 
 ## Licence
 

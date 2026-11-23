@@ -210,3 +210,24 @@ test('a worksheet link that inflates to megabytes (a decompression bomb) is refu
   const link = 'z' + z.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   await assert.rejects(() => C.decodeStudent(link), /far larger than any real worksheet/);
 });
+
+test('wrong answers are classified: sign, factor, stray constant, lost and extra solutions, wrong size', () => {
+  const w = ws(), dg = (i, a) => C.diagnose(w.questions[i], a);
+  assert.equal(dg(0, '-9'), 'sign'); assert.equal(dg(0, '18'), 'factor'); assert.equal(dg(0, '4.5'), 'factor'); assert.equal(dg(0, '7'), 'other');
+  assert.equal(dg(1, '-(2*x*sin(x)+x^2*cos(x))'), 'sign'); assert.equal(dg(1, '2*(2*x*sin(x)+x^2*cos(x))'), 'factor');
+  assert.equal(dg(1, '2*x*sin(x)+x^2*cos(x)+1'), 'constant'); assert.equal(dg(1, '2*x*sin(x)'), 'other');
+  assert.equal(dg(2, '-x^2 + C'), 'sign'); assert.equal(dg(2, '2*x^2 + C'), 'factor'); assert.equal(dg(2, 'x^3 + C'), 'other');
+  assert.equal(dg(5, '2'), 'missing'); assert.equal(dg(5, '2, 3, 4'), 'extra'); assert.equal(dg(5, '-2, -3'), 'sign');
+  assert.equal(dg(6, '1 0'), 'size'); assert.equal(dg(1, '2*x*sin('), 'unreadable'); assert.equal(dg(1, ''), null);
+});
+test('the gradebook totals the kinds of mistake per question and for the class', () => {
+  const w = ws(), mk = (n, a) => C.parseSubmission(C.makeSubmission(w, n, a)).sub;
+  const right = ['9', '2*x*sin(x)+x^2*cos(x)', 'x^2+C', '1', 'MVT', '2, 3', '1 0 ; 0 0.5', '2^3*3^2*5'];
+  const subs = [mk('A', right.slice()), mk('B', ['-9', '-(2*x*sin(x)+x^2*cos(x))', ...right.slice(2)]), mk('C', ['18', '2*x*sin(x)', ...right.slice(2, 5), '2', ...right.slice(6)]), mk('D', ['-9', '2*x*sin(x)+x^2*cos(x)', ...right.slice(2, 5), '2', ...right.slice(6)])];
+  const res = C.gradeAll(w, subs);
+  assert.deepEqual(res.mistakes[0].map(m => [m.kind, m.count]).sort(), [['factor', 1], ['sign', 2]]);
+  assert.deepEqual(res.mistakes[5].map(m => [m.kind, m.count]), [['missing', 2]]);
+  const top = res.mistakeTotals[0]; assert.equal(top.kind, 'sign'); assert.equal(top.count, 3); assert.equal(top.label, C.KIND_LABEL.sign);
+  assert.ok(Object.keys(C.KIND_LABEL).every(k => C.KIND_TIP[k]));
+  assert.equal(res.rows.find(r => r.name === 'A').per.every(p => p.kind === null), true);
+});

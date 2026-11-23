@@ -1210,6 +1210,7 @@
                             <button class="mini-btn" data-act="copytex" title="Copy LaTeX">Copy LaTeX</button>
                             <button class="mini-btn" data-act="embed" title="Copy an embed code for a web page or LMS">Embed code</button>
                             ${'speechSynthesis' in window ? `<button class="mini-btn" data-act="listen" title="Read the result aloud">Read aloud</button>` : ''}
+                            <button class="mini-btn" data-act="card" title="Save the result as a picture you can post or send">Save as image</button>
                             <button class="mini-btn" data-act="braille" title="Braille (Nemeth Code) output">Braille</button>
                             <button class="mini-btn" data-act="export" title="Download a Markdown report">Download Markdown</button>
                         </div></details>
@@ -1217,6 +1218,7 @@
                 </div>
                 ${r.main ? `<div class="result-content">${r.main.tex ? '' : `<span class="row-label">${esc(r.main.label)}</span> `}${texSpan(r.main.tex, r.main.text, true)}</div>` : ''}
                 ${rows ? `<div class="result-rows">${rows}</div>` : ''}
+                ${r.practice && r.practice.topic ? `<div class="cw-next"><button class="btn" type="button" data-act="practice" data-topic="${esc(r.practice.topic)}">Practise similar problems <span aria-hidden="true">→</span></button><span>Fresh ones on the same topic, with hints, so you can try the same idea again.</span></div>` : ''}
                 ${(r.badges && r.badges.length) ? `<div class="badges">${r.badges.map(b => `<span class="badge ${esc(b.kind)}">${esc(b.text)}</span>`).join('')}</div>` : ''}
                 ${checkBox(r)}
                 ${metaRest(r).length ? `<div class="result-meta">${metaRest(r).map(m => esc(m)).join('<br>')}</div>` : ''}
@@ -1234,7 +1236,9 @@
         container.querySelector('[data-act="print"]').addEventListener('click', printResult);
         container.querySelector('[data-act="embed"]').addEventListener('click', embedCode);
         container.querySelector('[data-act="braille"]').addEventListener('click', () => openBraille(r));
+        container.querySelector('[data-act="card"]').addEventListener('click', () => resultCard(r));
         const lb = container.querySelector('[data-act="listen"]'); if (lb) lb.addEventListener('click', () => speakResult(r));
+        const pb = container.querySelector('[data-act="practice"]'); if (pb) pb.addEventListener('click', () => { if (window.__practice) window.__practice.open(pb.dataset.topic, 2); });
         const more = container.querySelector('.more-menu');
         if (more) {
             more.querySelectorAll('.more-list button').forEach(b => b.addEventListener('click', () => { more.open = false; }));
@@ -1325,7 +1329,49 @@
     }
     function shareLink() {
         const url = location.href.split('#')[0] + '#s=' + encodeHash(snapshot());
+        if (navigator.share && window.matchMedia && matchMedia('(pointer: coarse)').matches) {
+            navigator.share({ title: 'Calculus Suite: ' + ((state.result && state.result.title) || 'a calculation'), text: state.result && state.result.main ? `${state.result.main.label} ${state.result.main.text}` : '', url }).catch(e => { if (e && e.name !== 'AbortError') copyText(url, 'Link copied – anyone opening it sees this calculation'); });
+            return;
+        }
         copyText(url, 'Link copied – anyone opening it sees this calculation');
+    }
+
+    /** A 1200×630 picture of the result (problem, answer, how it was checked) to post or send. Drawn on a canvas, so nothing leaves the device. */
+    async function resultCard(r) {
+        const W = 1200, H = 630, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+        try { await Promise.all([document.fonts.load('800 56px Archivo'), document.fonts.load('600 24px Archivo'), document.fonts.load('400 30px "Atkinson Hyperlegible Mono"'), document.fonts.load('400 40px "CS Math"')]); } catch (e) { /* fall back to system fonts */ }
+        const ink = '#111111', paper = '#f3f1ec', orange = '#ff4f00', mono = '"Atkinson Hyperlegible Mono", ui-monospace, Menlo, Consolas, monospace', disp = 'Archivo, "Helvetica Neue", Arial, sans-serif';
+        const clean = t => String(t == null ? '' : t).replace(/\s*\n\s*/g, '   ').replace(/\s+/g, ' ').trim();
+        const wrap = (text, font, maxW, maxLines) => { g.font = font; const words = text.split(' '), lines = []; let cur = ''; for (const w of words) { const t = cur ? cur + ' ' + w : w; if (g.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; } if (cur) lines.push(cur); if (lines.length > maxLines) { lines.length = maxLines; lines[maxLines - 1] = lines[maxLines - 1].replace(/.{0,2}$/, '…'); } return lines; };
+        g.fillStyle = paper; g.fillRect(0, 0, W, H);
+        g.fillStyle = ink; g.fillRect(0, 0, W, 6);
+        // brand
+        g.fillStyle = orange; g.fillRect(60, 40, 44, 44); g.fillStyle = ink; g.font = '400 32px "CS Math", Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('∫', 82, 62); g.textAlign = 'left';
+        g.font = `800 28px ${disp}`; g.fillText('Calculus Suite', 120, 63);
+        g.textBaseline = 'alphabetic';
+        // title and the problem
+        let y = 150; g.fillStyle = '#c43c00'; g.font = `700 20px ${disp}`; g.fillText(String(r.title || '').toUpperCase().split('').join(String.fromCharCode(8202)), 60, y);
+        const first = clean((($('functionInput') && $('functionInput').value) || '').split('\n')[0]);
+        y += 46; g.fillStyle = '#34322e'; wrap(first, `400 30px ${mono}`, W - 120, 2).forEach(l => { g.font = `400 30px ${mono}`; g.fillText(l, 60, y); y += 40; });
+        // the answer, with a bar down its side that is as tall as the answer
+        y += 14; const pretty = t => t.replace(/\s\*\s/g, ' · ').replace(/\^2\b/g, '²').replace(/\^3\b/g, '³');
+        const ans = pretty(clean(r.main ? `${r.main.label} ${r.main.text}` : r.title));
+        let size = 64, lines; for (; size >= 28; size -= 4) { lines = wrap(ans, `800 ${size}px ${disp}`, W - 190, 3); if (lines.length <= 2 || size <= 32) break; }
+        lines = lines.slice(0, 3); const top = y - 4; g.font = `800 ${size}px ${disp}`; g.fillStyle = ink; lines.forEach((l, i) => g.fillText(l, 96, y + size * 0.85 + i * (size + 8)));
+        const bottom = y + size * 0.85 + (lines.length - 1) * (size + 8) + 16; g.fillStyle = orange; g.fillRect(60, top, 12, bottom - top); y = bottom + 34;
+        // what went wrong, or what was checked
+        const why = (r.items || []).find(i => i.label === 'What went wrong:');
+        if (why && y < H - 120) { g.fillStyle = '#34322e'; wrap(clean(why.text), `400 26px ${disp}`, W - 120, 3).forEach(l => { g.font = `400 26px ${disp}`; g.fillText(l, 60, y); y += 36; }); y += 8; }
+        const note = (r.badges || []).find(b => b.kind === 'ok') || (r.badges || [])[0];
+        if (note && y < H - 100) { g.fillStyle = note.kind === 'ok' ? '#146b3a' : '#34322e'; wrap((note.kind === 'ok' ? '✓ ' : '') + clean(note.text), `600 24px ${disp}`, W - 120, 2).forEach(l => { g.font = `600 24px ${disp}`; g.fillText(l, 60, y); y += 32; }); }
+        // footer
+        g.fillStyle = ink; g.fillRect(0, H - 64, W, 64); g.fillStyle = paper; g.font = `600 24px ${disp}`; g.fillText('Free · no account · every answer checked', 60, H - 24); g.textAlign = 'right'; g.fillStyle = orange; g.fillText(location.host || 'calculus-suite', W - 60, H - 24); g.textAlign = 'left';
+        cv.toBlob(async blob => {
+            if (!blob) { toast('Could not make the picture', 'err'); return; }
+            const file = new File([blob], 'calculus-suite-result.png', { type: 'image/png' });
+            if (navigator.canShare && navigator.canShare({ files: [file] }) && matchMedia('(pointer: coarse)').matches) { try { await navigator.share({ files: [file], title: 'Calculus Suite' }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast('Picture saved');
+        }, 'image/png');
     }
 
     function getHistory() { try { const h = JSON.parse(localStorage.getItem('cs_history') || '[]'); return Array.isArray(h) ? h.filter(x => x && typeof x === 'object') : []; } catch (e) { return []; } }
@@ -2284,7 +2330,7 @@
         ctx.putImageData(d, 0, 0);
     }
     function cleanOCR(t) {
-        return String(t).replace(/™/g, '^').replace(/\bOto\b/g, '0 to').replace(/(\d)[Oo](?=\s|$|\d|\))/g, '$10').replace(/\bX\b/g, 'x').replace(/[×✕✖·•∙]/g, '*').replace(/÷/g, '/').replace(/[−–—‒]/g, '-').replace(/[“”"‘’`´]/g, '').replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim();
+        return String(t).replace(/™/g, '^').replace(/([A-Za-z)\]])\s?["”](?=\d)/g, '$1^').replace(/\bOto\b/g, '0 to').replace(/(\d)[Oo](?=\s|$|\d|\))/g, '$10').replace(/\bX\b/g, 'x').replace(/[×✕✖·•∙]/g, '*').replace(/÷/g, '/').replace(/[−–—‒]/g, '-').replace(/[“”"‘’`´]/g, '').replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim();
     }
     function initScan() {
         const dlg = $('scanDialog'); if (!dlg || !$('scanBtn')) return;
@@ -2371,6 +2417,13 @@
             return steps.length;
         }
         $('practiceBtn').addEventListener('click', async () => { try { await Runner.ensureFull(); } catch (e) { toast('Practice needs the full engine, which did not load. Check your connection and try again.', 'err'); return; } if (!cur) next(true); if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); $('pracAnswer').focus(); });
+        // lets other parts of the page (for example "Check my work") open practice on a chosen topic
+        window.__practice = { open: async (topic, level) => {
+            try { await Runner.ensureFull(); } catch (e) { toast('Practice needs the full engine, which did not load. Check your connection and try again.', 'err'); return; }
+            if (!P.TOPICS.some(t => t[0] === topic)) topic = 'derivative';
+            $('pracTopic').value = topic; $('pracLevel').value = String(level || 2); next(false);
+            if (dlg.showModal) { if (!dlg.open) dlg.showModal(); } else dlg.setAttribute('open', ''); $('pracAnswer').focus();
+        } };
         $('practiceClose').addEventListener('click', () => dlg.close());
         $('pracNew').addEventListener('click', () => next(false));
         $('pracDaily').addEventListener('click', () => { const now = new Date(), n = dayNumber(now); next(true, { topic: P.TOPICS[n % P.TOPICS.length][0], level: 2, seed: n }); });

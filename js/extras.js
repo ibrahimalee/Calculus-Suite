@@ -3577,6 +3577,7 @@
         const r = I.makeResult('check', 'Your working, checked');
         const mark = (ok, unknown) => unknown ? '?' : ok ? '✓' : '✗';
         const report = [];
+        let practiceTopic = 'derivative';
         const lastL = rep => { for (let k = rep.length - 1; k >= 0; k--) if (rep[k].L) return rep[k].L; return null; };
         let firstBad = -1, diag = null, method = '';
 
@@ -3610,6 +3611,7 @@
                 const last = report[report.length - 1];
                 if (firstBad < 0 && last && last.L && !last.L.hasInt && !last.L.hasC) r.warnings.push('The last line has no constant of integration. Add + C: every antiderivative differs from another by a constant.');
             }
+            practiceTopic = task.kind === 'derivative' ? 'derivative' : 'integral';
             r.title = task.kind === 'derivative' ? 'Your derivative, checked' : 'Your integral, checked';
             r.items.push({ label: 'Problem:', text: `${task.kind === 'derivative' ? 'd/d' + v + ' (' : '∫ '}${engine.strOf(bodyNode)}${task.kind === 'integral' ? ' d' + v : ')'}`, tex: task.kind === 'derivative' ? `\\frac{d}{d${v}}\\left(${engine.texOf(bodyNode)}\\right)` : `\\int ${engine.texOf(bodyNode)}\\,d${v}`, inline: true });
             if (diag) {
@@ -3637,6 +3639,7 @@
                 if (eqs[0].err) throw new CalcError(eqs[0].err);
                 const base = eqs[0].set;
                 method = `Each line's real solutions (searched between −60 and 60) are compared with the first equation's: a correct step never loses or gains a solution.`;
+                practiceTopic = 'equation';
                 r.title = 'Your equation steps, checked';
                 r.items.push({ label: 'Solutions of the first line:', text: cwSetText(base, v), tex: '', inline: true });
                 eqs.slice(1).forEach((q, k) => {
@@ -3663,6 +3666,7 @@
                 const start = cwLine(segs[0], v || (() => { const fv = engine.freeVars(engine.parse(cwTidy(segs[0]))); return fv.includes('x') ? 'x' : fv[0] || 'x'; })(), { consts: false, ints: false });
                 if (!v) { const fv = engine.freeVars(start.node); v = fv.includes('x') ? 'x' : fv[0] || 'x'; }
                 method = `Each line is compared with the first one at ${CW_XS.length} test values of ${v}: rewriting an expression must never change its value.`;
+                practiceTopic = null;   // there is no algebra drill to offer
                 r.title = 'Your simplification, checked';
                 r.items.push({ label: 'Starting expression:', text: segs[0], tex: start.tex, inline: true });
                 segs.slice(1).forEach((s, k) => {
@@ -3692,6 +3696,7 @@
         const checked = report.filter(q => !q.unknown).length;
         if (!report.length) throw new CalcError('Add your working under the first line, one step per line, so there is something to check.');
         if (firstBad >= 0) {
+            if (practiceTopic) r.practice = { topic: practiceTopic };
             r.main = { label: 'First mistake:', text: `step ${firstBad + 1}:  ${report[firstBad].s}`, tex: report[firstBad].tex ? `\\text{First mistake, step ${firstBad + 1}:}\\quad ${report[firstBad].tex}` : '' };
             r.badges.push({ kind: 'warn', text: `Step ${firstBad + 1} of ${report.length} is wrong` });
             const later = report.slice(firstBad + 1).filter(q => q.ok).length;

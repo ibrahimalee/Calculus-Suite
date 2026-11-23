@@ -609,11 +609,17 @@
     const CHECK_POINTS = [-3.3, -2.1, -1.3, -0.7, -0.35, 0.35, 0.55, 0.9, 1.4, 2.2, 3.1, 4.6];
 
     /** Verify d/dv F == f numerically on sample points. */
+    /** numDeriv, but NaN where the function oscillates too fast for it to be trusted: the same stencil at half the step must agree. */
+    function numDerivSteady(f, x) {
+        const h = 1e-4 * Math.max(1, Math.abs(x)), st = k => (-f(x + 2 * k) + 8 * f(x + k) - 8 * f(x - k) + f(x - 2 * k)) / (12 * k);
+        const a = st(h), b = st(h / 2);
+        return Math.abs(a - b) <= 2e-7 * (1 + Math.abs(b)) ? b : NaN;
+    }
     function checkAntiderivative(F, f, v) {
         const fF = compile(F, [v]), ff = compile(f, [v]);
         let good = 0, bad = 0;
         for (const x of CHECK_POINTS) {
-            const a = numDeriv(fF, x), b = ff(x);
+            const a = numDerivSteady(fF, x), b = ff(x);
             if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(b) > 1e5) continue;
             if (Math.abs(a - b) <= 1e-5 * Math.max(1, Math.abs(b))) good++; else bad++;
         }
@@ -656,16 +662,22 @@
             let dg;
             try { dg = diff(g, v); } catch (e) { continue; }
             if (dg.type === 'ConstantNode' && dg.value === 0) continue;
-            const ratio = simplifyNode(OP('/', 'divide', [node, new math.ParenthesisNode(dg)]));
             const gf = compile(g, [v]), probe = [0.37, 0.91, 1.43, 2.17], gvals = probe.map(gf);
             const same = n => { if (n.type === 'SymbolNode' || n.type === 'ConstantNode' || !dependsOn(n, v)) return false; const nf = compile(n, [v]); return probe.every((x, i) => { const y = nf(x); return Number.isFinite(y) && Number.isFinite(gvals[i]) && Math.abs(y - gvals[i]) <= 1e-9 * Math.max(1, Math.abs(y)); }); };
-            const replaced = ratio.transform(n => (same(n) ? S('u') : n));
-            if (dependsOn(replaced, v)) continue;
-            const G = integrateBasic(replaced, 'u');
-            if (!G) continue;
-            const back = substitute(G, { u: g });
-            if (!checkAntiderivative(back, node, v)) continue;
-            return { F: back, u: g, du: dg, inner: replaced, G };
+            // The simplifier does not cancel a factor against its negative ((2x − 1) against (1 − 2x)), so the quotient by du/dx is also
+            // tried with the opposite sign: dividing by −dg and putting the minus into the integrand.
+            for (const sgn of [1, -1]) {
+                const dgs = sgn === 1 ? dg : OP('-', 'unaryMinus', [new math.ParenthesisNode(dg)]);
+                const ratio = simplifyNode(OP('/', 'divide', [node, new math.ParenthesisNode(dgs)]));
+                const replaced = ratio.transform(n => (same(n) ? S('u') : n));
+                if (dependsOn(replaced, v)) continue;
+                const inner = sgn === 1 ? replaced : OP('-', 'unaryMinus', [new math.ParenthesisNode(replaced)]);
+                const G = integrateBasic(inner, 'u');
+                if (!G) continue;
+                const back = substitute(G, { u: g });
+                if (!checkAntiderivative(back, node, v)) continue;
+                return { F: back, u: g, du: dg, inner, G };
+            }
         }
         return null;
     }
@@ -1035,7 +1047,9 @@
         const lc = Q0[Q0.length - 1];
         const Qm = polyScale(Q0, 1 / lc);               // monic denominator
         const R = polyScale(rem, 1 / lc);               // remainder / lc over monic Q
-        const roots = polyRoots(Qm);
+        // roots with their multiplicities found exactly (by gcds), so a repeated factor such as (x²+1)⁴ is not smeared into
+        // eight nearby simple roots by the numerical solver; each root is repeated `mult` times and merges exactly below
+        const roots = polyRootsMult(Qm).flatMap(z => Array.from({ length: z.mult || 1 }, () => ({ re: z.re, im: z.im })));
         // group roots
         const groups = []; // {kind:'real', r, m} | {kind:'quad', a, b, m}
         const used = new Array(roots.length).fill(false);

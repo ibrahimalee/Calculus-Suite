@@ -140,3 +140,14 @@ details#analysis > summary { cursor: pointer; font: 700 13px var(--display); let
 .row > .field { min-width: 0; max-width: 100%; }
 .row > .field select { width: 100%; text-overflow: ellipsis; }
 .err:empty { min-height: 0; margin: 0; }
+
+/* class mistake report */
+.mistake-h { margin: 22px 0 8px; font: 700 12px var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+ol.mistakes { list-style: none; margin: 0 0 18px; padding: 0; border-top: var(--rule) solid var(--ink); }
+ol.mistakes li { padding: 12px 0; border-bottom: 1px solid var(--ink); }
+.mk-top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.mk-top b { font: 800 17px var(--display); letter-spacing: -.02em; }
+.mk-top span { font: 600 13px var(--display); color: var(--text-2); }
+.mk-bar { height: 8px; margin: 6px 0 8px; background: var(--surface-3); }
+.mk-bar i { display: block; height: 100%; background: var(--signal); }
+ol.mistakes p { margin: 0; max-width: 70ch; font-size: 15px; color: var(--text-2); }

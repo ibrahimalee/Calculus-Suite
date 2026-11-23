@@ -1,0 +1,81 @@
+{
+  "generated": "2026-11-23",
+  "seed": 20261123,
+  "totals": {
+    "total": 918,
+    "right": 903,
+    "declined": 15,
+    "wrong": 0,
+    "unread": 0
+  },
+  "categories": [
+    {
+      "name": "Derivatives",
+      "total": 300,
+      "right": 300,
+      "declined": 0,
+      "wrong": 0,
+      "unread": 0
+    },
+    {
+      "name": "Indefinite integrals",
+      "total": 150,
+      "right": 135,
+      "declined": 15,
+      "wrong": 0,
+      "unread": 0
+    },
+    {
+      "name": "Definite integrals",
+      "total": 120,
+      "right": 120,
+      "declined": 0,
+      "wrong": 0,
+      "unread": 0
+    },
+    {
+      "name": "Limits",
+      "total": 28,
+      "right": 28,
+      "declined": 0,
+      "wrong": 0,
+      "unread": 0
+    },
+    {
+      "name": "Equations",
+      "total": 100,
+      "right": 100,
+      "declined": 0,
+      "wrong": 0,
+      "unread": 0
+    },
+    {
+      "name": "Matrices",
+      "total": 160,
+      "right": 160,
+      "declined": 0,
+      "wrong": 0,
+      "unread": 0
+    },
+    {
+      "name": "Taylor series",
+      "total": 60,
+      "right": 60,
+      "declined": 0,
+      "wrong": 0,
+      "unread": 0
+    }
+  ],
+  "checkMyWork": {
+    "correctAccepted": "880/880",
+    "planted": {
+      "a flipped sign": "196/196",
+      "a wrong constant factor": "196/196",
+      "a stray constant added": "196/196",
+      "the derivative of a different function": "196/196",
+      "the function itself, not its derivative": "196/196",
+      "a solution lost in an equation": "80/80",
+      "a wrong root in an equation": "80/80"
+    }
+  }
+}

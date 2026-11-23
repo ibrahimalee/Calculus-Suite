@@ -408,7 +408,7 @@ GUIDES.forEach(g => outputs.push([`guides/${g.slug}.html`, guidePage(g)]));
 outputs.push(['guides/index.html', guidesHub()]);
 outputs.push(['problems/index.html', problemsHub(PROBLEMS.problems)]);
 outputs.push(['tools/index.html', hubPage()]);
-const urls = ['', 'app.html', 'teacher.html', 'tools/', ...PAGES.map(p => `tools/${p.slug}.html`), 'problems/', ...PROBLEMS.problems.map(p => `problems/${p.slug}.html`), 'guides/', ...GUIDES.map(g => `guides/${g.slug}.html`)];
+const urls = ['', 'app.html', 'teacher.html', 'accuracy.html', 'tools/', ...PAGES.map(p => `tools/${p.slug}.html`), 'problems/', ...PROBLEMS.problems.map(p => `problems/${p.slug}.html`), 'guides/', ...GUIDES.map(g => `guides/${g.slug}.html`)];
 outputs.push(['robots.txt', `User-agent: *\nAllow: /\nDisallow: /worksheet.html\n${SITE ? `\nSitemap: ${abs('sitemap.xml')}\n` : ''}`]);
 if (SITE) outputs.push(['sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(u => `  <url><loc>${esc(abs(u))}</loc></url>`).join('\n')}\n</urlset>\n`]);
 
